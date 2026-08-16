@@ -250,32 +250,34 @@ private fun StatusCard(
     }
 
     if (working) {
-        // 工作中：左边正方形卡片 + 右边两个框上下堆叠
+        // 工作中：左卡片（fillMaxHeight，和右边两框一样高）+ 右边两个框上下堆叠
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(IntrinsicSize.Min),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            // 左边：正方形"工作中"状态卡片
+            // 左边："工作中"状态卡片（fillMaxHeight，高度跟随右边两框总和）
             Card(
                 modifier = Modifier
                     .weight(1f)
-                    .aspectRatio(1f),
+                    .fillMaxHeight(),
                 colors = CardDefaults.defaultColors(color = workingBgColor),
                 onClick = actions.onInstallClick,
                 showIndication = true,
                 pressFeedbackType = PressFeedbackType.Tilt
             ) {
                 Box(modifier = Modifier.fillMaxSize()) {
+                    // 右下角大勾图标（原版 KSU v3.1.0 偏移：38.dp, 45.dp，尺寸 170.dp）
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
-                            .offset(10.dp, 12.dp),
+                            .offset(38.dp, 45.dp),
                         contentAlignment = Alignment.BottomEnd
                     ) {
                         Icon(
-                            modifier = Modifier.size(48.dp),
+                            modifier = Modifier.size(170.dp),
                             imageVector = Icons.Rounded.CheckCircleOutline,
                             tint = if (isDynamicColor) {
                                 colorScheme.primary.copy(alpha = 0.8f)
@@ -285,99 +287,108 @@ private fun StatusCard(
                             contentDescription = null
                         )
                     }
-                    if (grantLabel.isNotEmpty()) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(12.dp, 8.dp),
-                            contentAlignment = Alignment.BottomStart,
-                        ) {
-                            Text(
-                                text = grantLabel,
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Medium,
-                            )
-                        }
-                    }
-                    Box(
+                    // 左上角：标题 + 版本信息
+                    Column(
                         modifier = Modifier
                             .fillMaxSize()
-                            .padding(12.dp, 10.dp),
-                        contentAlignment = Alignment.TopStart,
+                            .padding(all = 16.dp)
                     ) {
-                        Column {
-                            Text(
-                                text = stringResource(id = R.string.permission_working),
-                                fontSize = 18.sp,
-                                fontWeight = FontWeight.SemiBold,
-                            )
-                            Spacer(Modifier.height(2.dp))
-                            Text(
-                                text = stringResource(R.string.permission_working_summary),
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Medium,
-                            )
-                        }
+                        Text(
+                            modifier = Modifier.fillMaxWidth(),
+                            text = if (grantLabel.isNotEmpty()) {
+                                stringResource(id = R.string.permission_working) + grantLabel
+                            } else {
+                                stringResource(id = R.string.permission_working)
+                            },
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                        Spacer(Modifier.height(2.dp))
+                        Text(
+                            modifier = Modifier.fillMaxWidth(),
+                            text = stringResource(R.string.permission_working_summary),
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Medium,
+                        )
                     }
                 }
             }
 
-            // 右边：两个框上下堆叠（只显示文字，不可点击）
+            // 右边：两个框上下堆叠（只显示文字+大数字，不可点击）
             Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
             ) {
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f),
+                    insideMargin = PaddingValues(16.dp),
                 ) {
-                    BasicComponent(
-                        title = stringResource(R.string.superuser),
-                        summary = "0",
-                        startAction = {
-                            Icon(
-                                imageVector = MiuixIcons.Link,
-                                contentDescription = null,
-                                modifier = Modifier.padding(end = 6.dp),
-                                tint = colorScheme.onBackground,
-                            )
-                        },
-                    )
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalAlignment = Alignment.Start
+                    ) {
+                        Text(
+                            modifier = Modifier.fillMaxWidth(),
+                            text = stringResource(R.string.superuser),
+                            fontWeight = FontWeight.Medium,
+                            fontSize = 15.sp,
+                            color = colorScheme.onSurfaceVariantSummary,
+                        )
+                        Text(
+                            modifier = Modifier.fillMaxWidth(),
+                            text = "0",
+                            fontSize = 26.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = colorScheme.onSurface,
+                        )
+                    }
                 }
+                Spacer(Modifier.height(12.dp))
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f),
+                    insideMargin = PaddingValues(16.dp),
                 ) {
-                    BasicComponent(
-                        title = stringResource(R.string.module),
-                        summary = "0",
-                        startAction = {
-                            Icon(
-                                imageVector = MiuixIcons.Link,
-                                contentDescription = null,
-                                modifier = Modifier.padding(end = 6.dp),
-                                tint = colorScheme.onBackground,
-                            )
-                        },
-                    )
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalAlignment = Alignment.Start
+                    ) {
+                        Text(
+                            modifier = Modifier.fillMaxWidth(),
+                            text = stringResource(R.string.module),
+                            fontWeight = FontWeight.Medium,
+                            fontSize = 15.sp,
+                            color = colorScheme.onSurfaceVariantSummary,
+                        )
+                        Text(
+                            modifier = Modifier.fillMaxWidth(),
+                            text = "0",
+                            fontSize = 26.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = colorScheme.onSurface,
+                        )
+                    }
                 }
             }
         }
     } else {
-        // 未授权：左边正方形卡片 + 右边两个框上下堆叠
+        // 未授权：左卡片（fillMaxHeight）+ 右边两个框上下堆叠
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(IntrinsicSize.Min),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            // 左边：正方形"未工作"卡片
+            // 左边："未工作"卡片
             Card(
                 modifier = Modifier
                     .weight(1f)
-                    .aspectRatio(1f),
+                    .fillMaxHeight(),
                 onClick = actions.onInstallClick,
                 showIndication = true,
                 pressFeedbackType = PressFeedbackType.Sink
@@ -389,53 +400,71 @@ private fun StatusCard(
                         Icon(
                             Icons.Rounded.ErrorOutline,
                             stringResource(R.string.permission_not_working),
-                            modifier = Modifier.padding(end = 6.dp),
+                            modifier = Modifier.padding(end = 16.dp),
                             tint = colorScheme.onBackground,
                         )
-                    },
+                    }
                 )
             }
 
-            // 右边：两个框上下堆叠（只显示文字，不可点击）
+            // 右边：两个框上下堆叠（只显示文字+大数字，不可点击）
             Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
             ) {
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f),
+                    insideMargin = PaddingValues(16.dp),
                 ) {
-                    BasicComponent(
-                        title = stringResource(R.string.superuser),
-                        summary = "0",
-                        startAction = {
-                            Icon(
-                                imageVector = MiuixIcons.Link,
-                                contentDescription = null,
-                                modifier = Modifier.padding(end = 6.dp),
-                                tint = colorScheme.onBackground,
-                            )
-                        },
-                    )
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalAlignment = Alignment.Start
+                    ) {
+                        Text(
+                            modifier = Modifier.fillMaxWidth(),
+                            text = stringResource(R.string.superuser),
+                            fontWeight = FontWeight.Medium,
+                            fontSize = 15.sp,
+                            color = colorScheme.onSurfaceVariantSummary,
+                        )
+                        Text(
+                            modifier = Modifier.fillMaxWidth(),
+                            text = "0",
+                            fontSize = 26.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = colorScheme.onSurface,
+                        )
+                    }
                 }
+                Spacer(Modifier.height(12.dp))
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f),
+                    insideMargin = PaddingValues(16.dp),
                 ) {
-                    BasicComponent(
-                        title = stringResource(R.string.module),
-                        summary = "0",
-                        startAction = {
-                            Icon(
-                                imageVector = MiuixIcons.Link,
-                                contentDescription = null,
-                                modifier = Modifier.padding(end = 6.dp),
-                                tint = colorScheme.onBackground,
-                            )
-                        },
-                    )
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalAlignment = Alignment.Start
+                    ) {
+                        Text(
+                            modifier = Modifier.fillMaxWidth(),
+                            text = stringResource(R.string.module),
+                            fontWeight = FontWeight.Medium,
+                            fontSize = 15.sp,
+                            color = colorScheme.onSurfaceVariantSummary,
+                        )
+                        Text(
+                            modifier = Modifier.fillMaxWidth(),
+                            text = "0",
+                            fontSize = 26.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = colorScheme.onSurface,
+                        )
+                    }
                 }
             }
         }
