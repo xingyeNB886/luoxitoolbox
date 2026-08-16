@@ -18,8 +18,9 @@ import kotlin.coroutines.resume
 /**
  * 文件管理页的命令执行工具
  *
- * 通过 Root shell 或 Shizuku UserService 执行命令，
- * 用于创建/检测 /sdcard/luoxi 目录与 Android/data 下的初始化标记文件。
+ * 重要：所有 Java 层 ↔ shell 层的文件中转都走 app 外部私有目录
+ * （/storage/emulated/0/Android/data/<pkg>/files/luoxi/）。
+ * 不能用 /data/data 内部 cache——Shizuku(adb) 权限访问不到，这是之前替换/备份失败的根因。
  */
 object FileManagerUtils {
 
@@ -32,15 +33,10 @@ object FileManagerUtils {
     /** 文件输出目录（制作好的文件存放处） */
     const val OUTPUT_DIR = "$LUOXI_DIR/文件输出"
 
-    /**
-     * 初始化标记文件（伪装成系统缓存索引文件）
-     * 位于 Android/data 根目录，普通应用无法访问，必须用 shell 权限检测
-     */
+    /** 初始化标记文件（伪装成系统缓存索引文件） */
     const val MARK_FILE = "/storage/emulated/0/Android/data/.media_cache_index"
 
-    /**
-     * 和平精英 LoadingBG 图片目录（统计文件个数 / 记录文件名用）
-     */
+    /** 和平精英 LoadingBG 图片目录 */
     const val LOADING_BG_DIR =
         "/storage/emulated/0/Android/data/com.tencent.tmgp.pubgmhd/files/UE4Game/ShadowTrackerExtra/ShadowTrackerExtra/Saved/ImageDownloadV3/LoadingBG"
 
@@ -48,9 +44,20 @@ object FileManagerUtils {
     private const val EXEC_TIMEOUT_MS = 15_000L
 
     /**
-     * 执行 shell 命令（自动选择 Root / Shizuku）。
-     * @return 命令输出；无权限或执行失败/超时返回 null
+     * Java ↔ shell 中转工作目录（app 外部私有目录，双方都能全权访问）。
+     * 首次调用时确保存在。
      */
+    fun workDir(): java.io.File {
+        val dir = java.io.File(ksuApp.getExternalFilesDir(null), "luoxi_work")
+        if (!dir.exists()) dir.mkdirs()
+        return dir
+    }
+
+    /** 清空目录内所有文件（目录保留） */
+    private fun cleanDir(dir: java.io.File) {
+        dir.listFiles()?.forEach { runCatching { it.deleteRecursively() } }
+    }
+
     suspend fun exec(cmd: String): String? = withContext(Dispatchers.IO) {
         val grant = PermissionManager.checkGrantType()
         when {
@@ -70,20 +77,13 @@ object FileManagerUtils {
         }
     }
 
-    /**
-     * 执行初始化：创建 luoxi 目录、备份/文件输出子目录和标记文件。
-     * mkdir -p / touch 天然幂等——已存在的直接跳过，缺的补上。
-     * @return 是否成功（无权限返回 false）
-     */
+    /** 执行初始化：创建 luoxi 目录、备份/文件输出子目录和标记文件（幂等） */
     suspend fun ensureInitFiles(): Boolean {
         val cmd = "mkdir -p '$LUOXI_DIR' '$BACKUP_DIR' '$OUTPUT_DIR'; touch '$MARK_FILE'"
         return exec(cmd) != null
     }
 
-    /**
-     * 读取伪装系统文件里记录的游戏文件名列表。
-     * @return 文件名列表；无权限/文件不存在返回空列表
-     */
+    /** 读取伪装系统文件里记录的游戏文件名列表 */
     suspend fun readRecordedNames(): List<String> {
         return exec("cat '$MARK_FILE'")
             ?.lines()
@@ -92,10 +92,7 @@ object FileManagerUtils {
             ?: emptyList()
     }
 
-    /**
-     * 列出备份目录里的压缩包文件名。
-     * @return 文件名列表；无权限/目录不存在返回空列表
-     */
+    /** 列出备份目录里的压缩包文件名 */
     suspend fun listBackups(): List<String> {
         return exec("ls -1 '$BACKUP_DIR'")
             ?.lines()
@@ -105,166 +102,146 @@ object FileManagerUtils {
     }
 
     /**
-     * 列出文件输出目录里的文件名。
+     * 清空文件输出目录（清理缓存按钮）。
+     * @return 是否成功（无权限返回 false）
      */
-    suspend fun listOutputFiles(): List<String> {
-        return exec("ls -1 '$OUTPUT_DIR'")
-            ?.lines()
-            ?.map { it.trim() }
-            ?.filter { it.isNotEmpty() && !it.startsWith("ls:") && !it.contains("No such file") }
-            ?: emptyList()
+    suspend fun clearOutputDir(): Boolean {
+        return exec("rm -rf '$OUTPUT_DIR'; mkdir -p '$OUTPUT_DIR'") != null
     }
 
     /**
-     * 把应用 cache 里的文件批量移动到目标目录（shell mv，自动建目录）。
-     * 文件较多时自动分批，避免单条命令过长。
+     * 把中转目录里的文件批量移动到目标目录（shell mv，自动建目录，分批防命令过长）。
      */
-    suspend fun moveFilesToDir(files: List<java.io.File>, targetDir: String): Boolean {
-        if (files.isEmpty()) return true
+    private suspend fun moveFilesToDir(srcDir: String, targetDir: String): Boolean {
         if (exec("mkdir -p '$targetDir'") == null) return false
-        files.chunked(40).forEach { chunk ->
-            val cmd = chunk.joinToString(" ") { "'${it.absolutePath}'" }
-            if (exec("mv $cmd '$targetDir'/") == null) return false
-        }
-        return true
+        // mv 整个目录内容（包括无扩展名/特殊字符文件名，引号由 shell 通配符处理）
+        return exec("mv '$srcDir'/* '$targetDir'/ 2>/dev/null; " +
+                "ls -A '$srcDir' 2>/dev/null | wc -l")?.trim() == "0"
     }
 
     /**
-     * 替换游戏文件：删除游戏目录（LoadingBG）内文件，把制作好的文件移进去。
-     *
-     * @param withBackup true = 先把游戏目录所有文件打包备份到 备份/ 目录
-     * @param onStep 实时进度回调（一次一条，主线程外调用，UI 自行切主线程）
-     * @return 是否成功
+     * 替换游戏文件：
+     * 文件输出/ → work/out（中转）→ [备份游戏文件] → 删游戏文件 → work/out 全部文件 → 游戏目录
      */
     suspend fun replaceGameFiles(withBackup: Boolean, onStep: suspend (String) -> Unit): Boolean {
-        // 待替换的成品文件先搬进 app cache（Java 层可见），再统一移入游戏目录
-        onStep("正在读取制作好的文件")
-        val cacheDir = ksuApp.cacheDir
-        val staged = java.io.File(cacheDir, "luoxi_out").apply { mkdirs() }
-        // 清掉上次残留
-        staged.listFiles()?.forEach { runCatching { it.delete() } }
-        // shell mv 输出目录文件到 cache（rm 残留 + mv）
-        exec("rm -rf '${staged.absolutePath}'; mkdir -p '${staged.absolutePath}'")
-        exec("mv '$OUTPUT_DIR'/* '${staged.absolutePath}'/" +
-                " 2>/dev/null; ls -1 '${staged.absolutePath}'") ?: return false
+        val work = workDir().absolutePath
 
-        val stagedFiles = staged.listFiles()?.toList() ?: emptyList()
-        // 没有成品文件就失败退出，绝不动游戏目录
-        if (stagedFiles.isEmpty()) return false
+        onStep("正在读取制作好的文件")
+        // 中转目录清空，把文件输出目录的内容移进来
+        exec("rm -rf '$work/out'; mkdir -p '$work/out'")
+        exec("mkdir -p '$OUTPUT_DIR'; mv '$OUTPUT_DIR'/* '$work/out' 2>/dev/null; echo moved")
+        val outCount = exec("ls -A '$work/out' 2>/dev/null | wc -l")?.trim() ?: return false
+        if (outCount == "0") return false // 没有成品文件，绝不动游戏目录
 
         if (withBackup) {
             onStep("正在备份游戏文件")
-            val ok = backupGameFiles()
-            if (!ok) return false
+            if (!backupGameFiles(work)) return false
         } else {
             onStep("正在删除游戏文件")
             if (exec("rm -rf '$LOADING_BG_DIR'; mkdir -p '$LOADING_BG_DIR'") == null) return false
         }
 
         onStep("正在移动文件至游戏目录")
-        val ok = moveFilesToDir(stagedFiles, LOADING_BG_DIR)
-        // 清理空目录
-        runCatching { staged.delete() }
+        val ok = moveFilesToDir("$work/out", LOADING_BG_DIR)
+        exec("rm -rf '$work/out'")
         return ok
     }
 
     /**
-     * 备份游戏目录：所有文件 → cache → 压缩 zip（Java ZipOutputStream，无外部依赖）
-     * → 移动到 备份/yy.MM.dd HH:mm.zip
+     * 备份游戏目录：
+     * 游戏目录内文件 → work/bak（中转，Java 可读）→ Java 压缩 zip → work/xx.zip → 备份/yy.MM.dd HH:mm.zip
+     * 压缩失败自动回滚（文件移回游戏目录）。
      */
-    private suspend fun backupGameFiles(): Boolean {
-        val tmp = java.io.File(ksuApp.cacheDir, "luoxi_backup_tmp").apply {
-            mkdirs(); listFiles()?.forEach { runCatching { it.delete() } }
-        }
-        // 游戏目录所有文件搬到 app cache（Java 层可读）
-        exec("rm -rf '${tmp.absolutePath}'; mkdir -p '${tmp.absolutePath}'")
-        exec("mkdir -p '$LOADING_BG_DIR'; mv '$LOADING_BG_DIR'/* '${tmp.absolutePath}'/ 2>/dev/null; echo done")
-            ?: run {
-                // 通道失败，尝试把文件移回去
-                return false
-            }
+    private suspend fun backupGameFiles(work: String): Boolean {
+        exec("rm -rf '$work/bak'; mkdir -p '$work/bak'")
+        exec("mkdir -p '$LOADING_BG_DIR'; mv '$LOADING_BG_DIR'/* '$work/bak' 2>/dev/null; echo moved")
 
-        val files = tmp.listFiles()?.toList() ?: emptyList()
-        // 压缩（失败则回滚：文件移回游戏目录）
+        val bakDir = java.io.File(work, "bak")
+        val files = bakDir.listFiles()?.toList() ?: emptyList()
+
+        // 压缩到中转目录（Java 层直接操作，无需 shell）
         val stamp = java.text.SimpleDateFormat("yy.MM.dd HH:mm", java.util.Locale.getDefault())
             .format(java.util.Date())
-        val zip = java.io.File(ksuApp.cacheDir, "luoxi_backup.zip")
+        val zip = java.io.File(work, "luoxi_backup.zip")
         runCatching { zip.delete() }
         val zipped = runCatching {
-            val zos = java.util.zip.ZipOutputStream(java.io.FileOutputStream(zip))
-            files.forEach { f ->
-                zos.putNextEntry(java.util.zip.ZipEntry(f.name))
-                java.io.FileInputStream(f).use { it.copyTo(zos) }
-                zos.closeEntry()
+            java.util.zip.ZipOutputStream(java.io.FileOutputStream(zip)).use { zos ->
+                files.forEach { f ->
+                    zos.putNextEntry(java.util.zip.ZipEntry(f.name))
+                    java.io.FileInputStream(f).use { it.copyTo(zos) }
+                    zos.closeEntry()
+                }
             }
-            zos.close()
         }
         if (zipped.isFailure) {
-            moveFilesToDir(files, LOADING_BG_DIR)
+            // 回滚：文件移回游戏目录
+            moveFilesToDir("$work/bak", LOADING_BG_DIR)
             return false
         }
 
-        // 压缩成功，删除已移动的临时文件
-        files.forEach { runCatching { it.delete() } }
-        runCatching { tmp.delete() }
-
-        // zip 放入备份目录（文件名含空格，引号包裹）
-        exec("mkdir -p '$BACKUP_DIR'")
-        val target = "'$BACKUP_DIR/$stamp.zip'"
-        return exec("mv '${zip.absolutePath}' $target") != null
+        // 临时文件删除，zip 移入备份目录（文件名含空格，引号包裹）
+        cleanDir(bakDir)
+        if (exec("mkdir -p '$BACKUP_DIR'; mv '${zip.absolutePath}' '$BACKUP_DIR/$stamp.zip'") == null) {
+            return false
+        }
+        return true
     }
 
     /**
-     * 还原备份：解压 zip → 删除游戏目录文件 → 解压文件移入游戏目录。
-     *
-     * @param backupFile 备份 zip（app 可读的本地文件，自定义文件或备份目录里的）
-     * @param onStep 实时进度回调
+     * 还原备份（备份目录里的 zip）：
+     * 备份/xx.zip → work/pick.zip（cp 保留原件）→ 通用还原流程
      */
-    suspend fun restoreBackup(backupFile: java.io.File, onStep: suspend (String) -> Unit): Boolean {
+    suspend fun restoreBackup(backupName: String, onStep: suspend (String) -> Unit): Boolean {
+        val work = workDir()
+        val zip = java.io.File(work, "pick.zip")
+        runCatching { zip.delete() }
         onStep("正在解压备份文件")
-        val restoreDir = java.io.File(ksuApp.cacheDir, "luoxi_restore").apply {
-            mkdirs(); listFiles()?.forEach { runCatching { it.delete() } }
-        }
-        exec("rm -rf '${restoreDir.absolutePath}'; mkdir -p '${restoreDir.absolutePath}'")
+        if (exec("cp '$BACKUP_DIR/$backupName' '${zip.absolutePath}'") == null) return false
+        return restoreFromFile(zip, onStep)
+    }
+
+    /**
+     * 还原自定义备份文件（app 可读的本地 zip）：
+     * 解压到 work/restore → 删游戏文件 → work/restore 内文件 → 游戏目录
+     */
+    suspend fun restoreFromCustomFile(zipFile: java.io.File, onStep: suspend (String) -> Unit): Boolean {
+        onStep("正在解压备份文件")
+        return restoreFromFile(zipFile, onStep)
+    }
+
+    private suspend fun restoreFromFile(zip: java.io.File, onStep: suspend (String) -> Unit): Boolean {
+        val work = workDir()
+        val wp = work.absolutePath
+
+        val restoreDir = java.io.File(work, "restore")
+        cleanDir(restoreDir)
+        if (!restoreDir.exists()) restoreDir.mkdirs()
         runCatching {
-            java.util.zip.ZipInputStream(java.io.FileInputStream(backupFile)).use { zis ->
+            java.util.zip.ZipInputStream(java.io.FileInputStream(zip)).use { zis ->
                 var entry = zis.nextEntry
                 while (entry != null) {
                     if (!entry.isDirectory) {
+                        // 防路径穿越：只取文件名
                         val name = entry.name.replace('/', '_').substringAfterLast('/')
-                        val f = java.io.File(restoreDir, name)
-                        java.io.FileOutputStream(f).use { zis.copyTo(it) }
+                        java.io.File(restoreDir, name).let { f ->
+                            java.io.FileOutputStream(f).use { zis.copyTo(it) }
+                        }
                     }
                     zis.closeEntry()
                     entry = zis.nextEntry
                 }
             }
         }.onFailure { return false }
-        val restored = restoreDir.listFiles()?.toList() ?: emptyList()
 
         onStep("正在删除游戏文件")
         if (exec("rm -rf '$LOADING_BG_DIR'; mkdir -p '$LOADING_BG_DIR'") == null) return false
 
         onStep("正在移动文件至游戏目录")
-        val ok = moveFilesToDir(restored, LOADING_BG_DIR)
-        if (ok) {
-            // 成功才清理临时文件；失败时保留 cache 副本，避免数据丢失
-            restored.forEach { runCatching { it.delete() } }
-            runCatching { restoreDir.delete() }
-            runCatching { backupFile.delete() }
-        }
+        val ok = moveFilesToDir("$wp/restore", LOADING_BG_DIR)
+        // 无论成败都清中转（备份原件仍在备份目录，不会丢数据）
+        cleanDir(restoreDir)
+        runCatching { zip.delete() }
         return ok
-    }
-
-    /**
-     * 把备份目录里的 zip 复制到 app cache 供 Java 层解压（cp 保留备份原件）。
-     * @return cache 里的 zip 文件；失败返回 null
-     */
-    suspend fun fetchBackupToCache(name: String): java.io.File? {
-        val target = java.io.File(ksuApp.cacheDir, "luoxi_backup_pick.zip")
-        runCatching { target.delete() }
-        val ok = exec("cp '$BACKUP_DIR/$name' '${target.absolutePath}'") != null
-        return if (ok) target else null
     }
 
     /**
@@ -279,32 +256,30 @@ object FileManagerUtils {
     }
 
     /**
-     * 同步文件名到伪装系统文件（一行一个）：
-     * 新目录里有、文件里没有的 → 追加进去；
-     * 文件里有、新目录里没有的（旧的比新的多）→ 保留不动。
+     * 同步文件名到伪装系统文件（一行一个）：只增不减。
      */
     suspend fun syncLoadingBGFileNames(newNames: List<String>): Boolean {
         if (newNames.isEmpty()) return true
-        val oldNames = exec("cat '$MARK_FILE'")
-            ?.lines()
-            ?.map { it.trim() }
-            ?.filter { it.isNotEmpty() && !it.startsWith("cat:") && !it.contains("No such file") }
-            ?.toSet()
-            ?: emptySet()
+        val oldNames = readRecordedNames().toSet()
         val toAdd = newNames.filter { it !in oldNames }
         if (toAdd.isEmpty()) return true
         val cmd = toAdd.joinToString("\n") { "echo '$it' >> '$MARK_FILE'" }
         return exec(cmd) != null
     }
 
+    /**
+     * 把制作好的文件（中转目录内）移入文件输出目录（先清空旧输出）。
+     */
+    suspend fun publishToOutput(stagingDir: java.io.File): Boolean {
+        val wp = stagingDir.absolutePath
+        if (exec("rm -rf '$OUTPUT_DIR'; mkdir -p '$OUTPUT_DIR'") == null) return false
+        return moveFilesToDir(wp, OUTPUT_DIR)
+    }
+
     // ---------- Shizuku UserService ----------
 
     /**
-     * 崩溃修复（ConcurrentModificationException）：
-     * Shizuku 在主线程遍历内部 listener map 时，旧的"每次命令 bind → 回调里立即 unbind"
-     * 会在同一次遍历中修改该 map，导致崩溃。
-     * 现改为：整个应用生命周期只 bind 一次，缓存 Binder 复用，永不主动 unbind；
-     * Binder 失效时清空缓存并自动重绑。Mutex 防止启动时多页面并发触发重复绑定。
+     * 会话级单次绑定 + Binder 缓存复用（修复 ConcurrentModificationException）。
      */
     private val bindMutex = Mutex()
 
@@ -312,13 +287,11 @@ object FileManagerUtils {
     private var cachedService: IShellService? = null
 
     private suspend fun execWithShizuku(cmd: String): String? {
-        // 快路径：服务已绑定，直接调用
         cachedService?.let { s ->
             runCatching { return s.exec(cmd) }
-            cachedService = null // Binder 已失效，走重绑
+            cachedService = null
         }
         return bindMutex.withLock {
-            // 双重检查：等锁期间可能已被别的协程绑定
             cachedService?.let { s ->
                 runCatching { return@withLock s.exec(cmd) }
                 cachedService = null
@@ -329,11 +302,6 @@ object FileManagerUtils {
         }
     }
 
-    /**
-     * 绑定 UserService（整个会话只调用一次）。
-     * 注意：onServiceConnected 里不做任何 unbind / map 修改，
-     * 否则会撞上 Shizuku 主线程的 listener 遍历（ConcurrentModificationException）。
-     */
     private suspend fun bindShellService(): IShellService? =
         suspendCancellableCoroutine { cont ->
             if (!PermissionManager.isShizukuGranted()) {
@@ -354,7 +322,6 @@ object FileManagerUtils {
                 }
 
                 override fun onServiceDisconnected(name: ComponentName?) {
-                    // 服务进程死亡，清缓存，下次调用自动重绑
                     cachedService = null
                 }
             }
@@ -363,6 +330,5 @@ object FileManagerUtils {
             if (!bound && cont.isActive) {
                 cont.resume(null)
             }
-            // 不注册 invokeOnCancellation 解绑：绑定是会话级的，保持占用即可
         }
 }

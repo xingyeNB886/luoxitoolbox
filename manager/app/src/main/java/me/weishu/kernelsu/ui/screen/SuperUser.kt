@@ -2,10 +2,13 @@ package me.weishu.kernelsu.ui.screen
 
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.Canvas
+import android.graphics.Paint
+import android.graphics.Rect
+import android.graphics.RectF
 import android.net.Uri
 import android.view.WindowManager
 import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
@@ -32,7 +35,6 @@ import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBars
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -88,11 +90,8 @@ import top.yukonga.miuix.kmp.utils.overScrollVertical
 import java.io.File
 
 /**
- * 取景框参数（全部归一化到正方形图的 0..1）
- *
- * @param cx 框中心 X
- * @param cy 框中心 Y
- * @param w  框宽（框高 = 框宽 × 屏幕短边/长边，保持横屏比例）
+ * 取景框参数（归一化到输出正方形画布的 0..1）：
+ * cx/cy 框中心，w 框宽（框高 = 框宽 × 屏幕短边/长边，即本机真实分辨率横屏比例）
  */
 data class CropParams(val cx: Float, val cy: Float, val w: Float)
 
@@ -123,9 +122,7 @@ fun SuperUserPager(
         tint = HazeTint(colorScheme.surface.copy(0.8f))
     )
 
-    // 已选图片列表（含每张图的取景框参数），仅内存缓存
     var images by remember { mutableStateOf(listOf<SelectedImage>()) }
-    // 正在编辑取景框的图片
     var editing by remember { mutableStateOf<SelectedImage?>(null) }
 
     Scaffold(
@@ -177,7 +174,6 @@ fun SuperUserPager(
         }
     }
 
-    // 取景框编辑器（点击已选图片打开）
     editing?.let { img ->
         ViewfinderDialog(
             image = img,
@@ -191,7 +187,7 @@ fun SuperUserPager(
 }
 
 /**
- * 选择图片板块
+ * 选择图片板块（系统文件选择器，可多选，可浏览真实目录）
  */
 @Composable
 private fun ImagePickerCard(
@@ -201,7 +197,7 @@ private fun ImagePickerCard(
     onPreview: (SelectedImage) -> Unit
 ) {
     val launcher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.PickMultipleVisualMedia(maxItems = 9)
+        contract = ActivityResultContracts.OpenMultipleDocuments()
     ) { uris ->
         if (uris.isNotEmpty()) onPick(uris)
     }
@@ -233,13 +229,7 @@ private fun ImagePickerCard(
             ) {
                 TextButton(
                     text = "选择图片",
-                    onClick = {
-                        launcher.launch(
-                            PickVisualMediaRequest(
-                                ActivityResultContracts.PickVisualMedia.ImageOnly
-                            )
-                        )
-                    },
+                    onClick = { launcher.launch(arrayOf("image/*")) },
                     colors = ButtonDefaults.textButtonColorsPrimary()
                 )
             }
@@ -282,7 +272,7 @@ private fun SelectedImageItem(
                 Image(
                     bitmap = bitmap.asImageBitmap(),
                     contentDescription = null,
-                    contentScale = ContentScale.Crop,
+                    contentScale = ContentScale.Fit,
                     modifier = Modifier
                         .size(64.dp)
                         .clip(RoundedCornerShape(12.dp))
@@ -327,8 +317,9 @@ private fun SelectedImageItem(
 
 /**
  * 取景框编辑器弹窗：
- * - 正方形图（边长 = 屏幕长边对应），中央虚线取景框（横屏屏幕比例），框外调暗
- * - 拖动移动取景框；左下角"自由取景"切换为缩放模式
+ * - 图片保持原始比例显示（等比缩放居中，留黑边，不裁剪）
+ * - 中央虚线取景框 = 本机真实分辨率（横屏）比例，框外调暗
+ * - 拖动移动取景框；左下角"自由取景"切换缩放模式
  */
 @Composable
 private fun ViewfinderDialog(
@@ -339,9 +330,8 @@ private fun ViewfinderDialog(
     val context = LocalContext.current
     val screen = remember { getScreenSize(context) }
 
-    // 编辑用正方形位图（原图 centerCrop，限尺寸防 OOM）
-    val square = remember(image.uri) {
-        loadSquareBitmap(image.uri, 2048)
+    val src = remember(image.uri) {
+        decodeSampledBitmap(image.uri, 2048)
     }
 
     val initial = image.crop ?: CropParams(0.5f, 0.5f, 1f)
@@ -350,7 +340,8 @@ private fun ViewfinderDialog(
     var w by remember { mutableStateOf(initial.w) }
     var freeMode by remember { mutableStateOf(false) }
 
-    val ratio = screen.shortSide.toFloat() / screen.longSide.toFloat() // 框高/框宽
+    // 框高/框宽 = 本机真实分辨率横屏比例
+    val ratio = screen.shortSide.toFloat() / screen.longSide.toFloat()
     val show = remember { mutableStateOf(true) }
 
     fun clampFrame() {
@@ -370,15 +361,16 @@ private fun ViewfinderDialog(
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
-                    text = "虚线框为游戏内可见区域（横屏），框外部分会被调暗；拖动调整位置",
+                    text = "虚线框为本机分辨率 ${screen.longSide}×${screen.shortSide}（横屏）可见区域，框外调暗；拖动调整",
                     fontSize = 12.sp,
                     color = colorScheme.onSurfaceVariantSummary,
                     textAlign = TextAlign.Center
                 )
                 Spacer(Modifier.height(10.dp))
 
-                if (square != null) {
+                if (src != null) {
                     val sidePx = with(androidx.compose.ui.platform.LocalDensity.current) { 280.dp.toPx() }
+                    val fit = remember(src) { computeFitRect(src.width, src.height) }
                     Canvas(
                         modifier = Modifier
                             .size(280.dp)
@@ -388,7 +380,6 @@ private fun ViewfinderDialog(
                                 detectDragGestures { change, drag ->
                                     change.consume()
                                     if (freeMode) {
-                                        // 自由取景：拖动缩放框宽（保持横屏比例）
                                         w += drag.x / sidePx
                                     } else {
                                         cx += drag.x / sidePx
@@ -399,16 +390,26 @@ private fun ViewfinderDialog(
                             }
                     ) {
                         val side = size.width
-                        // 正方形图
+                        // 图片原比例居中绘制（不裁剪不变形）
                         drawImage(
-                            image = square.asImageBitmap(),
-                            dstSize = androidx.compose.ui.unit.IntSize(side.toInt(), side.toInt())
+                            image = src.asImageBitmap(),
+                            srcOffset = androidx.compose.ui.unit.IntOffset.Zero,
+                            srcSize = androidx.compose.ui.unit.IntSize(src.width, src.height),
+                            dstOffset = androidx.compose.ui.unit.IntOffset(
+                                (fit.left * side).toInt(),
+                                (fit.top * side).toInt()
+                            ),
+                            dstSize = androidx.compose.ui.unit.IntSize(
+                                (fit.width() * side).toInt(),
+                                (fit.height() * side).toInt()
+                            ),
                         )
+                        // 取景框（本机真实分辨率横屏比例）
                         val fw = w * side
                         val fh = fw * ratio
                         val left = (cx * side) - fw / 2f
                         val top = (cy * side) - fh / 2f
-                        // 框外调暗（上/下/左/右四块）
+                        // 框外调暗（四块）
                         val dim = Color.Black.copy(alpha = 0.55f)
                         drawRect(dim, size = androidx.compose.ui.geometry.Size(side, top.coerceAtLeast(0f)))
                         drawRect(
@@ -452,7 +453,6 @@ private fun ViewfinderDialog(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // 左下角：自由取景开关
                     TextButton(
                         text = if (freeMode) "完成取景" else "自由取景",
                         onClick = {
@@ -487,14 +487,15 @@ private fun ViewfinderDialog(
 
 /**
  * 制作成文件板块：
- * 读取伪装系统文件里记录的游戏文件名，把选中的图片平均分配改名为游戏文件名，
- * 输出到 /storage/emulated/0/luoxi/文件输出/
+ * 按记录的游戏文件数复制所选图片并逐个命名，输出到 luoxi/文件输出/
+ * 例：80 个文件名 + 1 张图 = 复制 80 份；2 张图 = 每张 40 份；3 张图 = 各 26 份 + 余 2 份随机分。
  */
 @Composable
 private fun MakeFilesCard(images: List<SelectedImage>) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var making by remember { mutableStateOf(false) }
+    var clearing by remember { mutableStateOf(false) }
     var stepText by remember { mutableStateOf<String?>(null) }
     val stepShow = remember { mutableStateOf(false) }
 
@@ -512,7 +513,7 @@ private fun MakeFilesCard(images: List<SelectedImage>) {
             )
             Spacer(Modifier.height(8.dp))
             Text(
-                text = "读取已记录的游戏文件名，把选中的图片平均分配并改名为游戏文件名，保存到 luoxi/文件输出/",
+                text = "按记录的游戏文件数复制所选图片并逐个命名，保存到 luoxi/文件输出/",
                 fontSize = 14.sp,
                 color = colorScheme.onSurfaceVariantSummary
             )
@@ -521,6 +522,24 @@ private fun MakeFilesCard(images: List<SelectedImage>) {
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.End
             ) {
+                // 清理缓存（制作文件按钮左边）：清空文件输出目录
+                TextButton(
+                    text = if (clearing) "清理中…" else "清理缓存",
+                    enabled = !clearing && !making,
+                    onClick = {
+                        scope.launch {
+                            clearing = true
+                            val ok = FileManagerUtils.clearOutputDir()
+                            clearing = false
+                            android.widget.Toast.makeText(
+                                context,
+                                if (ok) "已清空文件输出目录" else "清理失败，请检查权限",
+                                android.widget.Toast.LENGTH_SHORT
+                            ).show()
+                        }
+                    }
+                )
+                Spacer(Modifier.padding(horizontal = 3.dp))
                 TextButton(
                     text = if (making) "制作中…" else "制作文件",
                     enabled = !making && images.isNotEmpty(),
@@ -578,10 +597,10 @@ private fun MakeFilesCard(images: List<SelectedImage>) {
 }
 
 /**
- * 制作文件的实际逻辑：
- * 1. 读记录的游戏文件名 N 个；2. 图片 M 张均分（余数随机多分一张）；
- * 3. 每张图按取景框渲染成"边长=屏幕长边"的正方形图，改名为分到的游戏文件名；
- * 4. 全部写入 luoxi/文件输出/（先清空旧输出）
+ * 制作文件：
+ * 1. 读记录的游戏文件名 N 个；2. 图片 M 张均分（各 N/M 份，余数随机多一份）；
+ * 3. 渲染到中转目录（app 外部目录，shell 可访问）；
+ * 4. shell 移入 文件输出/（先清空旧输出）。
  */
 private suspend fun makeFiles(
     context: android.content.Context,
@@ -598,10 +617,8 @@ private suspend fun makeFiles(
     val m = imgs.size
     val base = n / m
     val rem = n % m
-    // 随机挑 rem 张图各多分一个
     val extraIdx = imgs.indices.shuffled().take(rem).toSet()
 
-    // 分配：图片索引 -> 分到的文件名列表
     val assign = mutableListOf<Pair<SelectedImage, String>>()
     var idx = 0
     imgs.forEachIndexed { i, img ->
@@ -611,45 +628,40 @@ private suspend fun makeFiles(
     }
 
     val screen = getScreenSize(context)
-    val outDir = File(context.cacheDir, "luoxi_make").apply {
+    val ratio = screen.shortSide.toFloat() / screen.longSide.toFloat()
+    val staging = java.io.File(FileManagerUtils.workDir(), "make").apply {
         mkdirs(); listFiles()?.forEach { runCatching { it.delete() } }
     }
 
-    // 同一张图可能分到多个文件名，解码一次复用
-    val squareCache = mutableMapOf<Uri, Bitmap>()
+    val bitmapCache = mutableMapOf<Uri, Bitmap>()
     try {
         var done = 0
         assign.forEach { (img, name) ->
             done++
             onStep("正在生成文件 $done/${assign.size}")
-            val square = squareCache.getOrPut(img.uri) {
-                loadSquareBitmap(img.uri, 2048) ?: return@withContext false
+            val srcBmp = bitmapCache.getOrPut(img.uri) {
+                decodeSampledBitmap(img.uri, 2048) ?: return@withContext false
             }
             val crop = img.crop ?: CropParams(0.5f, 0.5f, 1f)
-            val rendered = renderOutput(square, screen.longSide, crop)
-            val f = File(outDir, name)
+            val rendered = renderOutput(srcBmp, screen.longSide, crop, ratio)
+            val f = File(staging, name)
             runCatching {
                 java.io.FileOutputStream(f).use { out ->
                     rendered.compress(Bitmap.CompressFormat.JPEG, 92, out)
                 }
             }.onFailure { return@withContext false }
-            if (rendered !== square) rendered.recycle()
+            if (rendered !== srcBmp) rendered.recycle()
         }
     } finally {
-        squareCache.values.forEach { runCatching { it.recycle() } }
+        bitmapCache.values.forEach { runCatching { it.recycle() } }
     }
 
     onStep("正在写入文件输出目录")
-    // 清空旧输出再移入
-    FileManagerUtils.exec("rm -rf '${FileManagerUtils.OUTPUT_DIR}'")
-    val files = outDir.listFiles()?.toList() ?: emptyList()
-    FileManagerUtils.moveFilesToDir(files, FileManagerUtils.OUTPUT_DIR)
-        .also { files.forEach { r -> runCatching { r.delete() } } }
+    FileManagerUtils.publishToOutput(staging)
 }
 
 /**
- * 替换游戏文件板块：
- * 删除游戏目录（LoadingBG）内文件，把制作好的文件移进去；可选先备份。
+ * 替换游戏文件板块：删除游戏目录（LoadingBG）内文件，把制作好的文件移进去；可选先备份。
  */
 @Composable
 private fun ReplaceFilesCard() {
@@ -693,7 +705,6 @@ private fun ReplaceFilesCard() {
         }
     }
 
-    // 是否备份替换
     SuperDialog(
         show = confirmShow,
         title = "是否备份替换",
@@ -712,21 +723,27 @@ private fun ReplaceFilesCard() {
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     TextButton(text = "取消", onClick = { confirmShow.value = false })
-                    Spacer(Modifier.width(8.dp))
+                    Spacer(Modifier.padding(horizontal = 3.dp))
                     TextButton(
                         text = "不备份",
-                        onClick = { confirmShow.value = false; startReplace(scope, false, context) { s, r ->
-                            stepText = s; running = r
-                            progressShow.value = r || stepText != ""
-                        } }
+                        enabled = !running,
+                        onClick = {
+                            confirmShow.value = false
+                            startReplace(scope, false, context) { s, r ->
+                                stepText = s; running = r; progressShow.value = true
+                            }
+                        }
                     )
-                    Spacer(Modifier.width(8.dp))
+                    Spacer(Modifier.padding(horizontal = 3.dp))
                     TextButton(
                         text = "备份",
-                        onClick = { confirmShow.value = false; startReplace(scope, true, context) { s, r ->
-                            stepText = s; running = r
-                            progressShow.value = r || stepText != ""
-                        } },
+                        enabled = !running,
+                        onClick = {
+                            confirmShow.value = false
+                            startReplace(scope, true, context) { s, r ->
+                                stepText = s; running = r; progressShow.value = true
+                            }
+                        },
                         colors = ButtonDefaults.textButtonColorsPrimary()
                     )
                 }
@@ -734,7 +751,6 @@ private fun ReplaceFilesCard() {
         }
     )
 
-    // 实时进度
     SuperDialog(
         show = progressShow,
         title = "正在替换",
@@ -782,7 +798,7 @@ private fun startReplace(
             onUpdate(if (ok) "替换完成" else "替换失败", false)
             android.widget.Toast.makeText(
                 context,
-                if (ok) "替换完成" else "替换失败，请检查权限/制作文件",
+                if (ok) "替换完成" else "替换失败，请检查权限/先制作文件",
                 android.widget.Toast.LENGTH_SHORT
             ).show()
         }
@@ -792,55 +808,56 @@ private fun startReplace(
 // ---------- 图片处理 ----------
 
 /**
- * 解码 URI → centerCrop 正方形位图（限制最大边长，防 OOM）
+ * 图片在正方形画布内的显示区（保持原比例、居中，归一化 0..1）。
+ * 竖图上下占满左右留黑；横图左右占满上下留黑。不裁剪、不变形。
  */
-private fun loadSquareBitmap(uri: Uri, maxSide: Int): Bitmap? {
-    return try {
-        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-        ksuApp.contentResolver.openInputStream(uri)?.use {
-            BitmapFactory.decodeStream(it, null, bounds)
-        }
-        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
-        var sample = 1
-        while (maxOf(bounds.outWidth, bounds.outHeight) / (sample * 2) >= maxSide) {
-            sample *= 2
-        }
-        val opts = BitmapFactory.Options().apply { inSampleSize = sample }
-        val src = ksuApp.contentResolver.openInputStream(uri)?.use {
-            BitmapFactory.decodeStream(it, null, opts)
-        } ?: return null
-
-        // centerCrop 成正方形
-        val side = minOf(src.width, src.height)
-        val x = (src.width - side) / 2
-        val y = (src.height - side) / 2
-        val sq = Bitmap.createBitmap(src, x, y, side, side)
-        if (sq !== src) src.recycle()
-        sq
-    } catch (e: Exception) {
-        null
+private fun computeFitRect(imgW: Int, imgH: Int): RectF {
+    return if (imgW >= imgH) {
+        val h = imgH.toFloat() / imgW
+        RectF(0f, (1f - h) / 2f, 1f, (1f + h) / 2f)
+    } else {
+        val w = imgW.toFloat() / imgH
+        RectF((1f - w) / 2f, 0f, (1f + w) / 2f, 1f)
     }
 }
 
 /**
- * 按取景框渲染输出图：
- * 以取景框中心为中心、边长=取景框宽 的正方形区域 → 缩放到屏幕长边 × 屏幕长边。
- * 游戏加载时取景框区域正好铺满横屏屏幕。
+ * 渲染输出图（所见即所得）：
+ * - 正方形画布，边长 = 屏幕长边（游戏加载图为正方形，中央横条为屏幕可见区）
+ * - 图片按原比例居中绘制（黑边填充，不裁剪不变形）
+ * - 取景框外区域压暗（与预览一致）
  */
-private fun renderOutput(square: Bitmap, longSide: Int, crop: CropParams): Bitmap {
-    val side = square.width
-    var fw = (crop.w * side).toInt().coerceAtLeast(8)
-    if (fw > side) fw = side
-    val cxF = (crop.cx * side).toInt()
-    val cyF = (crop.cy * side).toInt()
-    val left = (cxF - fw / 2).coerceIn(0, side - fw)
-    val top = (cyF - fw / 2).coerceIn(0, side - fw)
-    val region = Bitmap.createBitmap(square, left, top, fw, fw)
-    return Bitmap.createScaledBitmap(region, longSide, longSide, true)
+private fun renderOutput(src: Bitmap, longSide: Int, crop: CropParams, ratio: Float): Bitmap {
+    val out = Bitmap.createBitmap(longSide, longSide, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(out)
+    canvas.drawColor(android.graphics.Color.BLACK)
+
+    // 图片原比例居中
+    val fit = computeFitRect(src.width, src.height)
+    val dst = Rect(
+        (fit.left * longSide).toInt(),
+        (fit.top * longSide).toInt(),
+        (fit.right * longSide).toInt(),
+        (fit.bottom * longSide).toInt()
+    )
+    canvas.drawBitmap(src, null, dst, Paint(Paint.FILTER_BITMAP_FLAG))
+
+    // 取景框外压暗（与预览效果一致）
+    val fw = (crop.w.coerceIn(0.15f, 1f) * longSide)
+    val fh = fw * ratio
+    val left = (crop.cx * longSide) - fw / 2f
+    val top = (crop.cy * longSide) - fh / 2f
+    val dim = Paint().apply { color = android.graphics.Color.argb(140, 0, 0, 0) }
+    // 上/下/左/右
+    canvas.drawRect(0f, 0f, longSide.toFloat(), top.coerceAtLeast(0f), dim)
+    canvas.drawRect(0f, top + fh, longSide.toFloat(), longSide.toFloat(), dim)
+    canvas.drawRect(0f, top, left.coerceAtLeast(0f), top + fh, dim)
+    canvas.drawRect(left + fw, top, longSide.toFloat(), top + fh, dim)
+    return out
 }
 
 /**
- * 解码 URI 图片为采样后的小图（仅用于列表预览，避免 OOM）
+ * 解码 URI 图片为采样位图（保持原始比例，仅降采样防 OOM）
  */
 private fun decodeSampledBitmap(uri: Uri, maxSize: Int): Bitmap? {
     return try {
@@ -848,10 +865,9 @@ private fun decodeSampledBitmap(uri: Uri, maxSize: Int): Bitmap? {
         ksuApp.contentResolver.openInputStream(uri)?.use {
             BitmapFactory.decodeStream(it, null, bounds)
         }
+        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
         var sample = 1
-        while (bounds.outWidth / (sample * 2) >= maxSize &&
-            bounds.outHeight / (sample * 2) >= maxSize
-        ) {
+        while (maxOf(bounds.outWidth, bounds.outHeight) / (sample * 2) >= maxSize) {
             sample *= 2
         }
         val opts = BitmapFactory.Options().apply { inSampleSize = sample }

@@ -616,7 +616,13 @@ private fun InfoCard() {
             )
             InfoText(
                 title = stringResource(R.string.home_manager_version),
-                content = "${managerVersion.first} (${managerVersion.second})",
+                content = "${managerVersion.first} (${managerVersion.second})"
+            )
+            // 本机分辨率（横屏：长×短），取景框按此比例
+            val screen = remember { getScreenSize(context) }
+            InfoText(
+                title = stringResource(R.string.screen_resolution),
+                content = "${screen.longSide} × ${screen.shortSide}",
                 bottomPadding = 0.dp
             )
         }

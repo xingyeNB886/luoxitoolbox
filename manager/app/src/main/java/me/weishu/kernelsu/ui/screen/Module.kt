@@ -124,22 +124,24 @@ private fun RestoreBackupCard() {
     val confirmShow = remember { mutableStateOf(false) }
     var backups by remember { mutableStateOf<List<String>>(emptyList()) }
 
-    // 待还原的 zip（app 可读的 cache 文件）
-    var pendingZip by remember { mutableStateOf<File?>(null) }
+    // 待还原来源：null = 未选择；type: "backup" = 备份目录文件名，"custom" = 自定义 zip 文件
+    var pendingType by remember { mutableStateOf<String?>(null) }
     var pendingName by remember { mutableStateOf("") }
+    var pendingCustomZip by remember { mutableStateOf<File?>(null) }
 
     var running by remember { mutableStateOf(false) }
     var stepText by remember { mutableStateOf("") }
 
-    // 自定义文件选择（SAF）→ 复制到 cache
+    // 自定义文件选择（SAF）→ 复制到中转目录
     val customLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri ->
         if (uri != null) {
             scope.launch {
-                val f = copyToCache(uri)
+                val f = copyToWork(uri)
                 if (f != null) {
-                    pendingZip = f
+                    pendingType = "custom"
+                    pendingCustomZip = f
                     pendingName = uri.lastPathSegment ?: "自定义备份"
                     pickShow.value = false
                     confirmShow.value = true
@@ -248,19 +250,11 @@ private fun RestoreBackupCard() {
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .clickable {
-                                        scope.launch {
-                                            val f = FileManagerUtils.fetchBackupToCache(name)
-                                            if (f != null) {
-                                                pendingZip = f
-                                                pendingName = name
-                                                pickShow.value = false
-                                                confirmShow.value = true
-                                            } else {
-                                                android.widget.Toast.makeText(
-                                                    context, "读取备份失败，请检查权限", android.widget.Toast.LENGTH_SHORT
-                                                ).show()
-                                            }
-                                        }
+                                        pendingType = "backup"
+                                        pendingName = name
+                                        pendingCustomZip = null
+                                        pickShow.value = false
+                                        confirmShow.value = true
                                     }
                             ) {
                                 Text(
@@ -318,12 +312,18 @@ private fun RestoreBackupCard() {
                         text = if (running) "还原中…" else "确定",
                         enabled = !running,
                         onClick = {
-                            val zip = pendingZip ?: return@TextButton
+                            val type = pendingType ?: return@TextButton
                             scope.launch {
                                 running = true
                                 stepText = "准备中…"
-                                val ok = FileManagerUtils.restoreBackup(zip) { step ->
-                                    withContext(Dispatchers.Main) { stepText = step }
+                                val ok = when (type) {
+                                    "backup" -> FileManagerUtils.restoreBackup(pendingName) { step ->
+                                        withContext(Dispatchers.Main) { stepText = step }
+                                    }
+                                    "custom" -> FileManagerUtils.restoreFromCustomFile(pendingCustomZip!!) { step ->
+                                        withContext(Dispatchers.Main) { stepText = step }
+                                    }
+                                    else -> false
                                 }
                                 running = false
                                 stepText = if (ok) "还原完成" else "还原失败"
@@ -342,10 +342,10 @@ private fun RestoreBackupCard() {
     )
 }
 
-/** SAF Uri → cache 文件 */
-private suspend fun copyToCache(uri: Uri): File? = withContext(Dispatchers.IO) {
+/** SAF Uri → 中转目录文件（app 外部私有目录，Java/shell 均可访问） */
+private suspend fun copyToWork(uri: Uri): File? = withContext(Dispatchers.IO) {
     runCatching {
-        val f = File(ksuApp.cacheDir, "luoxi_custom_backup.zip")
+        val f = File(FileManagerUtils.workDir(), "luoxi_custom_backup.zip")
         ksuApp.contentResolver.openInputStream(uri)?.use { input ->
             java.io.FileOutputStream(f).use { input.copyTo(it) }
         } ?: return@runCatching null
