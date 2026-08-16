@@ -250,14 +250,14 @@ private fun StatusCard(
     }
 
     if (working) {
-        // 工作中：三块并排布局
+        // 工作中：左边正方形卡片 + 右边两个框上下堆叠
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(IntrinsicSize.Min),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            // 第1块：正方形"工作中"状态卡片
+            // 左边：正方形"工作中"状态卡片
             Card(
                 modifier = Modifier
                     .weight(1f)
@@ -268,7 +268,7 @@ private fun StatusCard(
                 pressFeedbackType = PressFeedbackType.Tilt
             ) {
                 Box(modifier = Modifier.fillMaxSize()) {
-                    // 右下角大图标
+                    // 右下角图标
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
@@ -325,67 +325,72 @@ private fun StatusCard(
                 }
             }
 
-            // 第2块：权限类型信息
-            Card(
-                modifier = Modifier
-                    .weight(1f)
-                    .aspectRatio(1f),
-                onClick = actions.onInstallClick,
-                showIndication = true,
-                pressFeedbackType = PressFeedbackType.Sink
+            // 右边：两个框上下堆叠
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                BasicComponent(
-                    title = stringResource(R.string.permission_screen_title),
-                    summary = when (state.permissionGrant) {
-                        me.weishu.kernelsu.ui.util.PermissionGrantType.ROOT ->
-                            stringResource(R.string.permission_root_granted)
-                        me.weishu.kernelsu.ui.util.PermissionGrantType.ADB ->
-                            stringResource(R.string.permission_shizuku_granted)
-                        me.weishu.kernelsu.ui.util.PermissionGrantType.BOTH ->
-                            stringResource(R.string.permission_grant_type_both)
-                        else -> grantLabel
-                    },
-                    startAction = {
-                        Icon(
-                            Icons.Rounded.CheckCircleOutline,
-                            contentDescription = null,
-                            modifier = Modifier.padding(end = 6.dp),
-                            tint = colorScheme.onBackground,
-                        )
-                    },
-                )
-            }
-
-            // 第3块：系统信息
-            Card(
-                modifier = Modifier
-                    .weight(1f)
-                    .aspectRatio(1f),
-                onClick = { /* no-op */ },
-                showIndication = false,
-                pressFeedbackType = PressFeedbackType.Sink
-            ) {
-                BasicComponent(
-                    title = stringResource(R.string.home_manager_version),
-                    summary = state.systemInfo.managerVersion,
-                    startAction = {
-                        Icon(
-                            imageVector = MiuixIcons.Link,
-                            contentDescription = null,
-                            modifier = Modifier.padding(end = 6.dp),
-                            tint = colorScheme.onBackground,
-                        )
-                    },
-                )
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                    onClick = actions.onInstallClick,
+                    showIndication = true,
+                    pressFeedbackType = PressFeedbackType.Sink
+                ) {
+                    BasicComponent(
+                        title = stringResource(R.string.permission_screen_title),
+                        summary = when (state.permissionGrant) {
+                            me.weishu.kernelsu.ui.util.PermissionGrantType.ROOT ->
+                                stringResource(R.string.permission_root_granted)
+                            me.weishu.kernelsu.ui.util.PermissionGrantType.ADB ->
+                                stringResource(R.string.permission_shizuku_granted)
+                            me.weishu.kernelsu.ui.util.PermissionGrantType.BOTH ->
+                                stringResource(R.string.permission_grant_type_both)
+                            else -> grantLabel
+                        },
+                        startAction = {
+                            Icon(
+                                Icons.Rounded.CheckCircleOutline,
+                                contentDescription = null,
+                                modifier = Modifier.padding(end = 6.dp),
+                                tint = colorScheme.onBackground,
+                            )
+                        },
+                    )
+                }
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                    onClick = { /* no-op */ },
+                    showIndication = false,
+                    pressFeedbackType = PressFeedbackType.Sink
+                ) {
+                    BasicComponent(
+                        title = stringResource(R.string.home_manager_version),
+                        summary = state.systemInfo.managerVersion,
+                        startAction = {
+                            Icon(
+                                imageVector = MiuixIcons.Link,
+                                contentDescription = null,
+                                modifier = Modifier.padding(end = 6.dp),
+                                tint = colorScheme.onBackground,
+                            )
+                        },
+                    )
+                }
             }
         }
     } else {
-        // 未授权：三块并排布局
+        // 未授权：左边正方形卡片 + 右边两个框上下堆叠
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(IntrinsicSize.Min),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            // 第1块：正方形"未工作"卡片
+            // 左边：正方形"未工作"卡片
             Card(
                 modifier = Modifier
                     .weight(1f)
@@ -408,50 +413,53 @@ private fun StatusCard(
                 )
             }
 
-            // 第2块：Shizuku 状态
-            Card(
-                modifier = Modifier
-                    .weight(1f)
-                    .aspectRatio(1f),
-                onClick = actions.onInstallClick,
-                showIndication = true,
-                pressFeedbackType = PressFeedbackType.Sink
+            // 右边：两个框上下堆叠
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                BasicComponent(
-                    title = stringResource(R.string.permission_shizuku_title),
-                    summary = stringResource(R.string.permission_shizuku_not_granted),
-                    startAction = {
-                        Icon(
-                            Icons.Rounded.ErrorOutline,
-                            contentDescription = null,
-                            modifier = Modifier.padding(end = 6.dp),
-                            tint = colorScheme.onBackground,
-                        )
-                    },
-                )
-            }
-
-            // 第3块：Root 状态
-            Card(
-                modifier = Modifier
-                    .weight(1f)
-                    .aspectRatio(1f),
-                onClick = actions.onInstallClick,
-                showIndication = true,
-                pressFeedbackType = PressFeedbackType.Sink
-            ) {
-                BasicComponent(
-                    title = stringResource(R.string.permission_root_title),
-                    summary = stringResource(R.string.permission_root_not_granted),
-                    startAction = {
-                        Icon(
-                            Icons.Rounded.ErrorOutline,
-                            contentDescription = null,
-                            modifier = Modifier.padding(end = 6.dp),
-                            tint = colorScheme.onBackground,
-                        )
-                    },
-                )
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                    onClick = actions.onInstallClick,
+                    showIndication = true,
+                    pressFeedbackType = PressFeedbackType.Sink
+                ) {
+                    BasicComponent(
+                        title = stringResource(R.string.permission_shizuku_title),
+                        summary = stringResource(R.string.permission_shizuku_not_granted),
+                        startAction = {
+                            Icon(
+                                Icons.Rounded.ErrorOutline,
+                                contentDescription = null,
+                                modifier = Modifier.padding(end = 6.dp),
+                                tint = colorScheme.onBackground,
+                            )
+                        },
+                    )
+                }
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                    onClick = actions.onInstallClick,
+                    showIndication = true,
+                    pressFeedbackType = PressFeedbackType.Sink
+                ) {
+                    BasicComponent(
+                        title = stringResource(R.string.permission_root_title),
+                        summary = stringResource(R.string.permission_root_not_granted),
+                        startAction = {
+                            Icon(
+                                Icons.Rounded.ErrorOutline,
+                                contentDescription = null,
+                                modifier = Modifier.padding(end = 6.dp),
+                                tint = colorScheme.onBackground,
+                            )
+                        },
+                    )
+                }
             }
         }
     }
