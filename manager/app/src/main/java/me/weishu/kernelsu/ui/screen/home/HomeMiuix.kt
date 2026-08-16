@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.add
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -239,110 +240,218 @@ private fun StatusCard(
     state: HomeUiState,
     actions: HomeActions,
 ) {
-    Column {
-        // 洛茜工具箱：使用新的权限授权状态（替代原 ksuVersion 三分支）
-        val working = state.permissionGrant.isWorking
-        val grantLabel = state.permissionGrant.displayLabel
+    val working = state.permissionGrant.isWorking
+    val grantLabel = state.permissionGrant.displayLabel
 
-        if (working) {
-            val workingMode = if (grantLabel.isNotEmpty()) grantLabel else null
+    val workingBgColor = when {
+        isDynamicColor -> colorScheme.secondaryContainer
+        isInDarkTheme() -> Color(0xFF1A3825)
+        else -> Color(0xFFDFFAE4)
+    }
 
-            Row(
+    if (working) {
+        // 工作中：三块并排布局
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(IntrinsicSize.Min),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            // 第1块：正方形"工作中"状态卡片
+            Card(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .height(IntrinsicSize.Min),
-                verticalAlignment = Alignment.CenterVertically,
+                    .weight(1f)
+                    .aspectRatio(1f),
+                colors = CardDefaults.defaultColors(color = workingBgColor),
+                onClick = actions.onInstallClick,
+                showIndication = true,
+                pressFeedbackType = PressFeedbackType.Tilt
             ) {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.defaultColors(
-                        color = when {
-                            isDynamicColor -> colorScheme.secondaryContainer
-                            isInDarkTheme() -> Color(0xFF1A3825)
-                            else -> Color(0xFFDFFAE4)
-                        }
-                    ),
-                    onClick = actions.onInstallClick,
-                    showIndication = true,
-                    pressFeedbackType = PressFeedbackType.Tilt
-                ) {
-                    Box {
+                Box(modifier = Modifier.fillMaxSize()) {
+                    // 右下角大图标
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .offset(10.dp, 12.dp),
+                        contentAlignment = Alignment.BottomEnd
+                    ) {
+                        Icon(
+                            modifier = Modifier.size(48.dp),
+                            imageVector = Icons.Rounded.CheckCircleOutline,
+                            tint = if (isDynamicColor) {
+                                colorScheme.primary.copy(alpha = 0.8f)
+                            } else {
+                                Color(0xFF36D167)
+                            },
+                            contentDescription = null
+                        )
+                    }
+                    // 左下角权限类型
+                    if (grantLabel.isNotEmpty()) {
                         Box(
                             modifier = Modifier
                                 .fillMaxSize()
-                                .offset(27.dp, 31.dp),
-                            contentAlignment = Alignment.BottomEnd
+                                .padding(12.dp, 8.dp),
+                            contentAlignment = Alignment.BottomStart,
                         ) {
-                            Icon(
-                                modifier = Modifier.size(110.dp),
-                                imageVector = Icons.Rounded.CheckCircleOutline,
-                                tint = if (isDynamicColor) {
-                                    colorScheme.primary.copy(alpha = 0.8f)
-                                } else {
-                                    Color(0xFF36D167)
-                                },
-                                contentDescription = null
+                            Text(
+                                text = grantLabel,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Medium,
                             )
                         }
-                        if (workingMode != null) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .padding(16.dp, 10.dp),
-                                contentAlignment = Alignment.BottomStart,
-                            ) {
-                                Text(
-                                    text = workingMode,
-                                    fontSize = 16.sp,
-                                    fontWeight = FontWeight.Medium,
-                                )
-                            }
-                        }
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(16.dp, 14.dp),
-                            contentAlignment = Alignment.TopStart,
-                        ) {
-                            Column {
-                                Text(
-                                    text = stringResource(id = R.string.permission_working),
-                                    fontSize = 22.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                )
-                                Spacer(Modifier.height(1.dp))
-                                Text(
-                                    text = stringResource(R.string.permission_working_summary),
-                                    fontSize = 15.sp,
-                                    fontWeight = FontWeight.Medium,
-                                )
-                            }
+                    }
+                    // 左上角标题
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(12.dp, 10.dp),
+                        contentAlignment = Alignment.TopStart,
+                    ) {
+                        Column {
+                            Text(
+                                text = stringResource(id = R.string.permission_working),
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.SemiBold,
+                            )
+                            Spacer(Modifier.height(2.dp))
+                            Text(
+                                text = stringResource(R.string.permission_working_summary),
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Medium,
+                            )
                         }
                     }
                 }
             }
-        } else {
-            // 未授权：显示"未工作"
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Card(
-                    modifier = Modifier.weight(1f),
-                    onClick = actions.onInstallClick,
-                    showIndication = true,
-                    pressFeedbackType = PressFeedbackType.Sink
-                ) {
-                    BasicComponent(
-                        title = stringResource(R.string.permission_not_working),
-                        summary = stringResource(R.string.permission_tap_to_grant),
-                        startAction = {
-                            Icon(
-                                Icons.Rounded.ErrorOutline,
-                                stringResource(R.string.permission_not_working),
-                                modifier = Modifier.padding(end = 6.dp),
-                                tint = colorScheme.onBackground,
-                            )
-                        },
-                    )
-                }
+
+            // 第2块：权限类型信息
+            Card(
+                modifier = Modifier
+                    .weight(1f)
+                    .aspectRatio(1f),
+                onClick = actions.onInstallClick,
+                showIndication = true,
+                pressFeedbackType = PressFeedbackType.Sink
+            ) {
+                BasicComponent(
+                    title = stringResource(R.string.permission_screen_title),
+                    summary = when (state.permissionGrant) {
+                        me.weishu.kernelsu.ui.util.PermissionGrantType.ROOT ->
+                            stringResource(R.string.permission_root_granted)
+                        me.weishu.kernelsu.ui.util.PermissionGrantType.ADB ->
+                            stringResource(R.string.permission_shizuku_granted)
+                        me.weishu.kernelsu.ui.util.PermissionGrantType.BOTH ->
+                            stringResource(R.string.permission_grant_type_both)
+                        else -> grantLabel
+                    },
+                    startAction = {
+                        Icon(
+                            Icons.Rounded.CheckCircleOutline,
+                            contentDescription = null,
+                            modifier = Modifier.padding(end = 6.dp),
+                            tint = colorScheme.onBackground,
+                        )
+                    },
+                )
+            }
+
+            // 第3块：系统信息
+            Card(
+                modifier = Modifier
+                    .weight(1f)
+                    .aspectRatio(1f),
+                onClick = { /* no-op */ },
+                showIndication = false,
+                pressFeedbackType = PressFeedbackType.Sink
+            ) {
+                BasicComponent(
+                    title = stringResource(R.string.home_manager_version),
+                    summary = state.systemInfo.managerVersion,
+                    startAction = {
+                        Icon(
+                            imageVector = MiuixIcons.Link,
+                            contentDescription = null,
+                            modifier = Modifier.padding(end = 6.dp),
+                            tint = colorScheme.onBackground,
+                        )
+                    },
+                )
+            }
+        }
+    } else {
+        // 未授权：三块并排布局
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            // 第1块：正方形"未工作"卡片
+            Card(
+                modifier = Modifier
+                    .weight(1f)
+                    .aspectRatio(1f),
+                onClick = actions.onInstallClick,
+                showIndication = true,
+                pressFeedbackType = PressFeedbackType.Sink
+            ) {
+                BasicComponent(
+                    title = stringResource(R.string.permission_not_working),
+                    summary = stringResource(R.string.permission_tap_to_grant),
+                    startAction = {
+                        Icon(
+                            Icons.Rounded.ErrorOutline,
+                            stringResource(R.string.permission_not_working),
+                            modifier = Modifier.padding(end = 6.dp),
+                            tint = colorScheme.onBackground,
+                        )
+                    },
+                )
+            }
+
+            // 第2块：Shizuku 状态
+            Card(
+                modifier = Modifier
+                    .weight(1f)
+                    .aspectRatio(1f),
+                onClick = actions.onInstallClick,
+                showIndication = true,
+                pressFeedbackType = PressFeedbackType.Sink
+            ) {
+                BasicComponent(
+                    title = stringResource(R.string.permission_shizuku_title),
+                    summary = stringResource(R.string.permission_shizuku_not_granted),
+                    startAction = {
+                        Icon(
+                            Icons.Rounded.ErrorOutline,
+                            contentDescription = null,
+                            modifier = Modifier.padding(end = 6.dp),
+                            tint = colorScheme.onBackground,
+                        )
+                    },
+                )
+            }
+
+            // 第3块：Root 状态
+            Card(
+                modifier = Modifier
+                    .weight(1f)
+                    .aspectRatio(1f),
+                onClick = actions.onInstallClick,
+                showIndication = true,
+                pressFeedbackType = PressFeedbackType.Sink
+            ) {
+                BasicComponent(
+                    title = stringResource(R.string.permission_root_title),
+                    summary = stringResource(R.string.permission_root_not_granted),
+                    startAction = {
+                        Icon(
+                            Icons.Rounded.ErrorOutline,
+                            contentDescription = null,
+                            modifier = Modifier.padding(end = 6.dp),
+                            tint = colorScheme.onBackground,
+                        )
+                    },
+                )
             }
         }
     }
