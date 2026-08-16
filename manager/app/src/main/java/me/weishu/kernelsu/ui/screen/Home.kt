@@ -606,15 +606,7 @@ private fun InfoCard() {
             )
             InfoText(
                 title = stringResource(R.string.home_manager_version),
-                content = "${managerVersion.first} (${managerVersion.second})"
-            )
-            InfoText(
-                title = stringResource(R.string.home_fingerprint),
-                content = Build.FINGERPRINT
-            )
-            InfoText(
-                title = stringResource(R.string.home_selinux_status),
-                content = getSELinuxStatus(),
+                content = "${managerVersion.first} (${managerVersion.second})",
                 bottomPadding = 0.dp
             )
         }
