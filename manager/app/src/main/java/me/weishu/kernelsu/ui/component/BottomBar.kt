@@ -6,8 +6,8 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.pager.PagerState
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Apps
 import androidx.compose.material.icons.rounded.Cottage
-import androidx.compose.material.icons.rounded.Extension
 import androidx.compose.material.icons.rounded.FolderOpen
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.runtime.Composable
@@ -71,7 +71,7 @@ enum class BottomBarDestination(
 ) {
     Home(R.string.home, Icons.Rounded.Cottage),
     SuperUser(R.string.file_manager, Icons.Rounded.FolderOpen),
-    Module(R.string.module, Icons.Rounded.Extension),
+    Module(R.string.function, Icons.Rounded.Apps),
     Setting(R.string.settings, Icons.Rounded.Settings)
 }
 

@@ -18,6 +18,8 @@
     <string name="superuser">超级用户</string>
     <string name="file_manager">文件管理</string>
     <string name="file_count">文件个数</string>
+    <string name="function">功能</string>
+    <string name="last_used_time">上次使用时间</string>
     <string name="module_failed_to_enable">无法启用模块：%s</string>
     <string name="module_failed_to_disable">无法禁用模块：%s</string>
     <string name="module_empty">没有安装模块</string>

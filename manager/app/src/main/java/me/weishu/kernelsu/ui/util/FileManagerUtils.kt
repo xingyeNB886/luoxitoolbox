@@ -6,11 +6,11 @@ import com.topjohnwu.superuser.ShellUtils
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import me.weishu.kernelsu.ksuApp
 import me.weishu.kernelsu.service.IShellService
 import me.weishu.kernelsu.service.ShellService
 import rikka.shizuku.Shizuku
-import java.util.concurrent.TimeUnit
 import kotlin.coroutines.resume
 
 /**
@@ -36,21 +36,26 @@ object FileManagerUtils {
     const val LOADING_BG_DIR =
         "/storage/emulated/0/Android/data/com.tencent.tmgp.pubgmhd/files/UE4Game/ShadowTrackerExtra/ShadowTrackerExtra/Saved/ImageDownloadV3/LoadingBG"
 
+    /** 单条命令执行超时，防止 shell 通道卡死导致界面永久等待 */
+    private const val EXEC_TIMEOUT_MS = 15_000L
+
     /**
      * 执行 shell 命令（自动选择 Root / Shizuku）。
-     * @return 命令输出；无权限或执行失败返回 null
+     * @return 命令输出；无权限或执行失败/超时返回 null
      */
     suspend fun exec(cmd: String): String? = withContext(Dispatchers.IO) {
         val grant = PermissionManager.checkGrantType()
         when {
             grant == PermissionGrantType.ROOT || grant == PermissionGrantType.BOTH -> {
-                runCatching {
-                    ShellUtils.fastCmd(getRootShell(), cmd)
-                }.getOrNull()
+                withTimeoutOrNull(EXEC_TIMEOUT_MS) {
+                    runCatching {
+                        ShellUtils.fastCmd(getRootShell(), cmd)
+                    }.getOrNull()
+                }
             }
 
             grant == PermissionGrantType.ADB -> {
-                execWithShizuku(cmd)
+                withTimeoutOrNull(EXEC_TIMEOUT_MS) { execWithShizuku(cmd) }
             }
 
             else -> null
@@ -58,19 +63,10 @@ object FileManagerUtils {
     }
 
     /**
-     * 检测初始化状态：
-     * @return Pair(目录是否存在, 标记文件是否存在)；无权限返回 null
+     * 执行初始化：创建 luoxi 目录和标记文件。
+     * mkdir -p / touch 天然幂等——已存在的直接跳过，缺的补上。
+     * @return 是否成功（无权限返回 false）
      */
-    suspend fun checkInitState(): Pair<Boolean, Boolean>? {
-        val cmd = "test -d '$LUOXI_DIR' && echo 1 || echo 0; " +
-            "test -f '$MARK_FILE' && echo 1 || echo 0"
-        val out = exec(cmd) ?: return null
-        val lines = out.trim().lines().filter { it.isNotEmpty() }
-        if (lines.size < 2) return null
-        return Pair(lines[0].trim() == "1", lines[1].trim() == "1")
-    }
-
-    /** 创建目录和标记文件（缺哪个补哪个） */
     suspend fun ensureInitFiles(): Boolean {
         val cmd = "mkdir -p '$LUOXI_DIR'; touch '$MARK_FILE'"
         return exec(cmd) != null
@@ -78,7 +74,7 @@ object FileManagerUtils {
 
     /**
      * 读取 LoadingBG 目录下的文件名列表。
-     * @return 文件名列表（目录为空或不存在返回空列表）；无权限返回 null
+     * @return 文件名列表（目录为空或不存在返回空列表）；无权限/失败返回 null
      */
     suspend fun listLoadingBGFiles(): List<String>? {
         val out = exec("ls -1 '$LOADING_BG_DIR'") ?: return null
@@ -111,6 +107,7 @@ object FileManagerUtils {
     /**
      * 通过 Shizuku UserService 执行命令。
      * bindUserService 是异步的，这里封装成 suspend。
+     * 调用方须用 withTimeoutOrNull 包裹，防止服务异常时永不回调。
      */
     private suspend fun execWithShizuku(cmd: String): String? =
         suspendCancellableCoroutine { cont ->

@@ -27,6 +27,11 @@
 -keep class rikka.shizuku.** { *; }
 -keep class moe.shizuku.** { *; }
 
+# 保留 Shizuku UserService 的 AIDL 接口和实现类（跨进程 Binder 按类名反序列化，混淆即失效）
+-keep class me.weishu.kernelsu.service.IShellService { *; }
+-keep class me.weishu.kernelsu.service.IShellService$* { *; }
+-keep class me.weishu.kernelsu.service.ShellService { *; }
+
 # 保留 HiddenApiBypass（被 attachBaseContext 反射调用）
 -keep class org.lsposed.hiddenapibypass.** { *; }
 

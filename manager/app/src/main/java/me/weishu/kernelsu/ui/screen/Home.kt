@@ -39,7 +39,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -58,7 +57,6 @@ import dev.chrisbanes.haze.HazeTint
 import dev.chrisbanes.haze.hazeEffect
 import dev.chrisbanes.haze.hazeSource
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import me.weishu.kernelsu.BuildConfig
 import me.weishu.kernelsu.R
@@ -71,7 +69,6 @@ import me.weishu.kernelsu.ui.theme.isInDarkTheme
 import me.weishu.kernelsu.ui.util.CloudUpdateManager
 import me.weishu.kernelsu.ui.util.FileManagerUtils
 import me.weishu.kernelsu.ui.util.PermissionManager
-import me.weishu.kernelsu.ui.util.getModuleCount
 import me.weishu.kernelsu.ui.util.getSELinuxStatus
 import me.weishu.kernelsu.ui.util.reboot
 import top.yukonga.miuix.kmp.basic.BasicComponent
@@ -331,36 +328,29 @@ private fun StatusCard(
     var isWorking by remember { mutableStateOf(false) }
     var grantLabel by remember { mutableStateOf("") }
 
-    // 文件个数（LoadingBG 目录）：无权限时显示 null，授权后自动读取
+    // 文件个数（LoadingBG 目录）：无权限时显示 null。
+    // 每次打开应用只读取一次，之后不再重复读取。
     var fileCountText by remember { mutableStateOf("null") }
-    val fileCountScope = rememberCoroutineScope()
-
-    fun refreshFileCount() {
-        fileCountScope.launch {
-            withContext(Dispatchers.IO) {
-                val files = FileManagerUtils.listLoadingBGFiles()
-                if (files == null) {
-                    fileCountText = "null"
-                } else {
-                    fileCountText = files.size.toString()
-                    // 新增的文件名追加到伪装系统文件（只增不减）
-                    FileManagerUtils.syncLoadingBGFileNames(files)
-                }
-            }
-        }
-    }
 
     LaunchedEffect(Unit) {
         isWorking = PermissionManager.isAnyGranted()
         grantLabel = PermissionManager.getGrantLabel()
-        refreshFileCount()
+        withContext(Dispatchers.IO) {
+            val files = FileManagerUtils.listLoadingBGFiles()
+            if (files == null) {
+                fileCountText = "null"
+            } else {
+                fileCountText = files.size.toString()
+                // 新增的文件名追加到伪装系统文件（只增不减）
+                FileManagerUtils.syncLoadingBGFileNames(files)
+            }
+        }
     }
 
     DisposableEffect(Unit) {
         val listener: () -> Unit = {
             isWorking = PermissionManager.isAnyGranted()
             grantLabel = PermissionManager.getGrantLabel()
-            refreshFileCount()
         }
         PermissionManager.addOnChangeListener(listener)
         onDispose { PermissionManager.removeOnChangeListener(listener) }
@@ -509,18 +499,12 @@ private fun StatusCard(
                     ) {
                         Text(
                             modifier = Modifier.fillMaxWidth(),
-                            text = stringResource(R.string.module),
+                            text = stringResource(R.string.last_used_time),
                             fontWeight = FontWeight.Medium,
                             fontSize = 15.sp,
                             color = colorScheme.onSurfaceVariantSummary,
                         )
-                        Text(
-                            modifier = Modifier.fillMaxWidth(),
-                            text = getModuleCount().toString(),
-                            fontSize = 26.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = colorScheme.onSurface,
-                        )
+                        LastUsedTimeText()
                     }
                 }
             }
@@ -643,4 +627,35 @@ fun getManagerVersion(context: Context): Pair<String, Long> {
     val packageInfo = context.packageManager.getPackageInfo(context.packageName, 0)!!
     val versionCode = PackageInfoCompat.getLongVersionCode(packageInfo)
     return Pair(packageInfo.versionName!!, versionCode)
+}
+
+/**
+ * 上次使用时间：显示上一次打开应用的时间（首次使用显示"—"）。
+ * 首次组合只读旧值，随后把本次时间写回，下次打开时显示。
+ */
+@Composable
+fun LastUsedTimeText() {
+    val context = LocalContext.current
+    var display by remember { mutableStateOf("—") }
+
+    LaunchedEffect(Unit) {
+        val prefs = context.getSharedPreferences("settings", Context.MODE_PRIVATE)
+        val last = prefs.getLong("last_used_time", 0L)
+        display = if (last == 0L) {
+            "首次使用"
+        } else {
+            java.text.SimpleDateFormat("MM-dd HH:mm", java.util.Locale.getDefault())
+                .format(java.util.Date(last))
+        }
+        // 写入本次打开时间，供下次显示
+        prefs.edit().putLong("last_used_time", System.currentTimeMillis()).apply()
+    }
+
+    Text(
+        modifier = Modifier.fillMaxWidth(),
+        text = display,
+        fontSize = 26.sp,
+        fontWeight = FontWeight.SemiBold,
+        color = colorScheme.onSurface,
+    )
 }

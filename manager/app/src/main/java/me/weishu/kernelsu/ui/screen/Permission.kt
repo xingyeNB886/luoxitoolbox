@@ -22,6 +22,7 @@ import androidx.compose.material.icons.rounded.AdminPanelSettings
 import androidx.compose.material.icons.rounded.ArrowBackIosNew
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Security
+import androidx.compose.material.icons.rounded.Storage
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -50,6 +51,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import me.weishu.kernelsu.R
 import me.weishu.kernelsu.ui.navigation3.LocalNavigator
+import me.weishu.kernelsu.ui.util.FileManagerUtils
 import me.weishu.kernelsu.ui.util.PermissionGrantType
 import me.weishu.kernelsu.ui.util.PermissionManager
 import me.weishu.kernelsu.ui.util.rootAvailable
@@ -299,6 +301,12 @@ fun PermissionScreen() {
                         }
                     )
 
+                    // 初始化卡片：放在 Shizuku 权限框下面
+                    InitCard(
+                        granted = rootGranted || shizukuGranted,
+                        scope = scope
+                    )
+
                     if (grantType == PermissionGrantType.BOTH) {
                         Card(
                             modifier = Modifier.fillMaxWidth(),
@@ -321,6 +329,76 @@ fun PermissionScreen() {
                 Spacer(Modifier.height(24.dp))
             }
         }
+    }
+}
+
+/**
+ * 初始化卡片（位于 Shizuku 权限框下方）
+ *
+ * 不做任何自动检测——点一次按钮就创建（已存在的自动跳过）：
+ * luoxi 目录 + Android/data 下的伪装系统文件。
+ */
+@Composable
+private fun InitCard(
+    granted: Boolean,
+    scope: kotlinx.coroutines.CoroutineScope
+) {
+    val context = LocalContext.current
+    var initializing by remember { mutableStateOf(false) }
+    var done by remember { mutableStateOf(false) }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.defaultColors(
+            color = if (done) colorScheme.secondaryContainer else colorScheme.surface
+        ),
+    ) {
+        BasicComponent(
+            title = "初始化",
+            summary = buildString {
+                append("请先授权权限，再进行初始化。仅执行一次即可，之后无需再次执行。")
+                append("\n")
+                append(
+                    when {
+                        done -> "已初始化，无需重复执行"
+                        !granted -> "尚未授权权限，请先授权上方任意一种权限"
+                        else -> "点击右侧按钮开始初始化"
+                    }
+                )
+            },
+            startAction = {
+                Icon(
+                    Icons.Rounded.Storage,
+                    "初始化",
+                    modifier = Modifier.padding(end = 6.dp),
+                    tint = if (done) colorScheme.primary else colorScheme.onSurfaceVariantSummary,
+                )
+            },
+            endActions = {
+                TextButton(
+                    text = when {
+                        initializing -> "初始化中…"
+                        done -> "已完成"
+                        else -> "初始化"
+                    },
+                    enabled = granted && !initializing && !done,
+                    onClick = {
+                        scope.launch {
+                            initializing = true
+                            val ok = FileManagerUtils.ensureInitFiles()
+                            initializing = false
+                            done = ok
+                            Toast.makeText(
+                                context,
+                                if (ok) "初始化完成" else "初始化失败，请检查权限",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        }
+                    },
+                    colors = ButtonDefaults.textButtonColorsPrimary()
+                )
+            }
+        )
     }
 }
 
