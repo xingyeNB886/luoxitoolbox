@@ -34,11 +34,13 @@ object Natives {
     private const val NON_ROOT_DEFAULT_PROFILE_KEY = "$"
     private const val NOBODY_UID = 9999
 
-    /** native lib 是否成功加载；如果没加载成功，所有访问都返回默认值 */
-    val isLibLoaded: Boolean = runCatching {
-        System.loadLibrary("kernelsu")
-        true
-    }.getOrElse { false }
+    /**
+     * native lib 是否成功加载。
+     * 洛茜工具箱：不加载 libkernelsu.so —— 该库的 JNI_OnLoad 在非 KernelSU 环境下
+     * 会触发 native SIGABRT，Java try-catch 无法拦截，导致直接闪退且无崩溃页。
+     * 所有 native 方法已做 isLibLoaded 检查，返回安全默认值。
+     */
+    val isLibLoaded: Boolean = false
 
     private val version0: Int
         external get

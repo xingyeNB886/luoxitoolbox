@@ -111,12 +111,7 @@ android {
     androidResources {
         generateLocaleConfig = true
     }
-    compileSdk {
-        version =
-            release(androidCompileSdkVersion) {
-                minorApiLevel = androidCompileSdkVersionMinor
-            }
-    }
+    compileSdk = androidCompileSdkVersion
     buildToolsVersion = androidBuildToolsVersion
     ndkVersion = androidCompileNdkVersion
 
