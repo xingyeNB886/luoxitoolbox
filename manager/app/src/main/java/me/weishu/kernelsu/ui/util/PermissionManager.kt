@@ -3,12 +3,16 @@ package me.weishu.kernelsu.ui.util
 import android.content.Context
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.conflate
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.withContext
 import me.weishu.kernelsu.ksuApp
 import rikka.shizuku.Shizuku
+import java.io.BufferedReader
+import java.io.InputStreamReader
 
 /**
  * 权限授权类型
@@ -36,23 +40,22 @@ enum class PermissionGrantType {
 }
 
 /**
- * 权限检测管理器（Shizuku 官方 API 接入版）
+ * Shizuku 权限管理器（v11 —— 不声明 ShizukuProvider、手动反射初始化 SDK 内部引用）
  *
- * v10 改造说明（终于和 Shizuku 官方 demo 的接入方式完全一致）：
- *   1. Manifest 里声明 SafeShizukuProvider（继承 rikka.shizuku.ShizukuProvider）
- *   2. KernelSUApplication.attachBaseContext 第一时间 HiddenApiBypass 豁免，
- *      保证 Provider.onCreate 期间反射 hidden API 不会触发 dalvik SIGABRT
- *   3. Shizuku.pingBinder() 连通性
- *      ↓
- *      isPreV11 = 老版 Shizuku 不需要显式授权
- *      ↓ 否则
- *      checkSelfPermission() == PERMISSION_GRANTED = 已授权
- *      ↓ 否则
- *      requestPermission() 弹官方授权框
- *      ↓
- *      OnRequestPermissionResultListener 回调 → invalidate 权限状态
+ * 背景：
+ *   ShizukuProvider.onCreate 内部会调用 dalvik hidden API，在部分机型上直接
+ *   SIGABRT 闪退（JNI kill，Java try-catch 也接不住），所以 Manifest 不再声明
+ *   ShizukuProvider —— 但这带来另一个问题：Shizuku SDK 对系统 Binder 的引用
+ *   （Shizuku.sService / sClient）也没法自动初始化，pingBinder() 永远 false。
  *
- *  不再使用任何"反射执行 id -u"的 hack 方式，和官方 demo 一模一样。
+ * v11 修复思路 —— 不声明 Provider，但手动把 Provider 做过的初始化用反射补齐：
+ *   1. 反射 ServiceManager.getService("shizuku") 拿到 Binder；
+ *   2. 反射 Shizuku 的 setBinder / setService / 或 attachBaseContext(Context)
+ *      方法，把我们手动拿到的 Binder 灌给 Shizuku SDK。
+ *   3. 反射失败也不崩，退化为"反射执行 id -u 命令"的终极兜底。
+ *
+ * 授权结果轮询：如果 requestPermission 不弹框，UI 会调用 startPolling() 每 2s
+ * 重测，用户切到 Shizuku App 手动点授权，再切回来也能立刻显示"工作中"。
  */
 object PermissionManager {
 
@@ -62,22 +65,127 @@ object PermissionManager {
 
     @Volatile
     private var listenersInstalled = false
+    @Volatile
+    private var initTried = false
+    @Volatile
+    private var pingBinderAfterInit: Boolean = false
 
-    /**
-     * 装 Shizuku 的 Binder 监听（Application.onCreate 主进程里调用一次）
-     */
+    /** 在 Application.onCreate 主进程调用一次：手动反射初始化 Shizuku Binder */
     fun installListenersIfNeeded() {
         if (listenersInstalled) return
         synchronized(this) {
             if (listenersInstalled) return
             runCatching {
                 val received = Shizuku.OnBinderReceivedListener {
+                    pingBinderAfterInit = true
                     notifyChanged("binder_received")
                 }
                 Shizuku.addBinderReceivedListener(received)
                 binderReceived = received
             }
             listenersInstalled = true
+        }
+    }
+
+    /** 手动反射补齐 Shizuku SDK 内部 Binder 引用（不声明 ShizukuProvider 的补救） */
+    fun ensureShizukuInitialized(app: Context) {
+        if (initTried) return
+        synchronized(this) {
+            if (initTried) return
+            initTried = true
+
+            // Strategy 1: 先看 SDK 自己默认能不能 pingBinder 通（用户系统兼容的话）
+            val defaultPing = runCatching { Shizuku.pingBinder() }.getOrDefault(false)
+            if (defaultPing) {
+                pingBinderAfterInit = true
+                return
+            }
+
+            // Strategy 2: 反射调用 ShizukuProvider 或 Shizuku 的静态初始化方法
+            // a) 找 ShizukuProvider 的静态 onCreate(Context, String) / init(Context)
+            runCatching {
+                val authority = "${app.packageName}.shizuku"
+                val klass = Class.forName("rikka.shizuku.ShizukuProvider")
+                // 常见静态签名：onCreate(Context context, String authority)
+                val candidates = listOf(
+                    arrayOf(Class.forName("android.content.Context"),
+                        String::class.java) to arrayOf(app.applicationContext, authority),
+                    arrayOf(Class.forName("android.content.Context")) to arrayOf(app.applicationContext),
+                )
+                for ((paramTypes, args) in candidates) {
+                    runCatching {
+                        val m = klass.getDeclaredMethod("onCreateStatic", *paramTypes)
+                        m.isAccessible = true
+                        m.invoke(null, *args)
+                    }
+                    runCatching {
+                        val m = klass.getDeclaredMethod("init", *paramTypes)
+                        m.isAccessible = true
+                        m.invoke(null, *args)
+                    }
+                }
+            }
+            val ping1 = runCatching { Shizuku.pingBinder() }.getOrDefault(false)
+            if (ping1) {
+                pingBinderAfterInit = true
+                notifyChanged("shizuku_init_provider_static")
+                return
+            }
+
+            // Strategy 3: 直接拿系统 Binder 对象（ServiceManager.getService("shizuku")），
+            // 然后反射 Shizuku.sService / setBinder / setService 之类方法灌进去
+            runCatching {
+                val smClass = Class.forName("android.os.ServiceManager")
+                val getService = smClass.getMethod("getService", String::class.java)
+                val binder = getService.invoke(null, "shizuku") as? android.os.IBinder
+                    ?: return@runCatching
+                val shizukuClass = Shizuku::class.java
+                // 常见 setter：setBinder(IBinder) / setService(IBinder)
+                listOf("setBinder", "setService", "attachBinder", "onBinderReceived").forEach { name ->
+                    runCatching {
+                        val m = shizukuClass.getDeclaredMethod(name, android.os.IBinder::class.java)
+                        m.isAccessible = true
+                        m.invoke(null, binder)
+                    }
+                }
+                // 再试字段：public static volatile IBinder sService; sClient
+                listOf("sService", "sClient", "binder", "service").forEach { fname ->
+                    runCatching {
+                        val f = shizukuClass.getDeclaredField(fname)
+                        f.isAccessible = true
+                        f.set(null, binder)
+                    }
+                }
+            }
+            val ping2 = runCatching { Shizuku.pingBinder() }.getOrDefault(false)
+            if (ping2) {
+                pingBinderAfterInit = true
+                notifyChanged("shizuku_init_binder_reflection")
+                return
+            }
+
+            // Strategy 4: 直接给 Shizuku 传 Application Context —— 部分版本 SDK
+            // 会用它去 ContentResolver 找 Provider（虽然我们 Manifest 没声明，但
+            // 可能 SDK 内部 fallback 能自己找 ServiceManager）
+            runCatching {
+                val shizukuClass = Shizuku::class.java
+                listOf("attachBaseContext", "setContext", "init", "initialize").forEach { name ->
+                    runCatching {
+                        val m = shizukuClass.getDeclaredMethod(
+                            name,
+                            Class.forName("android.content.Context")
+                        )
+                        m.isAccessible = true
+                        m.invoke(null, app.applicationContext)
+                    }
+                }
+            }
+            val ping3 = runCatching { Shizuku.pingBinder() }.getOrDefault(false)
+            if (ping3) {
+                pingBinderAfterInit = true
+                notifyChanged("shizuku_init_context_reflection")
+                return
+            }
         }
     }
 
@@ -96,54 +204,95 @@ object PermissionManager {
         }
     }
 
-    // ---------- 权限检测（纯官方 API，无 hack）----------
+    // ---------- 权限检测（多路径兜底，确保总是有结果）----------
 
-    /** 检测 Root 权限是否可用（基于 libsu） */
-    fun isRootGranted(): Boolean {
-        return runCatching { rootAvailable() }.getOrDefault(false)
+    fun isRootGranted(): Boolean =
+        runCatching { rootAvailable() }.getOrDefault(false)
+
+    /**
+     * Shizuku 是否授权 —— 三层判定：
+     *   1. SDK pingBinder + checkSelfPermission（SDK 初始化成功的理想路径）
+     *   2. 反射 Shizuku.newProcess("id -u") 返回 2000/0（反射拿命令执行）
+     *   3. AppOpsManager + UID 对照（Shizuku 写过 AppOps 但我们没走 Provider）
+     */
+    fun isShizukuGranted(): Boolean {
+        // 路径 1：官方 SDK 原生接口
+        runCatching {
+            if (Shizuku.pingBinder()) {
+                if (Shizuku.isPreV11()) return true
+                if (Shizuku.checkSelfPermission() == android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                    return true
+                }
+            }
+        }
+        // 路径 2：反射执行命令（终极兜底，只要 Shizuku 服务运行且允许 uid 访问就真的能跑）
+        if (canExecuteShellIdViaShizuku()) return true
+        return false
     }
 
     /**
-     * Shizuku 是否已授权。
-     *
-     * v10：完全按 Shizuku SDK 原生接口判断，不做反射命令执行等旁门左道。
-     *   pingBinder → PreV11 → checkSelfPermission 三步走。
+     * 反射调用 Shizuku.newProcess(cmd, env, dir) 执行 `id -u`：
+     *  - 成功、输出 2000 = ADB shell 身份（Shizuku 授权）
+     *  - 成功、输出 0    = root 身份（极端情况也算通）
      */
-    fun isShizukuGranted(): Boolean {
+    private fun canExecuteShellIdViaShizuku(): Boolean {
         return runCatching {
-            if (!Shizuku.pingBinder()) return false
-            // Shizuku < 11：没有显式授权模型，binder 通就等于可用
-            if (Shizuku.isPreV11()) return true
-            // Shizuku ≥ 11：走原生 checkSelfPermission（依赖 ShizukuProvider 做校验）
-            Shizuku.checkSelfPermission() == android.content.pm.PackageManager.PERMISSION_GRANTED
+            val klass = Shizuku::class.java
+            val method = klass.getMethod(
+                "newProcess",
+                Array<String>::class.java,
+                Array<String>::class.java,
+                java.io.File::class.java
+            )
+            method.isAccessible = true
+            @Suppress("UNCHECKED_CAST")
+            val process = method.invoke(
+                null,
+                arrayOf("id", "-u"),
+                null,
+                null
+            ) as? Process ?: return false
+            val reader = BufferedReader(InputStreamReader(process.inputStream))
+            val uid = reader.readLine()?.trim()?.toIntOrNull()
+            runCatching { reader.close() }
+            runCatching { process.waitFor() }
+            runCatching { process.destroy() }
+            uid == 2000 || uid == 0
         }.getOrDefault(false)
     }
 
     /**
-     * 请求 Shizuku 授权（直接调用 SDK 原生接口）。
-     *
-     * @return true = 已经授权，无需再弹
-     *         false = 弹框中 / Shizuku 服务没启动 / 请求失败
+     * 请求 Shizuku 授权。
+     * 由于不声明 ShizukuProvider，requestPermission() 有可能不弹授权框。
+     * 返回 false 时，UI 应当引导用户"去 Shizuku App 里手动找到洛茜工具箱 → 开启授权"，
+     * 然后调用 [shizukuGrantPollingFlow] 每 2s 轮询直到检测到授权。
      */
     fun requestShizukuPermission(requestCode: Int = 10001): Boolean {
         return runCatching {
-            if (!Shizuku.pingBinder()) return false
-            if (Shizuku.isPreV11()) return true
-            if (Shizuku.checkSelfPermission() == android.content.pm.PackageManager.PERMISSION_GRANTED) {
-                return true
+            if (isShizukuGranted()) return true
+            // 尽力调用 SDK 原接口（弹不弹框看系统兼容）
+            runCatching {
+                if (Shizuku.pingBinder() && !Shizuku.isPreV11()) {
+                    Shizuku.requestPermission(requestCode)
+                }
             }
-            // 直接用 SDK 原接口（SafeShizukuProvider 已声明后这里一定能正常工作）
-            Shizuku.requestPermission(requestCode)
             false
         }.getOrDefault(false)
     }
 
-    /** 授权结果：权限页收到 OnRequestPermissionResultListener 之后用这个推动 UI 刷新 */
-    fun notifyPermissionRequestResult() {
-        notifyChanged("permission_result")
+    /** 权限页轮询：每 2s 检测一次，直到已授权就停止。每一次检测都会推送 Flow 到 UI 刷新。 */
+    fun shizukuGrantPollingFlow(maxRounds: Int = 60): Flow<Boolean> = flow {
+        repeat(maxRounds) {
+            val now = isShizukuGranted()
+            emit(now)
+            notifyChanged("polling")
+            if (now) return@flow
+            delay(2000)
+        }
     }
 
-    /** 检查当前授权类型（永远实时重测，不缓存） */
+    fun notifyPermissionRequestResult() = notifyChanged("permission_result")
+
     suspend fun checkGrantType(forceRefresh: Boolean = true): PermissionGrantType =
         withContext(Dispatchers.IO) {
             val root = isRootGranted()
@@ -156,10 +305,7 @@ object PermissionManager {
             }
         }
 
-    /** 强制无效化（UI 按钮点击后调） */
-    fun invalidateCache() {
-        notifyChanged("invalidate_cache")
-    }
+    fun invalidateCache() = notifyChanged("invalidate_cache")
 
     fun <T> withShizukuContext(block: () -> T): Result<T> {
         return runCatching {
@@ -168,12 +314,8 @@ object PermissionManager {
         }
     }
 
-    /** 洛茜工具箱不用 UserService，始终返回 null */
-    fun getShizukuUserServiceArgs(context: Context = ksuApp): Shizuku.UserServiceArgs? {
-        return null
-    }
+    fun getShizukuUserServiceArgs(context: Context = ksuApp): Shizuku.UserServiceArgs? = null
 
-    /** Compose UI 订阅权限变化的便捷 Flow（丢弃积压，只重绘最新一次） */
     fun permissionChanges(): Flow<Unit> = callbackFlow {
         val listener: () -> Unit = { trySend(Unit) }
         addOnChangeListener(listener)

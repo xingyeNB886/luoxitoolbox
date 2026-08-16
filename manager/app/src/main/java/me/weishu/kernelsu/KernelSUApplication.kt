@@ -136,6 +136,12 @@ class KernelSUApplication : Application(), ViewModelStoreOwner {
             }
             EarlyCrashHandler.markStage("onCreate_PermissionListenersReady")
 
+            // 手动反射补齐 Shizuku SDK 内部 Binder 引用（不声明 Provider 的补救）
+            runCatching {
+                me.weishu.kernelsu.ui.util.PermissionManager.ensureShizukuInitialized(this)
+            }
+            EarlyCrashHandler.markStage("onCreate_PermissionInitDone")
+
             // 读上次崩溃 / 启动阶段日志 —— 由 MainActivity 首帧统一展示
             runCatching { EarlyCrashHandler.handlePendingCrash() }
 

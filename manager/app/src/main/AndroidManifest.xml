@@ -125,24 +125,17 @@
             android:foregroundServiceType="dataSync" />
 
         <!--
-            洛茜工具箱：安全版 Shizuku Provider（v10 方案）。
-            根因回顾：v6/v7 闪退 = ShizukuProvider.onCreate 调用 hidden API
-            被 dalvik 的 hidden-api-policy 直接 SIGABRT（不是 Java Throwable，
-            连 Java try-catch 也接不住）。
-            修复：KernelSUApplication.attachBaseContext 第一时间（早于 Provider
-            创建时机）调用 HiddenApiBypass.addHiddenApiExemptions("L") 全开豁免，
-            此时 Provider 初始化不再触发 native kill；外层再用 SafeShizukuProvider
-            子类包裹 onCreate 的 Java 异常。
-            ShizukuProvider 是 Shizuku.requestPermission() / checkSelfPermission()
-            能正确弹框和回调的必要组件（没它的话授权框不一定出、权限状态也不准），
-            这就是 Shizuku 官方 demo 的接入方式。
+            洛茜工具箱：**不声明** rikka.shizuku.ShizukuProvider。
+            原因：ShizukuProvider.onCreate 会在 dalvik 层触发 hidden API policy →
+            JNI SIGABRT（非 Java Throwable，try-catch 接不住），表现是"点图标直接闪退
+            没任何提示"。即便 KernelSUApplication.attachBaseContext 调
+            HiddenApiBypass.addHiddenApiExemptions 全豁免，在部分机型 / Android 版本
+            上仍然 SIGABRT（例如 Shizuku 的 <clinit> 阶段 native 调用）。
+            为了"进 App 是第一优先级"，这里选择不声明 Provider。
+            Shizuku SDK 的 Binder 初始化、checkSelfPermission 映射、requestPermission
+            弹框等工作改在 Application.onCreate 中用反射手动补齐，
+            全部 runCatching 兜底，绝不闪退。见 PermissionManager.ensureShizukuInitialized()。
         -->
-        <provider
-            android:name=".ui.crash.SafeShizukuProvider"
-            android:authorities="${applicationId}.shizuku"
-            android:exported="false"
-            android:multiprocess="false"
-            android:permission="moe.shizuku.api.access.permission.BIND" />
     </application>
 
 </manifest>

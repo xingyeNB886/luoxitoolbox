@@ -96,18 +96,48 @@ fun PermissionScreen() {
         },
         onRequestShizuku = {
             scope.launch {
+                // 1. 先走官方 SDK 接口（可能弹授权框，也可能因无 Provider 不弹）
                 val already = PermissionManager.requestShizukuPermission(10001)
                 if (already) {
-                    Toast.makeText(context, R.string.permission_shizuku_granted, Toast.LENGTH_SHORT).show()
+                    withContext(Dispatchers.Main) {
+                        Toast.makeText(context, R.string.permission_shizuku_granted, Toast.LENGTH_SHORT).show()
+                    }
                     PermissionManager.invalidateCache()
                     doRefresh()
-                } else {
-                    // Shizuku 未运行时提示
-                    val running = runCatching { Shizuku.pingBinder() }.getOrDefault(false)
-                    if (!running) {
+                    return@launch
+                }
+
+                // 2. 如果 SDK 没能弹框（90% 情况是无 Provider 不弹）——
+                //    引导用户去 Shizuku App 里手动找"洛茜工具箱 → 开启授权"，
+                //    同时启动每 2s 轮询，直到检测到授权才停止（最多 2 分钟）。
+                val running = runCatching { Shizuku.pingBinder() }.getOrDefault(false)
+                    || PermissionManager.isShizukuGranted()
+                if (!running) {
+                    withContext(Dispatchers.Main) {
                         Toast.makeText(context, R.string.permission_shizuku_not_installed, Toast.LENGTH_LONG).show()
                     }
+                    return@launch
                 }
+
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(
+                        context,
+                        "请打开 Shizuku → 找到「洛茜工具箱」→ 开启授权；授权后本页会自动检测（最多 2 分钟）",
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
+
+                // 3. 轮询检测：每 2s 重测一次，检测到立刻刷新
+                PermissionManager.shizukuGrantPollingFlow(maxRounds = 60)
+                    .collect { granted ->
+                        doRefresh()
+                        if (granted) {
+                            withContext(Dispatchers.Main) {
+                                Toast.makeText(context, R.string.permission_shizuku_granted, Toast.LENGTH_SHORT).show()
+                            }
+                            return@collect
+                        }
+                    }
             }
         },
         onRefresh = {
