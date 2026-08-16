@@ -109,7 +109,6 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
         with:
           cache-encryption-key: ${{ runner.os }}-gradle-cache
-          build-root-directory: ${{ env.MANAGER_DIR }}
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v4
