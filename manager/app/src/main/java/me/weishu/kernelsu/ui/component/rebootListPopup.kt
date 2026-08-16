@@ -18,7 +18,6 @@ import top.yukonga.miuix.kmp.basic.ListPopupDefaults
 import top.yukonga.miuix.kmp.basic.PopupPositionProvider
 import top.yukonga.miuix.kmp.extra.SuperListPopup
 import top.yukonga.miuix.kmp.icon.MiuixIcons
-import top.yukonga.miuix.kmp.icon.extended.Close2
 import top.yukonga.miuix.kmp.theme.MiuixTheme.colorScheme
 
 @Composable
@@ -27,19 +26,18 @@ fun RebootListPopup(
     alignment: PopupPositionProvider.Align = PopupPositionProvider.Align.TopEnd
 ) {
     val showTopPopup = remember { mutableStateOf(false) }
-    KsuIsValid {
-        IconButton(
-            modifier = modifier,
-            onClick = { showTopPopup.value = true },
-            holdDownState = showTopPopup.value
-        ) {
-            Icon(
-                imageVector = MiuixIcons.Close2,
-                contentDescription = stringResource(id = R.string.reboot),
-                tint = colorScheme.onBackground
-            )
-        }
-        SuperListPopup(
+    IconButton(
+        modifier = modifier,
+        onClick = { showTopPopup.value = true },
+        holdDownState = showTopPopup.value
+    ) {
+        Icon(
+            imageVector = MiuixIcons.MoreCircle,
+            contentDescription = stringResource(id = R.string.reboot),
+            tint = colorScheme.onBackground
+        )
+    }
+    SuperListPopup(
             show = showTopPopup,
             popupPositionProvider = ListPopupDefaults.ContextMenuPositionProvider,
             alignment = alignment,
@@ -75,5 +73,4 @@ fun RebootListPopup(
                 }
             }
         }
-    }
 }

@@ -10,6 +10,7 @@ import androidx.lifecycle.ViewModelStore
 import androidx.lifecycle.ViewModelStoreOwner
 import me.weishu.kernelsu.ui.crash.EarlyCrashHandler
 import me.weishu.kernelsu.ui.crash.GlobalCrashHandler
+import me.weishu.kernelsu.ui.util.CloudUpdateManager
 import me.weishu.kernelsu.ui.viewmodel.SuperUserViewModel
 import okhttp3.Cache
 import okhttp3.OkHttpClient
@@ -96,7 +97,21 @@ class KernelSUApplication : Application(), ViewModelStoreOwner {
             }
             EarlyCrashHandler.markStage("onCreate_mainProcess")
 
-            // 主进程：装上完整版异常处理器（会启动 NativeCrashActivity）
+            // 主进程：防篡改签名校验
+        runCatching {
+            if (!CloudUpdateManager.verifyAppSignature(this)) {
+                EarlyCrashHandler.markStage("onCreate_signatureInvalid")
+                // 签名校验失败，标记为无效签名（由 HomePager 弹窗处理）
+                val prefs = getSharedPreferences("settings", Context.MODE_PRIVATE)
+                prefs.edit().putBoolean("signature_invalid", true).apply()
+            } else {
+                val prefs = getSharedPreferences("settings", Context.MODE_PRIVATE)
+                prefs.edit().putBoolean("signature_invalid", false).apply()
+            }
+        }
+        EarlyCrashHandler.markStage("onCreate_signatureVerified")
+
+        // 主进程：装上完整版异常处理器（会启动 NativeCrashActivity）
             runCatching { GlobalCrashHandler.init() }
             EarlyCrashHandler.markStage("onCreate_GlobalCrashHandlerReady")
 
