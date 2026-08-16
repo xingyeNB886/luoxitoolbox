@@ -6,6 +6,7 @@ import android.os.Build
 import android.util.Base64
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import me.weishu.kernelsu.BuildConfig
 import me.weishu.kernelsu.ksuApp
 import okhttp3.Request
 import java.security.MessageDigest
@@ -68,8 +69,9 @@ object CloudUpdateManager {
                         val md = MessageDigest.getInstance("SHA-256")
                         val digest = md.digest(cert.toByteArray())
                         val hash = Base64.encodeToString(digest, Base64.NO_WRAP)
-                        // 只要有有效签名就通过（运行时签名校验）
-                        return hash.isNotEmpty()
+                        // 与构建时注入的期望签名指纹对比，防止篡改签名绕过检测
+                        val expected = BuildConfig.EXPECTED_SIGNATURE
+                        return expected.isNotEmpty() && hash == expected
                     }
                 }
             } else {
@@ -84,7 +86,8 @@ object CloudUpdateManager {
                     val md = MessageDigest.getInstance("SHA-256")
                     val digest = md.digest(signatures[0].toByteArray())
                     val hash = Base64.encodeToString(digest, Base64.NO_WRAP)
-                    return hash.isNotEmpty()
+                    val expected = BuildConfig.EXPECTED_SIGNATURE
+                    return expected.isNotEmpty() && hash == expected
                 }
             }
             false

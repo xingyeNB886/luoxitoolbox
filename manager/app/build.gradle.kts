@@ -4,7 +4,6 @@ plugins {
     alias(libs.plugins.agp.app)
     alias(libs.plugins.compose.compiler)
     alias(libs.plugins.kotlin.serialization)
-    alias(libs.plugins.lsplugin.apksign)
     id("kotlin-parcelize")
 }
 
@@ -22,13 +21,6 @@ val managerVersionName: String by rootProject.extra
 val defaultManagerPackageName = "me.luoxi.toolbox"
 val defaultManagerName = "洛茜工具箱"
 
-apksign {
-    storeFileProperty = "KEYSTORE_FILE"
-    storePasswordProperty = "KEYSTORE_PASSWORD"
-    keyAliasProperty = "KEY_ALIAS"
-    keyPasswordProperty = "KEY_PASSWORD"
-}
-
 val baseCFlags = listOf(
     "-Wall", "-Qunused-arguments", "-fvisibility=hidden", "-fvisibility-inlines-hidden",
     "-fno-exceptions", "-fno-stack-protector", "-fomit-frame-pointer",
@@ -39,6 +31,22 @@ val baseCppFlags = baseCFlags + "-fno-rtti"
 android {
     namespace = "me.weishu.kernelsu"
 
+    signingConfigs {
+        val keystoreFile = project.findProperty("KEYSTORE_FILE") as? String
+        val keystorePassword = project.findProperty("KEYSTORE_PASSWORD") as? String
+        val keyAlias = project.findProperty("KEY_ALIAS") as? String
+        val keyPassword = project.findProperty("KEY_PASSWORD") as? String
+
+        if (keystoreFile != null && keystorePassword != null && keyAlias != null && keyPassword != null) {
+            create("release") {
+                storeFile = rootProject.file(keystoreFile)
+                storePassword = keystorePassword
+                keyAlias = keyAlias
+                keyPassword = keyPassword
+            }
+        }
+    }
+
     buildTypes {
         debug {
             externalNativeBuild {
@@ -48,6 +56,7 @@ android {
             }
         }
         release {
+            signingConfig = signingConfigs.findByName("release")
             isMinifyEnabled = true
             isShrinkResources = false
             vcsInfo.include = false
@@ -114,6 +123,8 @@ android {
         versionCode = managerVersionCode
         versionName = managerVersionName
         applicationId = defaultManagerPackageName
+
+        buildConfigField("String", "EXPECTED_SIGNATURE", "\"${project.findProperty("EXPECTED_SIGNATURE") ?: ""}\"")
 
         externalNativeBuild {
             cmake {
