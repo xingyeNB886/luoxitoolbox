@@ -124,12 +124,13 @@
             android:exported="false"
             android:foregroundServiceType="dataSync" />
 
-        <!--
-            洛茜工具箱：移除 ShizukuProvider 声明。
-            ContentProvider 在 Application.onCreate 之前初始化，
-            如果在此阶段崩溃，全局异常处理器尚未安装，会导致直接闪退且无崩溃页。
-            Shizuku 功能改用 Shizuku.pingBinder() + 代码方式按需初始化。
-        -->
+        <!-- 洛茜工具箱：Shizuku Provider（Shizuku SDK 必需，否则 pingBinder/checkSelfPermission 不工作） -->
+        <provider
+            android:name="rikka.shizuku.ShizukuProvider"
+            android:authorities="${applicationId}.shizuku"
+            android:exported="false"
+            android:multiprocess="false"
+            android:permission="moe.shizuku.api.access.permission.BIND" />
     </application>
 
 </manifest>
