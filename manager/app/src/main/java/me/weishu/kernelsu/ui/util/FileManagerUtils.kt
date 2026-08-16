@@ -5,6 +5,8 @@ import android.os.IBinder
 import com.topjohnwu.superuser.ShellUtils
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import me.weishu.kernelsu.ksuApp
@@ -105,11 +107,41 @@ object FileManagerUtils {
     // ---------- Shizuku UserService ----------
 
     /**
-     * 通过 Shizuku UserService 执行命令。
-     * bindUserService 是异步的，这里封装成 suspend。
-     * 调用方须用 withTimeoutOrNull 包裹，防止服务异常时永不回调。
+     * 崩溃修复（ConcurrentModificationException）：
+     * Shizuku 在主线程遍历内部 listener map 时，旧的"每次命令 bind → 回调里立即 unbind"
+     * 会在同一次遍历中修改该 map，导致崩溃。
+     * 现改为：整个应用生命周期只 bind 一次，缓存 Binder 复用，永不主动 unbind；
+     * Binder 失效时清空缓存并自动重绑。Mutex 防止启动时多页面并发触发重复绑定。
      */
-    private suspend fun execWithShizuku(cmd: String): String? =
+    private val bindMutex = Mutex()
+
+    @Volatile
+    private var cachedService: IShellService? = null
+
+    private suspend fun execWithShizuku(cmd: String): String? {
+        // 快路径：服务已绑定，直接调用
+        cachedService?.let { s ->
+            runCatching { return s.exec(cmd) }
+            cachedService = null // Binder 已失效，走重绑
+        }
+        return bindMutex.withLock {
+            // 双重检查：等锁期间可能已被别的协程绑定
+            cachedService?.let { s ->
+                runCatching { return@withLock s.exec(cmd) }
+                cachedService = null
+            }
+            val s = bindShellService() ?: return@withLock null
+            cachedService = s
+            runCatching { s.exec(cmd) }.getOrNull()
+        }
+    }
+
+    /**
+     * 绑定 UserService（整个会话只调用一次）。
+     * 注意：onServiceConnected 里不做任何 unbind / map 修改，
+     * 否则会撞上 Shizuku 主线程的 listener 遍历（ConcurrentModificationException）。
+     */
+    private suspend fun bindShellService(): IShellService? =
         suspendCancellableCoroutine { cont ->
             if (!PermissionManager.isShizukuGranted()) {
                 cont.resume(null)
@@ -124,22 +156,20 @@ object FileManagerUtils {
             val connection = object : android.content.ServiceConnection {
                 override fun onServiceConnected(name: ComponentName?, binder: IBinder?) {
                     val service = IShellService.Stub.asInterface(binder)
-                    val result = runCatching { service.exec(cmd) }.getOrNull()
-                    // 用完即解绑，避免占用 Shizuku 服务
-                    runCatching { Shizuku.unbindUserService(args, this, true) }
-                    if (cont.isActive) cont.resume(result)
+                    cachedService = service
+                    if (cont.isActive) cont.resume(service)
                 }
 
-                override fun onServiceDisconnected(name: ComponentName?) {}
+                override fun onServiceDisconnected(name: ComponentName?) {
+                    // 服务进程死亡，清缓存，下次调用自动重绑
+                    cachedService = null
+                }
             }
 
             val bound = runCatching { Shizuku.bindUserService(args, connection) }.isSuccess
             if (!bound && cont.isActive) {
                 cont.resume(null)
-                return@suspendCancellableCoroutine
             }
-            cont.invokeOnCancellation {
-                runCatching { Shizuku.unbindUserService(args, connection, true) }
-            }
+            // 不注册 invokeOnCancellation 解绑：绑定是会话级的，保持占用即可
         }
 }
