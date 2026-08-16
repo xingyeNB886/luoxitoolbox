@@ -73,9 +73,8 @@ fun AboutScreen() {
     )
 
     val htmlString = stringResource(
-        id = R.string.about_source_code,
-        "<b><a href=\"https://github.com/tiann/KernelSU\">GitHub</a></b>",
-        "<b><a href=\"https://t.me/KernelSU\">Telegram</a></b>"
+        id = R.string.about_join_channel,
+        "<b><a href=\"https://t.me/xingyeNB886\">Telegram</a></b>"
     )
     val result = extractLinks(htmlString)
 

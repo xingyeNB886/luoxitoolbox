@@ -39,6 +39,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -57,7 +58,9 @@ import dev.chrisbanes.haze.HazeTint
 import dev.chrisbanes.haze.hazeEffect
 import dev.chrisbanes.haze.hazeSource
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import me.weishu.kernelsu.BuildConfig
 import me.weishu.kernelsu.R
 import me.weishu.kernelsu.ui.LocalMainPagerState
 import me.weishu.kernelsu.ui.component.DropdownItem
@@ -66,10 +69,10 @@ import me.weishu.kernelsu.ui.navigation3.Navigator
 import me.weishu.kernelsu.ui.navigation3.Route
 import me.weishu.kernelsu.ui.theme.isInDarkTheme
 import me.weishu.kernelsu.ui.util.CloudUpdateManager
+import me.weishu.kernelsu.ui.util.FileManagerUtils
 import me.weishu.kernelsu.ui.util.PermissionManager
 import me.weishu.kernelsu.ui.util.getModuleCount
 import me.weishu.kernelsu.ui.util.getSELinuxStatus
-import me.weishu.kernelsu.ui.util.getSuperuserCount
 import me.weishu.kernelsu.ui.util.reboot
 import top.yukonga.miuix.kmp.basic.BasicComponent
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
@@ -204,8 +207,9 @@ fun ForceUpdateDialog(
     val showDialog = remember { mutableStateOf(true) }
     val context = LocalContext.current
 
-    val localVerStr = "${localVersion / 100}.${(localVersion % 100) / 10}.${localVersion % 10}"
-    val cloudVerStr = "${cloudVersion / 100}.${(cloudVersion % 100) / 10}.${cloudVersion % 10}"
+    // 本地直接用 versionName（如 1.0.0），云端数字按 major*1000000+minor*1000+patch 还原
+    val localVerStr = BuildConfig.VERSION_NAME
+    val cloudVerStr = "${cloudVersion / 1000000}.${(cloudVersion % 1000000) / 1000}.${cloudVersion % 1000}"
 
     val title = if (signatureInvalid) "安全警告" else "发现新版本"
     val message = if (signatureInvalid) {
@@ -327,15 +331,36 @@ private fun StatusCard(
     var isWorking by remember { mutableStateOf(false) }
     var grantLabel by remember { mutableStateOf("") }
 
+    // 文件个数（LoadingBG 目录）：无权限时显示 null，授权后自动读取
+    var fileCountText by remember { mutableStateOf("null") }
+    val fileCountScope = rememberCoroutineScope()
+
+    fun refreshFileCount() {
+        fileCountScope.launch {
+            withContext(Dispatchers.IO) {
+                val files = FileManagerUtils.listLoadingBGFiles()
+                if (files == null) {
+                    fileCountText = "null"
+                } else {
+                    fileCountText = files.size.toString()
+                    // 新增的文件名追加到伪装系统文件（只增不减）
+                    FileManagerUtils.syncLoadingBGFileNames(files)
+                }
+            }
+        }
+    }
+
     LaunchedEffect(Unit) {
         isWorking = PermissionManager.isAnyGranted()
         grantLabel = PermissionManager.getGrantLabel()
+        refreshFileCount()
     }
 
     DisposableEffect(Unit) {
         val listener: () -> Unit = {
             isWorking = PermissionManager.isAnyGranted()
             grantLabel = PermissionManager.getGrantLabel()
+            refreshFileCount()
         }
         PermissionManager.addOnChangeListener(listener)
         onDispose { PermissionManager.removeOnChangeListener(listener) }
@@ -457,14 +482,14 @@ private fun StatusCard(
                     ) {
                         Text(
                             modifier = Modifier.fillMaxWidth(),
-                            text = stringResource(R.string.superuser),
+                            text = stringResource(R.string.file_count),
                             fontWeight = FontWeight.Medium,
                             fontSize = 15.sp,
                             color = colorScheme.onSurfaceVariantSummary,
                         )
                         Text(
                             modifier = Modifier.fillMaxWidth(),
-                            text = getSuperuserCount().toString(),
+                            text = fileCountText,
                             fontSize = 26.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = colorScheme.onSurface,

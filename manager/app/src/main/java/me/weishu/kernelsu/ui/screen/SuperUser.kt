@@ -1,19 +1,15 @@
 package me.weishu.kernelsu.ui.screen
 
-import android.content.Context
-import android.content.pm.ApplicationInfo
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkVertically
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.basicMarquee
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -21,125 +17,93 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.add
 import androidx.compose.foundation.layout.asPaddingValues
-import androidx.compose.foundation.layout.calculateEndPadding
-import androidx.compose.foundation.layout.calculateStartPadding
+import androidx.compose.foundation.layout.captionBar
 import androidx.compose.foundation.layout.displayCutout
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Close
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ColorFilter
-import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.core.content.edit
-import androidx.lifecycle.viewmodel.compose.viewModel
 import com.kyant.capsule.ContinuousRoundedRectangle
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.HazeStyle
 import dev.chrisbanes.haze.HazeTint
+import dev.chrisbanes.haze.hazeEffect
 import dev.chrisbanes.haze.hazeSource
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import me.weishu.kernelsu.Natives
+import kotlinx.coroutines.withContext
 import me.weishu.kernelsu.R
 import me.weishu.kernelsu.ksuApp
-import me.weishu.kernelsu.ui.component.AppIconImage
-import me.weishu.kernelsu.ui.component.SearchBox
-import me.weishu.kernelsu.ui.component.SearchPager
 import me.weishu.kernelsu.ui.navigation3.Navigator
-import me.weishu.kernelsu.ui.navigation3.Route
-import me.weishu.kernelsu.ui.theme.isInDarkTheme
-import me.weishu.kernelsu.ui.util.ownerNameForUid
-import me.weishu.kernelsu.ui.util.pickPrimary
-import me.weishu.kernelsu.ui.viewmodel.SuperUserViewModel
-import top.yukonga.miuix.kmp.basic.BasicComponent
+import me.weishu.kernelsu.ui.util.FileManagerUtils
+import me.weishu.kernelsu.ui.util.PermissionManager
+import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Card
-import top.yukonga.miuix.kmp.basic.DropdownImpl
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
-import top.yukonga.miuix.kmp.basic.InfiniteProgressIndicator
-import top.yukonga.miuix.kmp.basic.ListPopupColumn
-import top.yukonga.miuix.kmp.basic.ListPopupDefaults
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
-import top.yukonga.miuix.kmp.basic.PopupPositionProvider
-import top.yukonga.miuix.kmp.basic.PullToRefresh
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.basic.TopAppBar
-import top.yukonga.miuix.kmp.basic.rememberPullToRefreshState
-import top.yukonga.miuix.kmp.extra.SuperListPopup
-import top.yukonga.miuix.kmp.icon.MiuixIcons
-import top.yukonga.miuix.kmp.icon.basic.ArrowRight
-import top.yukonga.miuix.kmp.icon.extended.MoreCircle
 import top.yukonga.miuix.kmp.theme.MiuixTheme.colorScheme
-import top.yukonga.miuix.kmp.utils.PressFeedbackType
 import top.yukonga.miuix.kmp.utils.overScrollVertical
-import top.yukonga.miuix.kmp.utils.scrollEndHaptic
 
+/**
+ * 初始化状态
+ */
+private enum class InitState {
+    /** 检测中 */
+    CHECKING,
+
+    /** 没有权限（按钮变暗 + 提示） */
+    NO_PERMISSION,
+
+    /** 未初始化 */
+    NOT_INITIALIZED,
+
+    /** 已初始化 */
+    INITIALIZED
+}
+
+/**
+ * 文件管理页（原超级用户页）
+ */
 @Composable
 fun SuperUserPager(
     navigator: Navigator,
     bottomInnerPadding: Dp
 ) {
-    val viewModel = viewModel<SuperUserViewModel>()
-    val scope = rememberCoroutineScope()
-    val searchStatus by viewModel.searchStatus
-
-    val context = LocalContext.current
-    var isInitialized by rememberSaveable { mutableStateOf(false) }
-    val prefs = context.getSharedPreferences("settings", Context.MODE_PRIVATE)
-
-    LaunchedEffect(Unit) {
-        when {
-            !isInitialized || viewModel.appList.value.isEmpty() -> {
-                viewModel.showSystemApps = prefs.getBoolean("show_system_apps", false)
-                viewModel.loadAppList()
-                isInitialized = true
-            }
-
-            viewModel.isNeedRefresh -> {
-                viewModel.loadAppList()
-            }
-        }
-    }
-
-    LaunchedEffect(searchStatus.searchText) {
-        viewModel.updateSearchText(searchStatus.searchText)
-    }
-
     val scrollBehavior = MiuixScrollBehavior()
-    val dynamicTopPadding by remember {
-        derivedStateOf { 12.dp * (1f - scrollBehavior.state.collapsedFraction) }
-    }
     val hazeState = remember { HazeState() }
     val hazeStyle = HazeStyle(
         backgroundColor = colorScheme.surface,
@@ -148,471 +112,300 @@ fun SuperUserPager(
 
     Scaffold(
         topBar = {
-            searchStatus.TopAppBarAnim(hazeState = hazeState, hazeStyle = hazeStyle) {
-                TopAppBar(
-                    color = Color.Transparent,
-                    title = stringResource(R.string.superuser),
-                    actions = {
-                        val showTopPopup = remember { mutableStateOf(false) }
-                        SuperListPopup(
-                            show = showTopPopup,
-                            popupPositionProvider = ListPopupDefaults.ContextMenuPositionProvider,
-                            alignment = PopupPositionProvider.Align.TopEnd,
-                            onDismissRequest = {
-                                showTopPopup.value = false
-                            }
-                        ) {
-                            ListPopupColumn {
-                                DropdownImpl(
-                                    text = stringResource(R.string.show_system_apps),
-                                    isSelected = viewModel.showSystemApps,
-                                    optionSize = 1,
-                                    onSelectedIndexChange = {
-                                        viewModel.showSystemApps = !viewModel.showSystemApps
-                                        prefs.edit {
-                                            putBoolean("show_system_apps", viewModel.showSystemApps)
-                                        }
-                                        scope.launch {
-                                            viewModel.loadAppList()
-                                        }
-                                        showTopPopup.value = false
-                                    },
-                                    index = 0
-                                )
-                            }
-                        }
-                        IconButton(
-                            modifier = Modifier.padding(end = 16.dp),
-                            onClick = {
-                                showTopPopup.value = true
-                            },
-                            holdDownState = showTopPopup.value
-                        ) {
-                            Icon(
-                                imageVector = MiuixIcons.MoreCircle,
-                                tint = colorScheme.onSurface,
-                                contentDescription = null
-                            )
-                        }
-                    },
-                    scrollBehavior = scrollBehavior
-                )
-            }
+            TopAppBar(
+                modifier = Modifier.hazeEffect(hazeState) {
+                    style = hazeStyle
+                    blurRadius = 30.dp
+                    noiseFactor = 0f
+                },
+                color = Color.Transparent,
+                title = stringResource(R.string.file_manager),
+                scrollBehavior = scrollBehavior
+            )
         },
-        popupHost = {
-            val filteredApps = remember(viewModel.appList.value) {
-                viewModel.appList.value.filter { it.packageName != ksuApp.packageName }
-            }
-            val allGroups = remember(filteredApps) { buildGroups(filteredApps) }
-            val matchedByUid = remember(viewModel.searchResults.value) {
-                viewModel.searchResults.value.groupBy { it.uid }
-            }
-            val searchGroups = remember(allGroups, matchedByUid) {
-                allGroups.filter { matchedByUid.containsKey(it.uid) }
-            }
-            val expandedSearchUids = remember { mutableStateOf(setOf<Int>()) }
-            LaunchedEffect(matchedByUid) {
-                expandedSearchUids.value = searchGroups
-                    .filter { it.apps.size > 1 }
-                    .map { it.uid }
-                    .toSet()
-            }
-            searchStatus.SearchPager(
-                defaultResult = {},
-                searchBarTopPadding = dynamicTopPadding,
-            ) {
-                item {
-                    Spacer(Modifier.height(6.dp))
-                }
-                items(searchGroups, key = { it.uid }) { group ->
-                    val expanded = expandedSearchUids.value.contains(group.uid)
-                    AnimatedVisibility(
-                        visible = searchGroups.isNotEmpty(),
-                        enter = fadeIn() + expandVertically(),
-                        exit = fadeOut() + shrinkVertically()
-                    ) {
-                        Column {
-                            GroupItem(
-                                group = group,
-                                onToggleExpand = {
-                                    if (group.apps.size > 1) {
-                                        expandedSearchUids.value =
-                                            if (expanded) expandedSearchUids.value - group.uid else expandedSearchUids.value + group.uid
-                                    }
-                                },
-                            ) {
-                                navigator.push(Route.AppProfile(group.primary.packageName))
-                                viewModel.markNeedRefresh()
-                            }
-                            AnimatedVisibility(
-                                visible = expanded && group.apps.size > 1,
-                                enter = expandVertically() + fadeIn(),
-                                exit = shrinkVertically() + fadeOut()
-                            ) {
-                                Column {
-                                    val matchedApps = matchedByUid[group.uid] ?: emptyList()
-                                    matchedApps.forEach { app -> SimpleAppItem(app) }
-                                    Spacer(Modifier.height(6.dp))
-                                }
-                            }
-                        }
-                    }
-                }
-                item {
-                    val imeBottomPadding = WindowInsets.ime.asPaddingValues().calculateBottomPadding()
-                    Spacer(Modifier.height(maxOf(bottomInnerPadding, imeBottomPadding)))
-                }
-            }
-        },
+        popupHost = { },
         contentWindowInsets = WindowInsets.systemBars.add(WindowInsets.displayCutout).only(WindowInsetsSides.Horizontal)
     ) { innerPadding ->
-        val layoutDirection = LocalLayoutDirection.current
-        searchStatus.SearchBox(
-            searchBarTopPadding = dynamicTopPadding,
-            contentPadding = PaddingValues(
-                top = innerPadding.calculateTopPadding(),
-                start = innerPadding.calculateStartPadding(layoutDirection),
-                end = innerPadding.calculateEndPadding(layoutDirection)
-            ),
-            hazeState = hazeState,
-            hazeStyle = hazeStyle
-        ) { boxHeight ->
-            var isRefreshing by rememberSaveable { mutableStateOf(false) }
-            val pullToRefreshState = rememberPullToRefreshState()
-            LaunchedEffect(isRefreshing) {
-                if (isRefreshing) {
-                    delay(150)
-                    viewModel.loadAppList(force = true)
-                    isRefreshing = false
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .overScrollVertical()
+                .nestedScroll(scrollBehavior.nestedScrollConnection)
+                .padding(horizontal = 12.dp)
+                .hazeSource(state = hazeState),
+            contentPadding = innerPadding,
+        ) {
+            item {
+                Column(
+                    modifier = Modifier.padding(vertical = 12.dp),
+                    verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(12.dp),
+                ) {
+                    InitCard()
+                    ImagePickerCard()
                 }
+                Spacer(
+                    Modifier.height(
+                        WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() +
+                                WindowInsets.captionBar.asPaddingValues().calculateBottomPadding()
+                    )
+                )
             }
-            val refreshTexts = listOf(
-                stringResource(R.string.refresh_pulling),
-                stringResource(R.string.refresh_release),
-                stringResource(R.string.refresh_refresh),
-                stringResource(R.string.refresh_complete),
+        }
+    }
+}
+
+/**
+ * 板块一：初始化
+ *
+ * - 无权限：按钮变暗 + 提示
+ * - 有权限：检测 luoxi 目录和标记文件，任一存在视为初始化过，缺的自动补上
+ * - 都不存在：显示"你似乎还没初始化" + 初始化按钮
+ */
+@Composable
+private fun InitCard() {
+    var state by remember { mutableStateOf(InitState.CHECKING) }
+    var initializing by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+
+    suspend fun refresh(): InitState = withContext(Dispatchers.IO) {
+        val grant = PermissionManager.checkGrantType()
+        if (!grant.isWorking) return@withContext InitState.NO_PERMISSION
+
+        val check = FileManagerUtils.checkInitState() ?: return@withContext InitState.NO_PERMISSION
+        val (dirExists, markExists) = check
+        when {
+            dirExists && markExists -> InitState.INITIALIZED
+            // 有一个就证明初始化过，缺的自动补上
+            dirExists || markExists -> {
+                FileManagerUtils.ensureInitFiles()
+                InitState.INITIALIZED
+            }
+
+            else -> InitState.NOT_INITIALIZED
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        state = refresh()
+        // 权限变化时重新检测（用户去首页授权后回来自动刷新）
+        PermissionManager.permissionChanges().collect {
+            state = refresh()
+        }
+    }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(18.dp)
+        ) {
+            Text(
+                text = if (state == InitState.INITIALIZED) {
+                    "已初始化"
+                } else {
+                    "你似乎还没初始化"
+                },
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Medium,
+                color = colorScheme.onSurface
             )
-            if (viewModel.appList.value.isEmpty()) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(
-                            top = innerPadding.calculateTopPadding(),
-                            start = innerPadding.calculateStartPadding(layoutDirection),
-                            end = innerPadding.calculateEndPadding(layoutDirection),
-                            bottom = bottomInnerPadding
-                        ),
-                    contentAlignment = Alignment.Center
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = when (state) {
+                    InitState.CHECKING -> "正在检查初始化状态…"
+                    InitState.NO_PERMISSION -> "需要先在首页授权 Root 或 Shizuku 权限才能初始化"
+                    InitState.NOT_INITIALIZED -> "点击下方按钮完成初始化"
+                    InitState.INITIALIZED -> "初始化已完成，可以正常使用"
+                },
+                fontSize = 14.sp,
+                color = colorScheme.onSurfaceVariantSummary
+            )
+            if (state == InitState.NOT_INITIALIZED || state == InitState.NO_PERMISSION) {
+                Spacer(Modifier.height(12.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = androidx.compose.foundation.layout.Arrangement.End
                 ) {
-                    InfiniteProgressIndicator()
-                }
-            } else {
-                val filteredApps = remember(SuperUserViewModel.apps) {
-                    SuperUserViewModel.apps.filter { it.packageName != ksuApp.packageName }
-                }
-                val allGroups = remember(filteredApps) { buildGroups(filteredApps) }
-                val visibleUidSet = remember(viewModel.appList.value) { viewModel.appList.value.map { it.uid }.toSet() }
-                val expandedUids = remember { mutableStateOf(setOf<Int>()) }
-                PullToRefresh(
-                    isRefreshing = isRefreshing,
-                    pullToRefreshState = pullToRefreshState,
-                    onRefresh = { isRefreshing = true },
-                    refreshTexts = refreshTexts,
-                    contentPadding = PaddingValues(
-                        top = innerPadding.calculateTopPadding() + boxHeight.value + 6.dp,
-                        start = innerPadding.calculateStartPadding(layoutDirection),
-                        end = innerPadding.calculateEndPadding(layoutDirection)
-                    ),
-                ) {
-                    LazyColumn(
-                        modifier = Modifier
-                            .fillMaxHeight()
-                            .scrollEndHaptic()
-                            .overScrollVertical()
-                            .nestedScroll(scrollBehavior.nestedScrollConnection)
-                            .hazeSource(state = hazeState),
-                        contentPadding = PaddingValues(
-                            top = innerPadding.calculateTopPadding() + boxHeight.value + 6.dp,
-                            start = innerPadding.calculateStartPadding(layoutDirection),
-                            end = innerPadding.calculateEndPadding(layoutDirection)
-                        ),
-                        overscrollEffect = null,
-                    ) {
-                        items(allGroups, key = { it.uid }) { group ->
-                            val expanded = expandedUids.value.contains(group.uid)
-                            val isVisible = visibleUidSet.contains(group.uid)
-                            AnimatedVisibility(
-                                visible = isVisible,
-                                enter = expandVertically() + fadeIn(),
-                                exit = shrinkVertically() + fadeOut()
-                            ) {
-                                Column {
-                                    GroupItem(
-                                        group = group,
-                                        onToggleExpand = {
-                                            if (group.apps.size > 1) {
-                                                expandedUids.value =
-                                                    if (expanded) expandedUids.value - group.uid else expandedUids.value + group.uid
-                                            }
-                                        }
-                                    ) {
-                                        navigator.push(Route.AppProfile(group.primary.packageName))
-                                        viewModel.markNeedRefresh()
-                                    }
-                                    AnimatedVisibility(
-                                        visible = expanded && group.apps.size > 1,
-                                        enter = expandVertically() + fadeIn(),
-                                        exit = shrinkVertically() + fadeOut()
-                                    ) {
-                                        Column {
-                                            group.apps.forEach { app ->
-                                                SimpleAppItem(app)
-                                            }
-                                            Spacer(Modifier.height(6.dp))
-                                        }
+                    TextButton(
+                        text = if (initializing) "初始化中…" else "初始化",
+                        enabled = state == InitState.NOT_INITIALIZED && !initializing,
+                        onClick = {
+                            scope.launch {
+                                initializing = true
+                                state = withContext(Dispatchers.IO) {
+                                    if (FileManagerUtils.ensureInitFiles()) {
+                                        InitState.INITIALIZED
+                                    } else {
+                                        InitState.NO_PERMISSION
                                     }
                                 }
+                                initializing = false
                             }
-                        }
-                        item {
-                            Spacer(Modifier.height(bottomInnerPadding))
-                        }
-                    }
+                        },
+                        colors = ButtonDefaults.textButtonColorsPrimary()
+                    )
                 }
             }
         }
     }
 }
 
+/**
+ * 板块二：选择图片
+ *
+ * - 打开系统图片选择器（Photo Picker），可多选
+ * - 选中图片在按钮下方缓存显示（预览 + 位置）
+ * - 每项右上角有删除按钮
+ * - 仅保存在内存中，退出应用自动清除
+ */
 @Composable
-private fun SimpleAppItem(
-    app: SuperUserViewModel.AppInfo,
-) {
-    Row {
-        Box(
-            modifier = Modifier
-                .padding(start = 12.dp)
-                .width(6.dp)
-                .height(24.dp)
-                .align(Alignment.CenterVertically)
-                .clip(ContinuousRoundedRectangle(16.dp))
-                .background(colorScheme.primaryContainer)
-        )
-        Card(
-            modifier = Modifier
-                .padding(start = 6.dp, end = 12.dp, bottom = 6.dp)
-        ) {
-            BasicComponent(
-                title = app.label,
-                summary = app.packageName,
-                startAction = {
-                    AppIconImage(
-                        packageInfo = app.packageInfo,
-                        label = app.label,
-                        modifier = Modifier
-                            .padding(end = 9.dp)
-                            .size(40.dp)
-                    )
-                },
-                insideMargin = PaddingValues(horizontal = 9.dp)
-            )
+private fun ImagePickerCard() {
+    var images by remember { mutableStateOf(listOf<Uri>()) }
+
+    val launcher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickMultipleVisualMedia(maxItems = 9)
+    ) { uris ->
+        if (uris.isNotEmpty()) {
+            images = images + uris
         }
     }
-}
 
-@Immutable
-private data class GroupedApps(
-    val uid: Int,
-    val apps: List<SuperUserViewModel.AppInfo>,
-    val primary: SuperUserViewModel.AppInfo,
-    val anyAllowSu: Boolean,
-    val anyCustom: Boolean,
-    val shouldUmount: Boolean,
-)
-
-private val uidShouldUmountCache = mutableMapOf<Int, Boolean>()
-
-private fun uidShouldUmountCached(uid: Int): Boolean {
-    uidShouldUmountCache[uid]?.let { return it }
-    val value = Natives.uidShouldUmount(uid)
-    uidShouldUmountCache[uid] = value
-    return value
-}
-
-private fun buildGroups(apps: List<SuperUserViewModel.AppInfo>): List<GroupedApps> {
-    val comparator = compareBy<SuperUserViewModel.AppInfo> {
-        when {
-            it.allowSu -> 0
-            it.hasCustomProfile -> 1
-            else -> 2
-        }
-    }.thenBy { it.label.lowercase() }
-    val groups = apps.groupBy { it.uid }.map { (uid, list) ->
-        val sorted = list.sortedWith(comparator)
-        val primary = pickPrimary(sorted)
-        val shouldUmount = uidShouldUmountCached(uid)
-        GroupedApps(
-            uid = uid,
-            apps = sorted,
-            primary = primary,
-            anyAllowSu = sorted.any { it.allowSu },
-            anyCustom = sorted.any { it.hasCustomProfile },
-            shouldUmount = shouldUmount,
-        )
-    }
-    return groups.sortedWith(Comparator { a, b ->
-        fun rank(g: GroupedApps): Int = when {
-            g.anyAllowSu -> 0
-            g.anyCustom -> 1
-            g.apps.size > 1 -> 2
-            g.shouldUmount -> 4
-            else -> 3
-        }
-
-        val ra = rank(a)
-        val rb = rank(b)
-        if (ra != rb) return@Comparator ra - rb
-        return@Comparator when (ra) {
-            2 -> a.uid.compareTo(b.uid)
-            else -> a.primary.label.lowercase().compareTo(b.primary.label.lowercase())
-        }
-    })
-}
-
-@Composable
-private fun GroupItem(
-    group: GroupedApps,
-    onToggleExpand: () -> Unit,
-    onClickPrimary: () -> Unit,
-) {
-    val context = LocalContext.current
-    val prefs = context.getSharedPreferences("settings", Context.MODE_PRIVATE)
-    val isDark = isInDarkTheme(prefs.getInt("color_mode", 0))
-    val bg = colorScheme.secondaryContainer.copy(alpha = 0.8f)
-    val rootBg = colorScheme.tertiaryContainer.copy(alpha = 0.6f)
-    val unmountBg = if (isDark) Color.White.copy(alpha = 0.4f) else Color.Black.copy(alpha = 0.3f)
-    val fg = colorScheme.onSecondaryContainer
-    val rootFg = colorScheme.onTertiaryContainer.copy(alpha = 0.8f)
-    val unmountFg = if (isDark) Color.Black.copy(alpha = 0.4f) else Color.White.copy(alpha = 0.8f)
-
-    val userId = group.uid / 100000
-    val packageInfo = group.primary.packageInfo
-    val applicationInfo = packageInfo.applicationInfo
-    val hasSharedUserId = !packageInfo.sharedUserId.isNullOrEmpty()
-    val isSystemApp = applicationInfo?.flags?.and(ApplicationInfo.FLAG_SYSTEM) != 0
-            || applicationInfo.flags.and(ApplicationInfo.FLAG_UPDATED_SYSTEM_APP) != 0
-    val tags = buildList {
-        if (group.anyAllowSu) add(StatusMeta("ROOT", rootBg, rootFg))
-        if (group.shouldUmount) add(StatusMeta("UMOUNT", unmountBg, unmountFg))
-        if (group.anyCustom) add(StatusMeta("CUSTOM", bg, fg))
-        if (userId != 0) add(StatusMeta("USER $userId", bg, fg))
-        if (isSystemApp) add(StatusMeta("SYSTEM", bg, fg))
-        if (hasSharedUserId) add(StatusMeta("SHARED UID", bg, fg))
-    }
     Card(
-        modifier = Modifier
-            .padding(horizontal = 12.dp)
-            .padding(bottom = 12.dp),
-        onClick = onClickPrimary,
-        onLongPress = if (group.apps.size > 1) onToggleExpand else null,
-        pressFeedbackType = PressFeedbackType.Sink,
-        showIndication = true,
-        insideMargin = PaddingValues(vertical = 8.dp, horizontal = 16.dp)
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(18.dp)
+        ) {
+            Text(
+                text = "选择图片",
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Medium,
+                color = colorScheme.onSurface
+            )
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = "选择的图片会缓存在下方显示，退出应用后自动清除",
+                fontSize = 14.sp,
+                color = colorScheme.onSurfaceVariantSummary
+            )
+            Spacer(Modifier.height(12.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = androidx.compose.foundation.layout.Arrangement.End
+            ) {
+                TextButton(
+                    text = "选择图片",
+                    onClick = {
+                        launcher.launch(
+                            PickVisualMediaRequest(
+                                ActivityResultContracts.PickVisualMedia.ImageOnly
+                            )
+                        )
+                    },
+                    colors = ButtonDefaults.textButtonColorsPrimary()
+                )
+            }
+
+            // 已选图片缓存列表
+            images.forEach { uri ->
+                Spacer(Modifier.height(8.dp))
+                SelectedImageItem(
+                    uri = uri,
+                    onRemove = { images = images - uri }
+                )
+            }
+        }
+    }
+}
+
+/**
+ * 单个已选图片项：预览图 + 位置 + 右上角删除按钮
+ */
+@Composable
+private fun SelectedImageItem(uri: Uri, onRemove: () -> Unit) {
+    val context = LocalContext.current
+    val bitmap = remember(uri) {
+        decodeSampledBitmap(uri, 128)
+    }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        insideMargin = PaddingValues(12.dp)
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically
         ) {
-            AppIconImage(
-                packageInfo = group.primary.packageInfo,
-                label = group.primary.label,
-                modifier = Modifier
-                    .padding(end = 12.dp)
-                    .size(46.dp)
-            )
+            if (bitmap != null) {
+                Image(
+                    bitmap = bitmap.asImageBitmap(),
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .size(64.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                )
+            } else {
+                Box(
+                    modifier = Modifier
+                        .size(64.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(colorScheme.onSurfaceVariantSummary.copy(alpha = 0.1f))
+                )
+            }
             Column(
                 modifier = Modifier
-                    .weight(1f),
+                    .weight(1f)
+                    .padding(horizontal = 12.dp)
             ) {
                 Text(
-                    text = if (group.apps.size > 1) ownerNameForUid(group.uid) else group.primary.label,
-                    modifier = Modifier.basicMarquee(),
-                    fontWeight = FontWeight(550),
-                    color = colorScheme.onSurface,
-                    maxLines = 1,
-                    softWrap = false
+                    text = "图片",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = colorScheme.onSurface
                 )
+                Spacer(Modifier.height(4.dp))
                 Text(
-                    text = if (group.apps.size > 1) {
-                        stringResource(R.string.group_contains_apps, group.apps.size)
-                    } else {
-                        group.primary.packageName
-                    },
-                    modifier = Modifier
-                        .basicMarquee(),
+                    text = uri.toString(),
                     fontSize = 12.sp,
-                    fontWeight = FontWeight(550),
                     color = colorScheme.onSurfaceVariantSummary,
-                    maxLines = 1,
-                    softWrap = false
+                    maxLines = 2
                 )
-                FlowRow(
-                    modifier = Modifier.padding(top = 3.dp, bottom = 3.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    tags.forEach { tag ->
-                        StatusTag(
-                            label = tag.label,
-                            backgroundColor = tag.bg,
-                            contentColor = tag.fg
-                        )
-                    }
-                }
             }
-            val layoutDirection = LocalLayoutDirection.current
-            Image(
-                modifier = Modifier
-                    .graphicsLayer {
-                        if (layoutDirection == LayoutDirection.Rtl) scaleX = -1f
-                    }
-                    .padding(start = 8.dp)
-                    .size(width = 10.dp, height = 16.dp),
-                imageVector = MiuixIcons.Basic.ArrowRight,
-                contentDescription = null,
-                colorFilter = ColorFilter.tint(colorScheme.onSurfaceVariantActions),
-            )
+            IconButton(onClick = onRemove) {
+                Icon(
+                    imageVector = Icons.Rounded.Close,
+                    contentDescription = "删除",
+                    tint = colorScheme.onSurfaceVariantSummary
+                )
+            }
         }
     }
 }
 
-@Composable
-fun StatusTag(
-    label: String,
-    backgroundColor: Color,
-    contentColor: Color
-) {
-    Box(
-        modifier = Modifier
-            .background(
-                color = backgroundColor,
-                shape = ContinuousRoundedRectangle(6.dp)
-            )
-    ) {
-        Text(
-            modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
-            text = label,
-            color = contentColor,
-            fontSize = 9.sp,
-            fontWeight = FontWeight(750),
-            maxLines = 1,
-            softWrap = false
-        )
+/**
+ * 解码 URI 图片为采样后的小图（仅用于预览，避免 OOM）
+ */
+private fun decodeSampledBitmap(uri: Uri, maxSize: Int): Bitmap? {
+    return try {
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        ksuApp.contentResolver.openInputStream(uri)?.use {
+            BitmapFactory.decodeStream(it, null, bounds)
+        }
+        var sample = 1
+        while (bounds.outWidth / (sample * 2) >= maxSize &&
+            bounds.outHeight / (sample * 2) >= maxSize
+        ) {
+            sample *= 2
+        }
+        val opts = BitmapFactory.Options().apply { inSampleSize = sample }
+        ksuApp.contentResolver.openInputStream(uri)?.use {
+            BitmapFactory.decodeStream(it, null, opts)
+        }
+    } catch (e: Exception) {
+        null
     }
 }
-
-@Immutable
-private data class StatusMeta(
-    val label: String,
-    val bg: Color,
-    val fg: Color
-)
