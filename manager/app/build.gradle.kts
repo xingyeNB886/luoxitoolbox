@@ -32,17 +32,17 @@ android {
     namespace = "me.weishu.kernelsu"
 
     signingConfigs {
-        val keystoreFile = project.findProperty("KEYSTORE_FILE") as? String
-        val keystorePassword = project.findProperty("KEYSTORE_PASSWORD") as? String
-        val keyAlias = project.findProperty("KEY_ALIAS") as? String
-        val keyPassword = project.findProperty("KEY_PASSWORD") as? String
+        val ksFile = project.findProperty("KEYSTORE_FILE") as? String
+        val ksPassword = project.findProperty("KEYSTORE_PASSWORD") as? String
+        val ksAlias = project.findProperty("KEY_ALIAS") as? String
+        val ksKeyPassword = project.findProperty("KEY_PASSWORD") as? String
 
-        if (keystoreFile != null && keystorePassword != null && keyAlias != null && keyPassword != null) {
+        if (ksFile != null && ksPassword != null && ksAlias != null && ksKeyPassword != null) {
             create("release") {
-                storeFile = rootProject.file(keystoreFile)
-                storePassword = keystorePassword
-                keyAlias = keyAlias
-                keyPassword = keyPassword
+                storeFile = rootProject.file(ksFile)
+                storePassword = ksPassword
+                keyAlias = ksAlias
+                keyPassword = ksKeyPassword
             }
         }
     }
