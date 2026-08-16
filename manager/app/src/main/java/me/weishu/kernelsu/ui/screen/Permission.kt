@@ -358,6 +358,8 @@ private fun InitCard(
             summary = buildString {
                 append("请先授权权限，再进行初始化。仅执行一次即可，之后无需再次执行。")
                 append("\n")
+                append("将创建 luoxi 目录（含 备份/、文件输出/ 子目录）。")
+                append("\n")
                 append(
                     when {
                         done -> "已初始化，无需重复执行"
