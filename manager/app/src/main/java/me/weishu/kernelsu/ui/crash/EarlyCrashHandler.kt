@@ -88,6 +88,26 @@ object EarlyCrashHandler : Thread.UncaughtExceptionHandler {
         return if (f.exists()) runCatching { f.readText() }.getOrNull() else null
     }
 
+    /** 启动阶段埋点：把"走到了哪一步"追加到日志里。下次启动如果崩了，能看卡在哪步。 */
+    fun markStage(stage: String, extra: String = "") {
+        val ctx = earlyContext ?: return
+        runCatching {
+            val file = File(ctx.filesDir, "startup_stage.log")
+            val time = SimpleDateFormat("HH:mm:ss.SSS", Locale.getDefault()).format(Date())
+            file.appendText("[$time] STAGE $stage ${if (extra.isNotEmpty()) "| $extra" else ""}\n")
+        }
+    }
+
+    /** 读取上次启动的阶段日志，清掉旧的，返回内容（为 null=没写过）。 */
+    fun consumeStageLog(): String? {
+        val ctx = earlyContext ?: return null
+        val f = File(ctx.filesDir, "startup_stage.log")
+        if (!f.exists()) return null
+        val txt = runCatching { f.readText() }.getOrNull() ?: return null
+        runCatching { f.delete() }
+        return txt
+    }
+
     // --- 内部工具 ---
 
     private fun getPendingFile(ctx: Context? = earlyContext): File {

@@ -127,6 +127,24 @@ object GlobalCrashHandler : Thread.UncaughtExceptionHandler {
         }.getOrNull()
     }
 
+    /** 外部（如 Application.onCreate 整体 try-catch）调用：把 Throwable 写入崩溃日志。 */
+    fun writeCrashLogForThrowable(ctx: Context, throwable: Throwable, tag: String = "") {
+        val sw = StringWriter()
+        PrintWriter(sw).use { pw ->
+            pw.println("=== 崩溃堆栈 $tag ===")
+            pw.println("时间: ${SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date())}")
+            pw.println("线程: ${Thread.currentThread().name}")
+            throwable.printStackTrace(pw)
+            var cause = throwable.cause
+            while (cause != null) {
+                pw.println("=== Caused by: ${cause.javaClass.name}: ${cause.message} ===")
+                cause.printStackTrace(pw)
+                cause = cause.cause
+            }
+        }
+        writeCrashLog(ctx, sw.toString())
+    }
+
     /** 获取非空 Application Context，即使 ksuApp 没 ready 也兜底 */
     private fun appContext(): Context {
         return runCatching { ksuApp }.getOrNull()

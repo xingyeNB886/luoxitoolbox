@@ -125,18 +125,14 @@
             android:foregroundServiceType="dataSync" />
 
         <!--
-            洛茜工具箱：安全版 Shizuku Provider。
-            ShizukuProvider 是 ContentProvider，其 onCreate 时机为：
-                Application.attachBaseContext() → Provider.onCreate() → Application.onCreate()
-            位于 EarlyCrashHandler 之后、GlobalCrashHandler 之前。
-            用自定义子类包裹 try-catch，防止 Provider 内部抛异常直接杀进程。
+            洛茜工具箱：不声明 ShizukuProvider。
+            原因：rikka.shizuku.ShizukuProvider 的 static 初始化块 / 类加载阶段
+            会做 native/hidden API 相关操作，在某些机型上直接 SIGABRT（连 Java
+            try-catch 都接不住），且这个时机处于 ContentProvider 创建期，异常
+            会被系统当"Provider 初始化失败"直接杀进程，完全无崩溃提示。
+            Shizuku SDK 在无 Provider 的情况下 pingBinder() 仍可正常工作，
+            权限检测用 Shizuku #transact 方式兜底，详见 PermissionManager。
         -->
-        <provider
-            android:name=".ui.crash.SafeShizukuProvider"
-            android:authorities="${applicationId}.shizuku"
-            android:exported="false"
-            android:multiprocess="false"
-            android:permission="moe.shizuku.api.access.permission.BIND" />
     </application>
 
 </manifest>

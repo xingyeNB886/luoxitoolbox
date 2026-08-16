@@ -87,62 +87,102 @@ class KernelSUApplication : Application(), ViewModelStoreOwner {
 
         // 最早的异常捕获：只能做极简写文件操作，不可启动 Activity / 访问其他 SDK
         runCatching { EarlyCrashHandler.install(base ?: this) }
+        EarlyCrashHandler.markStage("attachBaseContext", "pkg=${packageName}")
     }
 
     override fun onCreate() {
-        super.onCreate()
+        EarlyCrashHandler.markStage("onCreate_start")
+        // 全函数 try-catch：任何业务初始化异常都不会直接杀进程，
+        // 而是记录下来，等 MainActivity 启动后弹崩溃页。
+        try {
+            super.onCreate()
+            EarlyCrashHandler.markStage("onCreate_superCalled")
 
-        // 如果是 :error_report / :webui 等子进程，到此为止，跳过所有业务初始化
-        if (!isMainProcess()) {
-            return
-        }
+            // 如果是 :error_report / :webui 等子进程，到此为止，跳过所有业务初始化
+            if (!isMainProcess()) {
+                EarlyCrashHandler.markStage("onCreate_skipSubprocess", currentProcessName)
+                return
+            }
+            EarlyCrashHandler.markStage("onCreate_mainProcess")
 
-        // 主进程：装上完整版异常处理器（会启动 CrashActivity）
-        runCatching { GlobalCrashHandler.init() }
+            // 主进程：装上完整版异常处理器（会启动 CrashActivity）
+            runCatching { GlobalCrashHandler.init() }
+            EarlyCrashHandler.markStage("onCreate_GlobalCrashHandlerReady")
 
-        // 有上次遗留的崩溃日志 → 主动展示给用户（由 MainActivity 首帧再弹更安全，
-        // 这里仅做：把 EarlyCrashHandler 的日志同步到 GlobalCrashHandler，由 MainActivity
-        // 首帧 LaunchedEffect 读取并展示 —— 我们这里加一个 Intent 标志更简单）。
-        runCatching { EarlyCrashHandler.handlePendingCrash() }
+            // 读上次崩溃 / 启动阶段日志 —— 由 MainActivity 首帧统一展示
+            runCatching { EarlyCrashHandler.handlePendingCrash() }
 
-        if (!isUserUnlocked()) {
-            return
-        }
+            if (!isUserUnlocked()) {
+                EarlyCrashHandler.markStage("onCreate_userLocked")
+                return
+            }
+            EarlyCrashHandler.markStage("onCreate_userUnlocked")
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                runCatching {
+                    val enable = SettingsRepositoryImpl().enablePredictiveBack
+                    HiddenApiBypass.addHiddenApiExemptions("Landroid/content/pm/ApplicationInfo;->setEnableOnBackInvokedCallback")
+                    setEnableOnBackInvokedCallback(applicationInfo, enable)
+                }
+                EarlyCrashHandler.markStage("onCreate_hiddenApiDone")
+            }
+
             runCatching {
-                val enable = SettingsRepositoryImpl().enablePredictiveBack
-                HiddenApiBypass.addHiddenApiExemptions("Landroid/content/pm/ApplicationInfo;->setEnableOnBackInvokedCallback")
-                setEnableOnBackInvokedCallback(applicationInfo, enable)
+                val superUserViewModel = ViewModelProvider(this)[SuperUserViewModel::class.java]
+                superUserViewModel.loadAppList()
             }
-        }
+            EarlyCrashHandler.markStage("onCreate_suVmLoaded")
 
-        runCatching {
-            val superUserViewModel = ViewModelProvider(this)[SuperUserViewModel::class.java]
-            superUserViewModel.loadAppList()
-        }
-
-        runCatching {
-            val webroot = File(dataDir, "webroot")
-            if (!webroot.exists()) {
-                webroot.mkdir()
+            runCatching {
+                val webroot = File(dataDir, "webroot")
+                if (!webroot.exists()) {
+                    webroot.mkdir()
+                }
             }
-        }
+            EarlyCrashHandler.markStage("onCreate_webrootReady")
 
-        runCatching {
-            Os.setenv("TMPDIR", cacheDir.absolutePath, true)
-        }
+            runCatching {
+                Os.setenv("TMPDIR", cacheDir.absolutePath, true)
+            }
+            EarlyCrashHandler.markStage("onCreate_tmpdirSet")
 
-        runCatching {
-            okhttpClient =
-                OkHttpClient.Builder().cache(Cache(File(cacheDir, "okhttp"), 10 * 1024 * 1024))
-                    .addInterceptor { block ->
-                        block.proceed(
-                            block.request().newBuilder()
-                                .header("User-Agent", "KernelSU/${BuildConfig.VERSION_CODE}")
-                                .header("Accept-Language", Locale.getDefault().toLanguageTag()).build()
-                        )
-                    }.build()
+            runCatching {
+                okhttpClient =
+                    OkHttpClient.Builder().cache(Cache(File(cacheDir, "okhttp"), 10 * 1024 * 1024))
+                        .addInterceptor { block ->
+                            block.proceed(
+                                block.request().newBuilder()
+                                    .header("User-Agent", "KernelSU/${BuildConfig.VERSION_CODE}")
+                                    .header("Accept-Language", Locale.getDefault().toLanguageTag()).build()
+                            )
+                        }.build()
+            }
+            EarlyCrashHandler.markStage("onCreate_okhttpReady")
+            EarlyCrashHandler.markStage("onCreate_end")
+        } catch (t: Throwable) {
+            // 任何没被 runCatching 兜住的异常 → 写日志 + 交给 Early/Global 处理器
+            EarlyCrashHandler.markStage("onCreate_FATAL",
+                "${t.javaClass.simpleName}: ${t.message}")
+            val sw = java.io.StringWriter()
+            java.io.PrintWriter(sw).use { t.printStackTrace(it) }
+            val detail = sw.toString()
+            runCatching {
+                me.weishu.kernelsu.ui.crash.GlobalCrashHandler.writeCrashLogForThrowable(
+                    this, t, "Application.onCreate 整体 try-catch"
+                )
+            }
+            // 强制设 early pending，保证下次启动一定能看到
+            runCatching {
+                val ctx = this
+                val pending = java.io.File(ctx.filesDir, "early_pending_crash.log")
+                pending.writeText(
+                    "=== Application.onCreate 异常（整体 try-catch 捕获） ===\n" +
+                            "时间: ${java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.getDefault()).format(java.util.Date())}\n" +
+                            "$detail\n"
+                )
+            }
+            // 注意：此处不重抛，不杀进程 —— 让系统继续走完 Application.onCreate
+            // MainActivity 启动时会读到 pending 崩溃日志自动弹崩溃页。
         }
     }
 
