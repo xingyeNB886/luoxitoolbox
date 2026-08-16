@@ -115,8 +115,13 @@ object CloudUpdateManager {
      * [历史版本]历史版本内容[历史版本]
      */
     private fun parseCloudData(raw: String): CloudData {
-        // 先清理 HTML：去除标签、解码实体（&nbsp; → 空格等）
-        val cleaned = cleanHtml(raw)
+        // 页面里内容出现三处：顶部预览区(<span class="tit">)、brief 字段、html_content。
+        // 前两处是单行纯文本摘要，只有 html_content 保留了换行结构。
+        // 必须从 html_content 开始截取，否则 extractBetween 会匹配到前面的单行摘要。
+        val marker = "html_content\":\""
+        val htmlStart = raw.indexOf(marker)
+        val content = if (htmlStart != -1) raw.substring(htmlStart + marker.length) else raw
+        val cleaned = cleanHtml(content)
         val internalVersion = extractBetween(cleaned, "[内部版本号]", "[内部版本号]")
             ?.trim()?.toIntOrNull() ?: 0
         val downloadUrl = extractBetween(cleaned, "[链接]", "[链接]")?.trim() ?: ""
