@@ -88,7 +88,7 @@ object GlobalCrashHandler : Thread.UncaughtExceptionHandler {
             System.exit(2)
         } catch (t: Throwable) {
             // 处理器本身出错，交给系统默认处理器
-            defaultHandler?.uncaughtException(t, t)
+            defaultHandler?.uncaughtException(Thread.currentThread(), t)
         }
     }
 
