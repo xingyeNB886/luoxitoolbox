@@ -26,6 +26,8 @@ data class HomeUiState(
     val systemInfo: SystemInfo,
     // 洛茜工具箱：权限授权状态
     val permissionGrant: PermissionGrantType = PermissionGrantType.NONE,
+    // 洛茜工具箱：buildState 过程中发生的错误（非 null 时会在首页顶部显示提示）
+    val buildError: String? = null,
 ) {
     val isSELinuxPermissive: Boolean
         get() = systemInfo.selinuxStatus == "Permissive"

@@ -60,47 +60,80 @@ class HomeViewModel(
         }
     }
 
-    private fun buildState(): HomeUiState {
+    private fun buildState(): HomeUiState = runCatching {
         val kernelVersion = getKernelVersion()
         val isManager = Natives.isManager
         val ksuVersion = if (isManager) Natives.version else null
         val kernelUAPIVersion = if (isManager) Natives.kernelUAPIVersion else null
         val managerUAPIVersion = Natives.managerUAPIVersion
-        val lkmMode = ksuVersion?.let { if (kernelVersion.isGKI()) Natives.isLkmMode else null }
-        val isRootAvailable = rootAvailable()
+        val lkmMode = runCatching {
+            ksuVersion?.let { if (kernelVersion.isGKI()) Natives.isLkmMode else null }
+        }.getOrNull()
+        val isRootAvailable = runCatching { rootAvailable() }.getOrDefault(false)
         val managerVersion = getManagerVersion(ksuApp)
         val currentGrant = runCatching {
             if (isRootAvailable) PermissionGrantType.ROOT else PermissionGrantType.NONE
         }.getOrDefault(PermissionGrantType.NONE)
 
-        return HomeUiState(
+        HomeUiState(
             kernelVersion = kernelVersion,
             ksuVersion = ksuVersion,
             lkmMode = lkmMode,
             isManager = isManager,
             isManagerPrBuild = BuildConfig.IS_PR_BUILD,
             isKernelPrBuild = Natives.isPrBuild,
-            requiresNewKernel = isManager && Natives.requireNewKernel(),
-            uapiMismatch = isManager && Natives.checkUAPIMismatch(),
+            requiresNewKernel = runCatching { isManager && Natives.requireNewKernel() }.getOrDefault(false),
+            uapiMismatch = runCatching { isManager && Natives.checkUAPIMismatch() }.getOrDefault(false),
             kernelUAPIVersion = kernelUAPIVersion,
             managerUAPIVersion = managerUAPIVersion,
             isRootAvailable = isRootAvailable,
             isSafeMode = Natives.isSafeMode,
             isLateLoadMode = Natives.isLateLoadMode,
-            checkUpdateEnabled = settingsRepo.checkUpdate,
+            checkUpdateEnabled = runCatching { settingsRepo.checkUpdate }.getOrDefault(true),
             latestVersionInfo = LatestVersionInfo(),
             currentManagerVersionCode = managerVersion.versionCode,
             systemInfo = SystemInfo(
-                kernelVersion = Os.uname().release,
+                kernelVersion = runCatching { Os.uname().release }.getOrDefault("unknown"),
                 managerVersion = "${managerVersion.versionName} (${managerVersion.versionCode}-${managerUAPIVersion})",
-                deviceModel = resolveDeviceName(),
+                deviceModel = runCatching { resolveDeviceName() }.getOrDefault("${Build.MANUFACTURER} ${Build.MODEL}"),
                 fingerprint = Build.FINGERPRINT,
-                selinuxStatus = getSELinuxStatusRaw(),
+                selinuxStatus = runCatching { getSELinuxStatusRaw() }.getOrDefault("Unknown"),
                 seccompStatus = runCatching {
                     Os.prctl(21 /* PR_GET_SECCOMP */, 0, 0, 0, 0)
                 }.getOrDefault(-1),
             ),
             permissionGrant = currentGrant,
+        )
+    }.getOrElse { ex ->
+        // buildState 任何异常都兜底，给出一个"能让界面显示出来"的最小状态
+        val managerVersion = runCatching { getManagerVersion(ksuApp) }
+        HomeUiState(
+            kernelVersion = getKernelVersion(),
+            ksuVersion = null,
+            lkmMode = null,
+            isManager = false,
+            isManagerPrBuild = BuildConfig.IS_PR_BUILD,
+            isKernelPrBuild = false,
+            requiresNewKernel = false,
+            uapiMismatch = false,
+            kernelUAPIVersion = null,
+            managerUAPIVersion = -1,
+            isRootAvailable = false,
+            isSafeMode = false,
+            isLateLoadMode = false,
+            checkUpdateEnabled = false,
+            latestVersionInfo = LatestVersionInfo(),
+            currentManagerVersionCode = managerVersion.getOrNull()?.versionCode ?: 0,
+            systemInfo = SystemInfo(
+                kernelVersion = runCatching { Os.uname().release }.getOrDefault("unknown"),
+                managerVersion = "${managerVersion.getOrNull()?.versionName ?: "0"} build-state-error",
+                deviceModel = "${Build.MANUFACTURER} ${Build.MODEL}",
+                fingerprint = Build.FINGERPRINT,
+                selinuxStatus = "Unknown",
+                seccompStatus = -1,
+            ),
+            permissionGrant = PermissionGrantType.NONE,
+            buildError = ex.localizedMessage ?: ex.javaClass.simpleName,
         )
     }
 }
