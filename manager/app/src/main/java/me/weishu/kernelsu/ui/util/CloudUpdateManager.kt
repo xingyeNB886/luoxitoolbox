@@ -136,8 +136,13 @@ object CloudUpdateManager {
      * 清理 HTML：去除标签，解码 HTML 实体
      */
     private fun cleanHtml(raw: String): String {
+        // QQ 收藏的 html_content 里 '<' 是 JS unicode 转义 \u003C，
+        // 必须先解码，否则后续正则匹配不到任何标签（换行全丢）
+        var result = Regex("\\\\u([0-9a-fA-F]{4})").replace(raw) { m ->
+            m.groupValues[1].toInt(16).toChar().toString()
+        }
         // 把块级标签（div、br、p）替换为换行符，保留内容结构
-        var result = raw
+        result = result
             .replace(Regex("<br\\s*/?>"), "\n")
             .replace(Regex("<div[^>]*>"), "\n")
             .replace(Regex("</div>"), "")
