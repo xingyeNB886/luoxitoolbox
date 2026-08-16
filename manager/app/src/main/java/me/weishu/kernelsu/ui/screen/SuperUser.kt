@@ -33,6 +33,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Close
@@ -141,24 +142,39 @@ fun SuperUserPager(
                 .hazeSource(state = hazeState),
             contentPadding = innerPadding,
         ) {
-            item {
-                Column(
-                    modifier = Modifier.padding(vertical = 12.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    ImagePickerCard(
-                        images = images,
-                        onPick = { uris -> images = images + uris.map { SelectedImage(it) } },
-                        onRemove = { idx -> images = images.filterIndexed { i, _ -> i != idx } },
-                        onPreview = { idx -> editingIdx = idx }
-                    )
+            // 拆分为多个 item：图片增减不会导致整页重新锚定（修复滚动跳底）
+            item(key = "picker") {
+                ImagePickerCard(
+                    onPick = { uris -> images = images + uris.map { SelectedImage(it) } }
+                )
+            }
+            itemsIndexed(
+                images,
+                key = { idx, _ -> "img$idx" },
+                contentType = { _, _ -> "selected_image" }
+            ) { idx, img ->
+                SelectedImageItem(
+                    modifier = Modifier.padding(top = 12.dp),
+                    image = img,
+                    onRemove = { images = images.filterIndexed { i, _ -> i != idx } },
+                    onClick = { editingIdx = idx }
+                )
+            }
+            item(key = "make") {
+                Column(Modifier.padding(top = 12.dp)) {
                     MakeFilesCard(images = images)
+                }
+            }
+            item(key = "replace") {
+                Column(Modifier.padding(top = 12.dp)) {
                     ReplaceFilesCard()
                 }
+            }
+            item(key = "bottom") {
                 Spacer(
                     Modifier.height(
                         WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() +
-                                WindowInsets.captionBar.asPaddingValues().calculateBottomPadding()
+                                WindowInsets.captionBar.asPaddingValues().calculateBottomPadding() + 12.dp
                     )
                 )
             }
@@ -180,14 +196,11 @@ fun SuperUserPager(
 }
 
 /**
- * 选择图片板块（系统图片选择器，可多选）
+ * 选择图片板块头部（系统图片选择器，可多选）；已选图片以独立列表项展示
  */
 @Composable
 private fun ImagePickerCard(
-    images: List<SelectedImage>,
-    onPick: (List<Uri>) -> Unit,
-    onRemove: (Int) -> Unit,
-    onPreview: (Int) -> Unit
+    onPick: (List<Uri>) -> Unit
 ) {
     val launcher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickMultipleVisualMedia()
@@ -196,7 +209,9 @@ private fun ImagePickerCard(
     }
 
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 12.dp),
     ) {
         Column(
             modifier = Modifier
@@ -232,24 +247,16 @@ private fun ImagePickerCard(
                     colors = ButtonDefaults.textButtonColorsPrimary()
                 )
             }
-
-            images.forEachIndexed { idx, img ->
-                Spacer(Modifier.height(8.dp))
-                SelectedImageItem(
-                    image = img,
-                    onRemove = { onRemove(idx) },
-                    onClick = { onPreview(idx) }
-                )
-            }
         }
     }
 }
 
 /**
- * 单个已选图片项：预览图 + 取景状态 + 右上角删除按钮，点击整项打开预览
+ * 单个已选图片项：预览图 + 裁剪状态 + 右上角删除按钮，点击整项打开裁剪
  */
 @Composable
 private fun SelectedImageItem(
+    modifier: Modifier = Modifier,
     image: SelectedImage,
     onRemove: () -> Unit,
     onClick: () -> Unit
@@ -259,7 +266,7 @@ private fun SelectedImageItem(
     }
 
     Card(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .clickable(onClick = onClick),
         insideMargin = PaddingValues(12.dp)

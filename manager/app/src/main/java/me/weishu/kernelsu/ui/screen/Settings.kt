@@ -23,7 +23,6 @@ import androidx.compose.material.icons.rounded.DeleteForever
 import androidx.compose.material.icons.rounded.DeveloperMode
 import androidx.compose.material.icons.rounded.Fence
 import androidx.compose.material.icons.rounded.FolderDelete
-import androidx.compose.material.icons.rounded.Groups
 import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.RemoveCircle
 import androidx.compose.material.icons.rounded.RemoveModerator
@@ -459,51 +458,6 @@ fun SettingPager(
                         .padding(vertical = 12.dp)
                         .fillMaxWidth(),
                 ) {
-                    val context2 = LocalContext.current
-                    // 加入 QQ 群组 1
-                    SuperArrow(
-                        title = "加入 QQ 群组 1",
-                        startAction = {
-                            Icon(
-                                Icons.Rounded.Groups,
-                                modifier = Modifier.padding(end = 16.dp),
-                                contentDescription = "加入 QQ 群组 1",
-                                tint = colorScheme.onBackground
-                            )
-                        },
-                        onClick = {
-                            runCatching {
-                                context2.startActivity(
-                                    android.content.Intent(
-                                        android.content.Intent.ACTION_VIEW,
-                                        android.net.Uri.parse("https://qm.qq.com/q/TEuQTWTu48")
-                                    )
-                                )
-                            }
-                        }
-                    )
-                    // 加入 QQ 群组 2
-                    SuperArrow(
-                        title = "加入 QQ 群组 2",
-                        startAction = {
-                            Icon(
-                                Icons.Rounded.Groups,
-                                modifier = Modifier.padding(end = 16.dp),
-                                contentDescription = "加入 QQ 群组 2",
-                                tint = colorScheme.onBackground
-                            )
-                        },
-                        onClick = {
-                            runCatching {
-                                context2.startActivity(
-                                    android.content.Intent(
-                                        android.content.Intent.ACTION_VIEW,
-                                        android.net.Uri.parse("https://qm.qq.com/q/9XnN0A6PbW")
-                                    )
-                                )
-                            }
-                        }
-                    )
                     val about = stringResource(id = R.string.about)
                     SuperArrow(
                         title = about,

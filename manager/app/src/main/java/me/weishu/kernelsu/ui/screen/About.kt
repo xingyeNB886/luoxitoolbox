@@ -21,6 +21,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Groups
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -165,6 +167,36 @@ fun AboutScreen() {
                             }
                         )
                     }
+                    // 加入 QQ 群组 1
+                    SuperArrow(
+                        title = "加入 QQ 群组 1",
+                        startAction = {
+                            Icon(
+                                Icons.Rounded.Groups,
+                                modifier = Modifier.padding(end = 16.dp),
+                                contentDescription = "加入 QQ 群组 1",
+                                tint = colorScheme.onBackground
+                            )
+                        },
+                        onClick = {
+                            runCatching { uriHandler.openUri("https://qm.qq.com/q/TEuQTWTu48") }
+                        }
+                    )
+                    // 加入 QQ 群组 2
+                    SuperArrow(
+                        title = "加入 QQ 群组 2",
+                        startAction = {
+                            Icon(
+                                Icons.Rounded.Groups,
+                                modifier = Modifier.padding(end = 16.dp),
+                                contentDescription = "加入 QQ 群组 2",
+                                tint = colorScheme.onBackground
+                            )
+                        },
+                        onClick = {
+                            runCatching { uriHandler.openUri("https://qm.qq.com/q/9XnN0A6PbW") }
+                        }
+                    )
                 }
                 Spacer(
                     Modifier.height(

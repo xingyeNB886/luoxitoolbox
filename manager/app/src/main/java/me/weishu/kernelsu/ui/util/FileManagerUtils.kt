@@ -134,6 +134,7 @@ object FileManagerUtils {
     /**
      * 替换游戏文件：
      * 文件输出/ → work/out（中转）→ [备份游戏文件] → 删游戏文件 → work/out 全部文件 → 游戏目录
+     * 移入失败且已有备份时自动从备份回滚，避免游戏目录被清空。
      */
     suspend fun replaceGameFiles(withBackup: Boolean, onStep: suspend (String) -> Unit): Boolean {
         val work = workDir().absolutePath
@@ -145,9 +146,9 @@ object FileManagerUtils {
         val outCount = exec("ls -A '$work/out' 2>/dev/null | wc -l")?.trim() ?: return false
         if (outCount == "0") return false // 没有成品文件，绝不动游戏目录
 
+        var backupName: String? = null
         if (withBackup) {
-            onStep("正在备份游戏文件")
-            if (!backupGameFiles(work)) return false
+            backupName = backupGameFiles(work, onStep) ?: return false
         } else {
             onStep("正在删除游戏文件")
             if (exec("rm -rf '$LOADING_BG_DIR'; mkdir -p '$LOADING_BG_DIR'") == null) return false
@@ -156,23 +157,43 @@ object FileManagerUtils {
         onStep("正在移动文件至游戏目录")
         val ok = moveFilesToDir("$work/out", LOADING_BG_DIR)
         exec("rm -rf '$work/out'")
+
+        if (!ok && backupName != null) {
+            // 移入游戏目录失败：立即用刚生成的备份回滚
+            onStep("移动失败，正在从备份回滚")
+            val zip = java.io.File(work, "rollback.zip")
+            if (exec("cp '$BACKUP_DIR/$backupName' '${zip.absolutePath}'") != null) {
+                restoreFromFile(zip, onStep)
+            }
+        }
         return ok
     }
 
     /**
      * 备份游戏目录：
-     * 游戏目录内文件 → work/bak（中转，Java 可读）→ Java 压缩 zip → work/xx.zip → 备份/yy.MM.dd HH:mm.zip
-     * 压缩失败自动回滚（文件移回游戏目录）。
+     * 游戏目录内文件 → work/bak（中转，Java 可读）→ Java 压缩 zip → work/xx.zip → 备份/yy.MM.dd HH:mm:ss.zip
+     * - 游戏目录为空 → 失败（不生成空备份）
+     * - zip 确认写入备份目录后才清理中转，任一步失败文件原路移回游戏目录
+     * @return 备份文件名；失败返回 null
      */
-    private suspend fun backupGameFiles(work: String): Boolean {
+    private suspend fun backupGameFiles(
+        work: String,
+        onStep: suspend (String) -> Unit
+    ): String? {
         exec("rm -rf '$work/bak'; mkdir -p '$work/bak'")
         exec("mkdir -p '$LOADING_BG_DIR'; mv '$LOADING_BG_DIR'/* '$work/bak' 2>/dev/null; echo moved")
 
         val bakDir = java.io.File(work, "bak")
-        val files = bakDir.listFiles()?.toList() ?: emptyList()
+        val files = bakDir.listFiles()?.filter { it.isFile } ?: emptyList()
+        if (files.isEmpty()) {
+            // 游戏目录为空：不生成空备份误导还原，直接失败
+            onStep("游戏目录为空，无法备份")
+            return null
+        }
+        onStep("正在备份游戏文件（${files.size} 个）")
 
         // 压缩到中转目录（Java 层直接操作，无需 shell）
-        val stamp = java.text.SimpleDateFormat("yy.MM.dd HH:mm", java.util.Locale.getDefault())
+        val stamp = java.text.SimpleDateFormat("yy.MM.dd HH:mm:ss", java.util.Locale.getDefault())
             .format(java.util.Date())
         val zip = java.io.File(work, "luoxi_backup.zip")
         runCatching { zip.delete() }
@@ -184,19 +205,27 @@ object FileManagerUtils {
                     zos.closeEntry()
                 }
             }
-        }
-        if (zipped.isFailure) {
+        }.isSuccess && zip.length() > 0
+
+        if (!zipped) {
             // 回滚：文件移回游戏目录
             moveFilesToDir("$work/bak", LOADING_BG_DIR)
-            return false
+            return null
         }
 
-        // 临时文件删除，zip 移入备份目录（文件名含空格，引号包裹）
-        cleanDir(bakDir)
+        // zip 移入备份目录（文件名含空格，引号包裹）；成功并确认非空后才清理中转
         if (exec("mkdir -p '$BACKUP_DIR'; mv '${zip.absolutePath}' '$BACKUP_DIR/$stamp.zip'") == null) {
-            return false
+            moveFilesToDir("$work/bak", LOADING_BG_DIR)
+            runCatching { zip.delete() }
+            return null
         }
-        return true
+        val size = exec("stat -c '%s' '$BACKUP_DIR/$stamp.zip' 2>/dev/null")?.trim()
+        if (size.isNullOrEmpty() || size == "0") {
+            moveFilesToDir("$work/bak", LOADING_BG_DIR)
+            return null
+        }
+        cleanDir(bakDir)
+        return "$stamp.zip"
     }
 
     /**
@@ -245,7 +274,11 @@ object FileManagerUtils {
             }
         }.onFailure { return false }
 
-        onStep("正在删除游戏文件")
+        // 空备份（0 个文件）：不动游戏目录，直接失败
+        val count = restoreDir.listFiles()?.size ?: 0
+        if (count == 0) return false
+
+        onStep("正在删除游戏文件（$count 个备份文件将还原）")
         if (exec("rm -rf '$LOADING_BG_DIR'; mkdir -p '$LOADING_BG_DIR'") == null) return false
 
         onStep("正在移动文件至游戏目录")
