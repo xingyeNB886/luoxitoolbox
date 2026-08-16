@@ -9,9 +9,11 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.add
 import androidx.compose.foundation.layout.displayCutout
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBars
@@ -104,7 +106,7 @@ fun PermissionScreenMiuix(
                         Text(
                             text = stringResource(R.string.permission_screen_subtitle),
                             fontSize = 14.sp,
-                            color = colorScheme.onSurfaceVariant,
+                            color = colorScheme.onSurfaceVariantSummary,
                             modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 4.dp)
                         )
                         PermissionCardMiuix(
@@ -229,7 +231,7 @@ private fun PermissionCardMiuix(
                     icon,
                     title,
                     modifier = Modifier.padding(end = 6.dp),
-                    tint = if (granted) colorScheme.primary else colorScheme.onSurfaceVariant,
+                    tint = if (granted) colorScheme.primary else colorScheme.onSurfaceVariantSummary,
                 )
             },
             endActions = {
