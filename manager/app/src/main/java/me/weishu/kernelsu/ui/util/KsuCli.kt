@@ -353,14 +353,18 @@ fun reboot(reason: String = "") {
         }
         ShellUtils.fastCmd(shell, "/system/bin/svc power reboot $reason || /system/bin/reboot $reason")
     } else {
-        // Shizuku 权限重启
+        // 非 Root（Shizuku/adb）模式：直接执行 svc 命令
         runCatching {
-            val cmd = if (reason.isEmpty()) {
-                arrayOf("/system/bin/svc", "power", "reboot")
-            } else {
-                arrayOf("/system/bin/svc", "power", "reboot", reason)
+            val pb = ProcessBuilder(
+                "/system/bin/svc", "power", "reboot",
+                *if (reason.isEmpty()) emptyArray() else arrayOf(reason)
+            )
+            pb.start()
+        }.onFailure {
+            // 兜底：reboot 二进制
+            runCatching {
+                Runtime.getRuntime().exec(arrayOf("/system/bin/reboot", reason))
             }
-            rikka.shizuku.Shizuku.newProcess(cmd, null, null)
         }
     }
 }
