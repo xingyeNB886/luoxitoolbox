@@ -31,7 +31,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
           submodules: false
@@ -97,7 +97,7 @@ jobs:
           java-version: 21
 
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@v6
         with:
           cache-encryption-key: ${{ runner.os }}-gradle-cache
           build-root-directory: ${{ env.MANAGER_DIR }}
@@ -120,7 +120,7 @@ jobs:
           ls -la dist/
 
       - name: 上传 APK Artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: luoxi-toolbox-apk
           path: dist/*.apk
