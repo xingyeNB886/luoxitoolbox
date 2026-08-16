@@ -180,7 +180,7 @@ fun SuperUserPager(
 }
 
 /**
- * 选择图片板块（系统文件选择器，可多选，可浏览真实目录）
+ * 选择图片板块（系统图片选择器，可多选）
  */
 @Composable
 private fun ImagePickerCard(
@@ -190,7 +190,7 @@ private fun ImagePickerCard(
     onPreview: (Int) -> Unit
 ) {
     val launcher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.OpenMultipleDocuments()
+        contract = ActivityResultContracts.PickMultipleVisualMedia()
     ) { uris ->
         if (uris.isNotEmpty()) onPick(uris)
     }
@@ -222,7 +222,13 @@ private fun ImagePickerCard(
             ) {
                 TextButton(
                     text = "选择图片",
-                    onClick = { launcher.launch(arrayOf("image/*")) },
+                    onClick = {
+                        launcher.launch(
+                            androidx.activity.result.PickVisualMediaRequest(
+                                ActivityResultContracts.PickVisualMedia.ImageOnly
+                            )
+                        )
+                    },
                     colors = ButtonDefaults.textButtonColorsPrimary()
                 )
             }

@@ -16,7 +16,6 @@ import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Adb
-import androidx.compose.material.icons.rounded.BugReport
 import androidx.compose.material.icons.rounded.Colorize
 import androidx.compose.material.icons.rounded.ContactPage
 import androidx.compose.material.icons.rounded.Delete
@@ -24,11 +23,11 @@ import androidx.compose.material.icons.rounded.DeleteForever
 import androidx.compose.material.icons.rounded.DeveloperMode
 import androidx.compose.material.icons.rounded.Fence
 import androidx.compose.material.icons.rounded.FolderDelete
+import androidx.compose.material.icons.rounded.Groups
 import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.RemoveCircle
 import androidx.compose.material.icons.rounded.RemoveModerator
 import androidx.compose.material.icons.rounded.RestartAlt
-import androidx.compose.material.icons.rounded.Update
 import androidx.compose.material.icons.rounded.UploadFile
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -57,9 +56,7 @@ import dev.chrisbanes.haze.hazeSource
 import me.weishu.kernelsu.Natives
 import me.weishu.kernelsu.R
 import me.weishu.kernelsu.ui.component.KsuIsValid
-import me.weishu.kernelsu.ui.component.SendLogDialog
 import me.weishu.kernelsu.ui.component.UninstallDialog
-import me.weishu.kernelsu.ui.component.rememberLoadingDialog
 import me.weishu.kernelsu.ui.navigation3.Navigator
 import me.weishu.kernelsu.ui.navigation3.Route
 import me.weishu.kernelsu.ui.util.execKsud
@@ -109,12 +106,8 @@ fun SettingPager(
         popupHost = { },
         contentWindowInsets = WindowInsets.systemBars.add(WindowInsets.displayCutout).only(WindowInsetsSides.Horizontal)
     ) { innerPadding ->
-        val loadingDialog = rememberLoadingDialog()
-
         val showUninstallDialog = rememberSaveable { mutableStateOf(false) }
         val uninstallDialog = UninstallDialog(showUninstallDialog, navigator)
-        val showSendLogDialog = rememberSaveable { mutableStateOf(false) }
-        val sendLogDialog = SendLogDialog(showSendLogDialog, loadingDialog)
 
         LazyColumn(
             modifier = Modifier
@@ -130,35 +123,14 @@ fun SettingPager(
             item {
                 val context = LocalContext.current
                 val prefs = context.getSharedPreferences("settings", Context.MODE_PRIVATE)
-                var checkUpdate by rememberSaveable {
-                    mutableStateOf(prefs.getBoolean("check_update", true))
-                }
 
-                Card(
-                    modifier = Modifier
-                        .padding(top = 12.dp)
-                        .fillMaxWidth(),
-                ) {
-                    SuperSwitch(
-                        title = stringResource(id = R.string.settings_check_update),
-                        summary = stringResource(id = R.string.settings_check_update_summary),
-                        startAction = {
-                            Icon(
-                                Icons.Rounded.Update,
-                                modifier = Modifier.padding(end = 16.dp),
-                                contentDescription = stringResource(id = R.string.settings_check_update),
-                                tint = colorScheme.onBackground
-                            )
-                        },
-                        checked = checkUpdate,
-                        onCheckedChange = {
-                            prefs.edit {
-                                putBoolean("check_update", it)
-                            }
-                            checkUpdate = it
-                        }
-                    )
-                    KsuIsValid {
+                // 检查更新开关已移除：更新检查在代码层始终开启，不提供关闭入口
+                KsuIsValid {
+                    Card(
+                        modifier = Modifier
+                            .padding(top = 12.dp)
+                            .fillMaxWidth(),
+                    ) {
                         var checkModuleUpdate by rememberSaveable {
                             mutableStateOf(prefs.getBoolean("module_check_update", true))
                         }
@@ -169,7 +141,7 @@ fun SettingPager(
                                 Icon(
                                     Icons.Rounded.UploadFile,
                                     modifier = Modifier.padding(end = 16.dp),
-                                    contentDescription = stringResource(id = R.string.settings_check_update),
+                                    contentDescription = stringResource(id = R.string.settings_module_check_update),
                                     tint = colorScheme.onBackground
                                 )
                             },
@@ -487,20 +459,50 @@ fun SettingPager(
                         .padding(vertical = 12.dp)
                         .fillMaxWidth(),
                 ) {
+                    val context2 = LocalContext.current
+                    // 加入 QQ 群组 1
                     SuperArrow(
-                        title = stringResource(id = R.string.send_log),
+                        title = "加入 QQ 群组 1",
                         startAction = {
                             Icon(
-                                Icons.Rounded.BugReport,
+                                Icons.Rounded.Groups,
                                 modifier = Modifier.padding(end = 16.dp),
-                                contentDescription = stringResource(id = R.string.send_log),
+                                contentDescription = "加入 QQ 群组 1",
                                 tint = colorScheme.onBackground
                             )
                         },
                         onClick = {
-                            showSendLogDialog.value = true
-                            sendLogDialog
+                            runCatching {
+                                context2.startActivity(
+                                    android.content.Intent(
+                                        android.content.Intent.ACTION_VIEW,
+                                        android.net.Uri.parse("https://qm.qq.com/q/TEuQTWTu48")
+                                    )
+                                )
+                            }
+                        }
+                    )
+                    // 加入 QQ 群组 2
+                    SuperArrow(
+                        title = "加入 QQ 群组 2",
+                        startAction = {
+                            Icon(
+                                Icons.Rounded.Groups,
+                                modifier = Modifier.padding(end = 16.dp),
+                                contentDescription = "加入 QQ 群组 2",
+                                tint = colorScheme.onBackground
+                            )
                         },
+                        onClick = {
+                            runCatching {
+                                context2.startActivity(
+                                    android.content.Intent(
+                                        android.content.Intent.ACTION_VIEW,
+                                        android.net.Uri.parse("https://qm.qq.com/q/9XnN0A6PbW")
+                                    )
+                                )
+                            }
+                        }
                     )
                     val about = stringResource(id = R.string.about)
                     SuperArrow(

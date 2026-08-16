@@ -106,7 +106,6 @@ fun HomePager(
 
     val context = LocalContext.current
     val prefs = context.getSharedPreferences("settings", Context.MODE_PRIVATE)
-    val checkUpdate = prefs.getBoolean("check_update", true)
     val themeMode = prefs.getInt("color_mode", 0)
     val signatureInvalid = prefs.getBoolean("signature_invalid", false)
 
@@ -118,10 +117,10 @@ fun HomePager(
     }
 
     // 签名校验失败 → 直接弹窗，不依赖云端数据
-    // 云端版本 > 本地版本 → 强制更新（需 checkUpdate 开启且云端数据有效）
+    // 云端版本 > 本地版本 → 强制更新（代码层常开，不提供任何关闭入口）
     val localVersion = CloudUpdateManager.getLocalVersion()
     val cloudVersion = cloudData.internalVersion
-    val showForceUpdate = signatureInvalid || (checkUpdate && cloudVersion > 0 && cloudVersion > localVersion)
+    val showForceUpdate = signatureInvalid || (cloudVersion > 0 && cloudVersion > localVersion)
 
     // 强制更新弹窗
     if (showForceUpdate) {
