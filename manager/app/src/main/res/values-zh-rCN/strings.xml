@@ -204,4 +204,24 @@
     <string name="current_kmi">本设备 KMI 版本: %s</string>
     <string name="current_device_kmi">当前设备的 KMI</string>
     <string name="module_action_success">模块 action 执行成功。</string>
+    <!-- 洛茜工具箱：权限相关字符串 -->
+    <string name="permission_working">工作中</string>
+    <string name="permission_working_summary">工具箱正在运行</string>
+    <string name="permission_not_working">未工作</string>
+    <string name="permission_tap_to_grant">点击授权</string>
+    <string name="permission_screen_title">权限获取</string>
+    <string name="permission_screen_subtitle">请授予以下任一权限以启用全部功能</string>
+    <string name="permission_shizuku_title">Shizuku</string>
+    <string name="permission_shizuku_summary">通过 Shizuku 服务获取 Shell 级别权限（需安装 Shizuku 应用并激活 ADB）</string>
+    <string name="permission_shizuku_not_granted">未授权</string>
+    <string name="permission_shizuku_granted">已授权</string>
+    <string name="permission_shizuku_request_button">授权 Shizuku</string>
+    <string name="permission_shizuku_not_installed">未检测到 Shizuku 服务，请先安装并激活 Shizuku</string>
+    <string name="permission_root_title">Root</string>
+    <string name="permission_root_summary">通过 su 获取设备 Root 权限（KernelSU / Magisk）</string>
+    <string name="permission_root_not_granted">未授权</string>
+    <string name="permission_root_granted">已授权</string>
+    <string name="permission_root_request_button">请求 Root</string>
+    <string name="permission_refresh_button">刷新状态</string>
+    <string name="permission_grant_type_both">双重授权</string>
 </resources>
