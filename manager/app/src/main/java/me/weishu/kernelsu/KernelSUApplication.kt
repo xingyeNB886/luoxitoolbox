@@ -58,8 +58,8 @@ class KernelSUApplication : Application(), ViewModelStoreOwner {
     private fun isUserUnlocked(): Boolean =
         runCatching { getSystemService(UserManager::class.java)?.isUserUnlocked == true }.getOrDefault(false)
 
-    /** 当前进程名 */
-    private val processName: String by lazy {
+    /** 当前进程名（避免和 Application.getProcessName() JVM 签名冲突，不用 processName 命名） */
+    private val currentProcessName: String by lazy {
         runCatching {
             val pid = android.os.Process.myPid()
             val am = getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
@@ -72,7 +72,7 @@ class KernelSUApplication : Application(), ViewModelStoreOwner {
      * :error_report / :webui 等子进程中应跳过所有业务初始化，
      * 避免子进程里重复触发 Natives / SuperUser / Root Shell 等导致闪退。
      */
-    private fun isMainProcess(): Boolean = processName == packageName
+    private fun isMainProcess(): Boolean = currentProcessName == packageName
 
     /**
      * 最早入口：Android 系统第一个调用到的 Application 方法。
