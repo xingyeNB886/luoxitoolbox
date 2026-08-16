@@ -125,14 +125,24 @@
             android:foregroundServiceType="dataSync" />
 
         <!--
-            洛茜工具箱：不声明 ShizukuProvider。
-            原因：rikka.shizuku.ShizukuProvider 的 static 初始化块 / 类加载阶段
-            会做 native/hidden API 相关操作，在某些机型上直接 SIGABRT（连 Java
-            try-catch 都接不住），且这个时机处于 ContentProvider 创建期，异常
-            会被系统当"Provider 初始化失败"直接杀进程，完全无崩溃提示。
-            Shizuku SDK 在无 Provider 的情况下 pingBinder() 仍可正常工作，
-            权限检测用 Shizuku #transact 方式兜底，详见 PermissionManager。
+            洛茜工具箱：安全版 Shizuku Provider（v10 方案）。
+            根因回顾：v6/v7 闪退 = ShizukuProvider.onCreate 调用 hidden API
+            被 dalvik 的 hidden-api-policy 直接 SIGABRT（不是 Java Throwable，
+            连 Java try-catch 也接不住）。
+            修复：KernelSUApplication.attachBaseContext 第一时间（早于 Provider
+            创建时机）调用 HiddenApiBypass.addHiddenApiExemptions("L") 全开豁免，
+            此时 Provider 初始化不再触发 native kill；外层再用 SafeShizukuProvider
+            子类包裹 onCreate 的 Java 异常。
+            ShizukuProvider 是 Shizuku.requestPermission() / checkSelfPermission()
+            能正确弹框和回调的必要组件（没它的话授权框不一定出、权限状态也不准），
+            这就是 Shizuku 官方 demo 的接入方式。
         -->
+        <provider
+            android:name=".ui.crash.SafeShizukuProvider"
+            android:authorities="${applicationId}.shizuku"
+            android:exported="false"
+            android:multiprocess="false"
+            android:permission="moe.shizuku.api.access.permission.BIND" />
     </application>
 
 </manifest>

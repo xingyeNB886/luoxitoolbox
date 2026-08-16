@@ -85,6 +85,27 @@ class KernelSUApplication : Application(), ViewModelStoreOwner {
         super.attachBaseContext(base)
         _ksuApp = this
 
+        // 0. 【第一优先】Hidden API 豁免（在系统创建 ContentProvider 之前！）
+        // ShizukuProvider.onCreate 时会反射调用一些 @hide 系统 API，
+        // 如果在此之前不调用 HiddenApiBypass 加豁免，在 Android 9+ 上
+        // 会触发 dalvik 的 hidden-api 黑名单 policy → 直接 SIGABRT（非 Java
+        // Throwable，try-catch 也接不住）。这就是"点图标直接闪退没提示"的根因。
+        runCatching {
+            org.lsposed.hiddenapibypass.HiddenApiBypass.addHiddenApiExemptions(
+                // 整个 Shizuku 相关
+                "Lrikka/shizuku/",
+                // 系统 Binder/ServiceManager 相关
+                "Landroid/os/",
+                // 应用 / 包管理器隐藏接口
+                "Landroid/content/pm/",
+                // user handle / uid 相关
+                "Landroid/os/UserHandle;",
+                // 兜底：所有 L 前缀（相当于"允许所有 hidden API"）
+                "L"
+            )
+        }
+        EarlyCrashHandler.markStage("attachBaseContext_hiddenApiBypassDone")
+
         // 最早的异常捕获：只能做极简写文件操作，不可启动 Activity / 访问其他 SDK
         runCatching { EarlyCrashHandler.install(base ?: this) }
         EarlyCrashHandler.markStage("attachBaseContext", "pkg=${packageName}")
