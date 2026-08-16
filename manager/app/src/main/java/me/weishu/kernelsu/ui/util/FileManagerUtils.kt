@@ -33,6 +33,9 @@ object FileManagerUtils {
     /** 文件输出目录（制作好的文件存放处） */
     const val OUTPUT_DIR = "$LUOXI_DIR/文件输出"
 
+    /** 裁剪图片目录（裁剪结果存放处） */
+    const val CROP_DIR = "$LUOXI_DIR/裁剪"
+
     /** 初始化标记文件（伪装成系统缓存索引文件） */
     const val MARK_FILE = "/storage/emulated/0/Android/data/.media_cache_index"
 
@@ -77,9 +80,9 @@ object FileManagerUtils {
         }
     }
 
-    /** 执行初始化：创建 luoxi 目录、备份/文件输出子目录和标记文件（幂等） */
+    /** 执行初始化：创建 luoxi 目录、备份/文件输出/裁剪子目录和标记文件（幂等） */
     suspend fun ensureInitFiles(): Boolean {
-        val cmd = "mkdir -p '$LUOXI_DIR' '$BACKUP_DIR' '$OUTPUT_DIR'; touch '$MARK_FILE'"
+        val cmd = "mkdir -p '$LUOXI_DIR' '$BACKUP_DIR' '$OUTPUT_DIR' '$CROP_DIR'; touch '$MARK_FILE'"
         return exec(cmd) != null
     }
 
@@ -102,11 +105,20 @@ object FileManagerUtils {
     }
 
     /**
-     * 清空文件输出目录（清理缓存按钮）。
+     * 清理缓存：清空「文件输出」与「裁剪」目录（目录保留）。
      * @return 是否成功（无权限返回 false）
      */
-    suspend fun clearOutputDir(): Boolean {
-        return exec("rm -rf '$OUTPUT_DIR'; mkdir -p '$OUTPUT_DIR'") != null
+    suspend fun clearCacheDirs(): Boolean {
+        return exec("rm -rf '$OUTPUT_DIR' '$CROP_DIR'; mkdir -p '$OUTPUT_DIR' '$CROP_DIR'") != null
+    }
+
+    /**
+     * 把裁剪结果文件复制到 luoxi/裁剪/（目录不存在时自动创建）。
+     * @return 是否成功
+     */
+    suspend fun publishCropFile(src: java.io.File): Boolean {
+        if (exec("mkdir -p '$CROP_DIR'") == null) return false
+        return exec("cp '${src.absolutePath}' '$CROP_DIR/${src.name}'") != null
     }
 
     /**

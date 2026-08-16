@@ -2,9 +2,6 @@ package me.weishu.kernelsu.ui.screen
 
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
-import android.graphics.Canvas
-import android.graphics.Paint
-import android.graphics.Rect
 import android.graphics.RectF
 import android.net.Uri
 import android.view.WindowManager
@@ -89,14 +86,8 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme.colorScheme
 import top.yukonga.miuix.kmp.utils.overScrollVertical
 import java.io.File
 
-/**
- * 取景框参数（归一化到输出正方形画布的 0..1）：
- * cx/cy 框中心，w 框宽（框高 = 框宽 × 屏幕短边/长边，即本机真实分辨率横屏比例）
- */
-data class CropParams(val cx: Float, val cy: Float, val w: Float)
-
-/** 已选图片（内存缓存，退出应用自动清除） */
-data class SelectedImage(val uri: Uri, val crop: CropParams?)
+/** 已选图片（内存缓存，退出应用自动清除；uri 为 SAF uri 或裁剪后的本地文件 uri） */
+data class SelectedImage(val uri: Uri)
 
 /** 屏幕分辨率（px），横屏方向 */
 data class ScreenSize(val longSide: Int, val shortSide: Int)
@@ -123,7 +114,7 @@ fun SuperUserPager(
     )
 
     var images by remember { mutableStateOf(listOf<SelectedImage>()) }
-    var editing by remember { mutableStateOf<SelectedImage?>(null) }
+    var editingIdx by remember { mutableStateOf<Int?>(null) }
 
     Scaffold(
         topBar = {
@@ -157,9 +148,9 @@ fun SuperUserPager(
                 ) {
                     ImagePickerCard(
                         images = images,
-                        onPick = { images = images + it.map { SelectedImage(it, null) } },
-                        onRemove = { img -> images = images - img },
-                        onPreview = { editing = it }
+                        onPick = { uris -> images = images + uris.map { SelectedImage(it) } },
+                        onRemove = { idx -> images = images.filterIndexed { i, _ -> i != idx } },
+                        onPreview = { idx -> editingIdx = idx }
                     )
                     MakeFilesCard(images = images)
                     ReplaceFilesCard()
@@ -174,13 +165,15 @@ fun SuperUserPager(
         }
     }
 
-    editing?.let { img ->
-        ViewfinderDialog(
-            image = img,
-            onDismiss = { editing = null },
-            onConfirm = { crop ->
-                images = images.map { if (it.uri == img.uri) it.copy(crop = crop) else it }
-                editing = null
+    val editIdx = editingIdx
+    if (editIdx != null && editIdx < images.size) {
+        CropDialog(
+            index = editIdx,
+            image = images[editIdx],
+            onDismiss = { editingIdx = null },
+            onCropped = { i, uri ->
+                images = images.toMutableList().also { it[i] = SelectedImage(uri) }
+                editingIdx = null
             }
         )
     }
@@ -193,8 +186,8 @@ fun SuperUserPager(
 private fun ImagePickerCard(
     images: List<SelectedImage>,
     onPick: (List<Uri>) -> Unit,
-    onRemove: (SelectedImage) -> Unit,
-    onPreview: (SelectedImage) -> Unit
+    onRemove: (Int) -> Unit,
+    onPreview: (Int) -> Unit
 ) {
     val launcher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenMultipleDocuments()
@@ -218,7 +211,7 @@ private fun ImagePickerCard(
             )
             Spacer(Modifier.height(8.dp))
             Text(
-                text = "点击图片可预览并调整取景框，退出应用后自动清除",
+                text = "点击图片进行裁剪，裁剪结果会替换原图并保存到 luoxi/裁剪/",
                 fontSize = 14.sp,
                 color = colorScheme.onSurfaceVariantSummary
             )
@@ -234,12 +227,12 @@ private fun ImagePickerCard(
                 )
             }
 
-            images.forEach { img ->
+            images.forEachIndexed { idx, img ->
                 Spacer(Modifier.height(8.dp))
                 SelectedImageItem(
                     image = img,
-                    onRemove = { onRemove(img) },
-                    onClick = { onPreview(img) }
+                    onRemove = { onRemove(idx) },
+                    onClick = { onPreview(idx) }
                 )
             }
         }
@@ -291,7 +284,7 @@ private fun SelectedImageItem(
                     .padding(horizontal = 12.dp)
             ) {
                 Text(
-                    text = if (image.crop != null) "已设置取景框 · 点击预览" else "未设置取景框（默认居中）· 点击预览",
+                    text = if (image.uri.scheme == "file") "已裁剪 · 点击可再次裁剪" else "未裁剪 · 点击裁剪",
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Medium,
                     color = colorScheme.onSurface
@@ -316,136 +309,177 @@ private fun SelectedImageItem(
 }
 
 /**
- * 取景框编辑器弹窗：
- * - 图片保持原始比例显示（等比缩放居中，留黑边，不裁剪）
- * - 中央虚线取景框 = 本机真实分辨率（横屏）比例，框外调暗
- * - 拖动移动取景框；左下角"自由取景"切换缩放模式
+ * 裁剪弹窗：
+ * - 图片按原始比例完整显示（画布比例 = 图片比例）
+ * - 裁剪框比例固定为本机分辨率（横屏 长边:短边），始终限制在图片内部
+ * - 按住框内拖动 = 移动；按住四个角任意一角拖动 = 缩放（保持比例，对角固定）
+ * - 确定后直接裁剪：结果替换列表中的原图，并保存到 luoxi/裁剪/
  */
 @Composable
-private fun ViewfinderDialog(
+private fun CropDialog(
+    index: Int,
     image: SelectedImage,
     onDismiss: () -> Unit,
-    onConfirm: (CropParams) -> Unit
+    onCropped: (Int, Uri) -> Unit
 ) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     val screen = remember { getScreenSize(context) }
 
-    val src = remember(image.uri) {
-        decodeSampledBitmap(image.uri, 2048)
-    }
-
-    val initial = image.crop ?: CropParams(0.5f, 0.5f, 1f)
-    var cx by remember { mutableStateOf(initial.cx) }
-    var cy by remember { mutableStateOf(initial.cy) }
-    var w by remember { mutableStateOf(initial.w) }
-    var freeMode by remember { mutableStateOf(false) }
-
-    // 框高/框宽 = 本机真实分辨率横屏比例
+    // 裁剪框高/宽 = 本机分辨率横屏比例（短边/长边）
     val ratio = screen.shortSide.toFloat() / screen.longSide.toFloat()
-    val show = remember { mutableStateOf(true) }
 
-    fun clampFrame() {
-        w = w.coerceIn(0.15f, 1f)
-        val h = w * ratio
-        cx = cx.coerceIn(w / 2f, 1f - w / 2f)
-        cy = cy.coerceIn(h / 2f, 1f - h / 2f)
+    val src = remember(image.uri) { decodeSampledBitmap(image.uri, 2048) }
+    // 裁剪框（图片像素坐标），默认 = 图片内能放下的最大等比框，居中
+    var box by remember(image.uri) {
+        mutableStateOf(src?.let { defaultCropBox(it.width.toFloat(), it.height.toFloat(), ratio) })
     }
+    var saving by remember { mutableStateOf(false) }
+    val show = remember { mutableStateOf(true) }
 
     SuperDialog(
         show = show,
-        title = "预览",
-        onDismissRequest = { show.value = false; onDismiss() },
+        title = "裁剪图片",
+        onDismissRequest = { if (!saving) { show.value = false; onDismiss() } },
         content = {
             Column(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
-                    text = "虚线框为本机分辨率 ${screen.longSide}×${screen.shortSide}（横屏）可见区域，框外调暗；拖动调整",
+                    text = "虚线裁剪框比例为本机分辨率 ${screen.longSide}×${screen.shortSide}（横屏），始终限制在图片内；按住框内拖动移动，按住四角缩放",
                     fontSize = 12.sp,
                     color = colorScheme.onSurfaceVariantSummary,
                     textAlign = TextAlign.Center
                 )
                 Spacer(Modifier.height(10.dp))
 
-                if (src != null) {
-                    val sidePx = with(androidx.compose.ui.platform.LocalDensity.current) { 280.dp.toPx() }
-                    val fit = remember(src) { computeFitRect(src.width, src.height) }
+                if (src != null && box != null) {
+                    // 画布尺寸跟随图片比例（宽上限 300dp、高上限 280dp）
+                    val maxW = 300.dp
+                    val maxH = 280.dp
+                    val aspect = src.width.toFloat() / src.height.toFloat()
+                    val dispW: Dp
+                    val dispH: Dp
+                    if (maxW / maxH > aspect) {
+                        dispW = maxH * aspect; dispH = maxH
+                    } else {
+                        dispW = maxW; dispH = maxW / aspect
+                    }
+
                     Canvas(
                         modifier = Modifier
-                            .size(280.dp)
+                            .size(dispW, dispH)
                             .clip(RoundedCornerShape(12.dp))
                             .background(Color.Black)
-                            .pointerInput(freeMode, ratio) {
-                                detectDragGestures { change, drag ->
-                                    change.consume()
-                                    if (freeMode) {
-                                        w += drag.x / sidePx
-                                    } else {
-                                        cx += drag.x / sidePx
-                                        cy += drag.y / sidePx
+                            .pointerInput(src) {
+                                var mode = 0   // 0=无操作 1=移动框 2=缩放角
+                                var corner = 0 // 0=左上 1=右上 2=左下 3=右下
+                                detectDragGestures(
+                                    onDragStart = { p ->
+                                        val s = size.width.toFloat() / src.width
+                                        val b = box ?: return@detectDragGestures
+                                        val grab = 26.dp.toPx()
+                                        val corners = arrayOf(
+                                            Offset(b.left * s, b.top * s),
+                                            Offset(b.right * s, b.top * s),
+                                            Offset(b.left * s, b.bottom * s),
+                                            Offset(b.right * s, b.bottom * s)
+                                        )
+                                        val hit = corners.indexOfFirst { (it - p).getDistance() <= grab }
+                                        if (hit >= 0) {
+                                            mode = 2; corner = hit
+                                        } else if (
+                                            p.x >= b.left * s && p.x <= b.right * s &&
+                                            p.y >= b.top * s && p.y <= b.bottom * s
+                                        ) {
+                                            mode = 1
+                                        } else {
+                                            mode = 0
+                                        }
+                                    },
+                                    onDrag = { change, drag ->
+                                        change.consume()
+                                        val b = box ?: return@detectDragGestures
+                                        val s = size.width.toFloat() / src.width
+                                        val imgW = src.width.toFloat()
+                                        val imgH = src.height.toFloat()
+                                        if (mode == 1) {
+                                            // 整体移动，钳制在图片内
+                                            val w = b.width(); val h = b.height()
+                                            val nl = (b.left + drag.x / s).coerceIn(0f, imgW - w)
+                                            val nt = (b.top + drag.y / s).coerceIn(0f, imgH - h)
+                                            box = RectF(nl, nt, nl + w, nt + h)
+                                        } else if (mode == 2) {
+                                            // 对角固定，向拖动方向缩放，保持比例且不越出图片
+                                            val px = change.position.x / s
+                                            val py = change.position.y / s
+                                            val fixX = if (corner == 0 || corner == 2) b.right else b.left
+                                            val fixY = if (corner == 0 || corner == 1) b.bottom else b.top
+                                            val dx = px - fixX
+                                            val dy = py - fixY
+                                            val dirX = if (dx >= 0f) 1f else -1f
+                                            val dirY = if (dy >= 0f) 1f else -1f
+                                            val availX = if (dirX > 0f) imgW - fixX else fixX
+                                            val availY = if (dirY > 0f) imgH - fixY else fixY
+                                            val wMax = minOf(availX, availY / ratio, minOf(imgW, imgH / ratio))
+                                            val wMin = minOf(24f, wMax)
+                                            var w = maxOf(kotlin.math.abs(dx), kotlin.math.abs(dy) / ratio)
+                                            w = w.coerceIn(wMin, wMax)
+                                            val h = w * ratio
+                                            box = RectF(
+                                                minOf(fixX, fixX + dirX * w),
+                                                minOf(fixY, fixY + dirY * h),
+                                                maxOf(fixX, fixX + dirX * w),
+                                                maxOf(fixY, fixY + dirY * h)
+                                            )
+                                        }
                                     }
-                                    clampFrame()
-                                }
+                                )
                             }
                     ) {
-                        val side = size.width
-                        // 图片原比例居中绘制（不裁剪不变形）
+                        val cw = size.width
+                        val ch = size.height
+                        val s = cw / src.width
+                        // 图片铺满画布（画布比例 = 图片比例，不变形）
                         drawImage(
                             image = src.asImageBitmap(),
                             srcOffset = androidx.compose.ui.unit.IntOffset.Zero,
                             srcSize = androidx.compose.ui.unit.IntSize(src.width, src.height),
-                            dstOffset = androidx.compose.ui.unit.IntOffset(
-                                (fit.left * side).toInt(),
-                                (fit.top * side).toInt()
-                            ),
-                            dstSize = androidx.compose.ui.unit.IntSize(
-                                (fit.width() * side).toInt(),
-                                (fit.height() * side).toInt()
-                            ),
+                            dstOffset = androidx.compose.ui.unit.IntOffset.Zero,
+                            dstSize = androidx.compose.ui.unit.IntSize(cw.toInt(), ch.toInt()),
                         )
-                        // 取景框（本机真实分辨率横屏比例）
-                        val fw = w * side
-                        val fh = fw * ratio
-                        val left = (cx * side) - fw / 2f
-                        val top = (cy * side) - fh / 2f
+                        val b = box!!
+                        val bl = b.left * s; val bt = b.top * s
+                        val br = b.right * s; val bb = b.bottom * s
                         // 框外调暗（四块）
                         val dim = Color.Black.copy(alpha = 0.55f)
-                        drawRect(dim, size = androidx.compose.ui.geometry.Size(side, top.coerceAtLeast(0f)))
-                        drawRect(
-                            dim,
-                            topLeft = Offset(0f, top + fh),
-                            size = androidx.compose.ui.geometry.Size(side, side - (top + fh))
-                        )
-                        drawRect(
-                            dim,
-                            topLeft = Offset(0f, top.coerceAtLeast(0f)),
-                            size = androidx.compose.ui.geometry.Size(left.coerceAtLeast(0f), fh)
-                        )
-                        drawRect(
-                            dim,
-                            topLeft = Offset(left + fw, top.coerceAtLeast(0f)),
-                            size = androidx.compose.ui.geometry.Size(side - (left + fw), fh)
-                        )
-                        // 虚线框
-                        val dash = PathEffect.dashPathEffect(floatArrayOf(14f, 10f))
+                        drawRect(dim, size = androidx.compose.ui.geometry.Size(cw, bt))
+                        drawRect(dim, topLeft = Offset(0f, bb), size = androidx.compose.ui.geometry.Size(cw, ch - bb))
+                        drawRect(dim, topLeft = Offset(0f, bt), size = androidx.compose.ui.geometry.Size(bl, bb - bt))
+                        drawRect(dim, topLeft = Offset(br, bt), size = androidx.compose.ui.geometry.Size(cw - br, bb - bt))
+                        // 虚线裁剪框
                         drawRect(
                             color = Color.White,
-                            topLeft = Offset(left, top),
-                            size = androidx.compose.ui.geometry.Size(fw, fh),
-                            style = Stroke(width = 2.5f, pathEffect = dash)
+                            topLeft = Offset(bl, bt),
+                            size = androidx.compose.ui.geometry.Size(br - bl, bb - bt),
+                            style = Stroke(width = 2.5f, pathEffect = PathEffect.dashPathEffect(floatArrayOf(14f, 10f)))
                         )
+                        // 四角手柄
+                        val hr = 6.dp.toPx()
+                        listOf(Offset(bl, bt), Offset(br, bt), Offset(bl, bb), Offset(br, bb)).forEach { c ->
+                            drawCircle(Color.White, radius = hr, center = c)
+                            drawCircle(Color.Black.copy(alpha = 0.35f), radius = hr, center = c, style = Stroke(2f))
+                        }
                     }
                 } else {
                     Text("图片加载失败", color = colorScheme.onSurfaceVariantSummary)
                 }
 
                 Spacer(Modifier.height(6.dp))
-                Text(
-                    text = if (freeMode) "自由取景中：左右拖动缩放取景框" else "取景模式：拖动移动取景框",
-                    fontSize = 12.sp,
-                    color = if (freeMode) colorScheme.primary else colorScheme.onSurfaceVariantSummary
-                )
+                if (saving) {
+                    Text("正在裁剪…", fontSize = 12.sp, color = colorScheme.primary)
+                }
                 Spacer(Modifier.height(10.dp))
 
                 Row(
@@ -453,28 +487,45 @@ private fun ViewfinderDialog(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    TextButton(
-                        text = if (freeMode) "完成取景" else "自由取景",
-                        onClick = {
-                            freeMode = !freeMode
-                            if (!freeMode) clampFrame()
-                        },
-                        colors = ButtonDefaults.textButtonColorsPrimary()
+                    Text(
+                        text = "确定后裁剪结果替换原图，并保存到 luoxi/裁剪/",
+                        fontSize = 11.sp,
+                        color = colorScheme.onSurfaceVariantSummary,
+                        modifier = Modifier.weight(1f)
                     )
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         TextButton(
                             text = "取消",
+                            enabled = !saving,
                             onClick = { show.value = false; onDismiss() }
                         )
                         TextButton(
                             text = "确定",
+                            enabled = !saving && box != null,
                             onClick = {
-                                clampFrame()
-                                show.value = false
-                                onConfirm(CropParams(cx, cy, w))
+                                val b = box ?: return@TextButton
+                                val preview = src ?: return@TextButton
+                                scope.launch {
+                                    saving = true
+                                    var published = false
+                                    val newUri = withContext(Dispatchers.IO) {
+                                        performCrop(image.uri, preview, b) { f ->
+                                            published = FileManagerUtils.publishCropFile(f)
+                                        }
+                                    }
+                                    saving = false
+                                    if (newUri != null) {
+                                        show.value = false
+                                        onCropped(index, newUri)
+                                        android.widget.Toast.makeText(
+                                            context,
+                                            if (published) "已裁剪并保存到 luoxi/裁剪/" else "已裁剪（保存到裁剪目录失败）",
+                                            android.widget.Toast.LENGTH_SHORT
+                                        ).show()
+                                    } else {
+                                        android.widget.Toast.makeText(context, "裁剪失败", android.widget.Toast.LENGTH_SHORT).show()
+                                    }
+                                }
                             },
                             colors = ButtonDefaults.textButtonColorsPrimary()
                         )
@@ -522,18 +573,18 @@ private fun MakeFilesCard(images: List<SelectedImage>) {
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.End
             ) {
-                // 清理缓存（制作文件按钮左边）：清空文件输出目录
+                // 清理缓存（制作文件按钮左边）：清空文件输出 + 裁剪目录
                 TextButton(
                     text = if (clearing) "清理中…" else "清理缓存",
                     enabled = !clearing && !making,
                     onClick = {
                         scope.launch {
                             clearing = true
-                            val ok = FileManagerUtils.clearOutputDir()
+                            val ok = FileManagerUtils.clearCacheDirs()
                             clearing = false
                             android.widget.Toast.makeText(
                                 context,
-                                if (ok) "已清空文件输出目录" else "清理失败，请检查权限",
+                                if (ok) "已清空「文件输出」与「裁剪」目录" else "清理失败，请检查权限",
                                 android.widget.Toast.LENGTH_SHORT
                             ).show()
                         }
@@ -547,7 +598,7 @@ private fun MakeFilesCard(images: List<SelectedImage>) {
                         scope.launch {
                             making = true
                             stepShow.value = true
-                            val ok = makeFiles(context, images) { step ->
+                            val ok = makeFiles(images) { step ->
                                 withContext(Dispatchers.Main) { stepText = step }
                             }
                             making = false
@@ -598,12 +649,11 @@ private fun MakeFilesCard(images: List<SelectedImage>) {
 
 /**
  * 制作文件：
- * 1. 读记录的游戏文件名 N 个；2. 图片 M 张均分（各 N/M 份，余数随机多一份）；
- * 3. 渲染到中转目录（app 外部目录，shell 可访问）；
+ * 1. 读记录的游戏文件名 N 个；2. 图片 M 张（已裁剪）均分（各 N/M 份，余数随机多一份）；
+ * 3. 按游戏文件名逐个字节复制到中转目录（保留原始格式与画质）；
  * 4. shell 移入 文件输出/（先清空旧输出）。
  */
 private suspend fun makeFiles(
-    context: android.content.Context,
     images: List<SelectedImage>,
     onStep: suspend (String) -> Unit
 ): Boolean = withContext(Dispatchers.IO) {
@@ -627,33 +677,22 @@ private suspend fun makeFiles(
         }
     }
 
-    val screen = getScreenSize(context)
-    val ratio = screen.shortSide.toFloat() / screen.longSide.toFloat()
     val staging = java.io.File(FileManagerUtils.workDir(), "make").apply {
         mkdirs(); listFiles()?.forEach { runCatching { it.delete() } }
     }
 
-    val bitmapCache = mutableMapOf<Uri, Bitmap>()
-    try {
-        var done = 0
-        assign.forEach { (img, name) ->
-            done++
-            onStep("正在生成文件 $done/${assign.size}")
-            val srcBmp = bitmapCache.getOrPut(img.uri) {
-                decodeSampledBitmap(img.uri, 2048) ?: return@withContext false
+    var done = 0
+    assign.forEach { (img, name) ->
+        done++
+        onStep("正在复制文件 $done/${assign.size}")
+        try {
+            val input = ksuApp.contentResolver.openInputStream(img.uri) ?: return@withContext false
+            input.use {
+                java.io.File(staging, name).outputStream().use { out -> input.copyTo(out) }
             }
-            val crop = img.crop ?: CropParams(0.5f, 0.5f, 1f)
-            val rendered = renderOutput(srcBmp, screen.longSide, crop, ratio)
-            val f = File(staging, name)
-            runCatching {
-                java.io.FileOutputStream(f).use { out ->
-                    rendered.compress(Bitmap.CompressFormat.JPEG, 92, out)
-                }
-            }.onFailure { return@withContext false }
-            if (rendered !== srcBmp) rendered.recycle()
+        } catch (e: Exception) {
+            return@withContext false
         }
-    } finally {
-        bitmapCache.values.forEach { runCatching { it.recycle() } }
     }
 
     onStep("正在写入文件输出目录")
@@ -808,52 +847,48 @@ private fun startReplace(
 // ---------- 图片处理 ----------
 
 /**
- * 图片在正方形画布内的显示区（保持原比例、居中，归一化 0..1）。
- * 竖图上下占满左右留黑；横图左右占满上下留黑。不裁剪、不变形。
+ * 默认裁剪框：图片内能放下的最大等比框（比例 = 本机分辨率横屏），居中。
  */
-private fun computeFitRect(imgW: Int, imgH: Int): RectF {
-    return if (imgW >= imgH) {
-        val h = imgH.toFloat() / imgW
-        RectF(0f, (1f - h) / 2f, 1f, (1f + h) / 2f)
-    } else {
-        val w = imgW.toFloat() / imgH
-        RectF((1f - w) / 2f, 0f, (1f + w) / 2f, 1f)
-    }
+private fun defaultCropBox(imgW: Float, imgH: Float, ratio: Float): RectF {
+    val w = minOf(imgW, imgH / ratio)
+    val h = w * ratio
+    val l = (imgW - w) / 2f
+    val t = (imgH - h) / 2f
+    return RectF(l, t, l + w, t + h)
 }
 
 /**
- * 渲染输出图（所见即所得）：
- * - 正方形画布，边长 = 屏幕长边（游戏加载图为正方形，中央横条为屏幕可见区）
- * - 图片按原比例居中绘制（黑边填充，不裁剪不变形）
- * - 取景框外区域压暗（与预览一致）
+ * 执行裁剪：
+ * 以更高分辨率（≤4096）重新解码原图，把预览坐标系的裁剪框映射回原坐标并裁剪，
+ * 结果存为中转目录 JPEG 文件，并通过 onPublish 复制到 luoxi/裁剪/。
+ * @return 裁剪结果文件 uri；失败返回 null
  */
-private fun renderOutput(src: Bitmap, longSide: Int, crop: CropParams, ratio: Float): Bitmap {
-    val out = Bitmap.createBitmap(longSide, longSide, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(out)
-    canvas.drawColor(android.graphics.Color.BLACK)
-
-    // 图片原比例居中
-    val fit = computeFitRect(src.width, src.height)
-    val dst = Rect(
-        (fit.left * longSide).toInt(),
-        (fit.top * longSide).toInt(),
-        (fit.right * longSide).toInt(),
-        (fit.bottom * longSide).toInt()
-    )
-    canvas.drawBitmap(src, null, dst, Paint(Paint.FILTER_BITMAP_FLAG))
-
-    // 取景框外压暗（与预览效果一致）
-    val fw = (crop.w.coerceIn(0.15f, 1f) * longSide)
-    val fh = fw * ratio
-    val left = (crop.cx * longSide) - fw / 2f
-    val top = (crop.cy * longSide) - fh / 2f
-    val dim = Paint().apply { color = android.graphics.Color.argb(140, 0, 0, 0) }
-    // 上/下/左/右
-    canvas.drawRect(0f, 0f, longSide.toFloat(), top.coerceAtLeast(0f), dim)
-    canvas.drawRect(0f, top + fh, longSide.toFloat(), longSide.toFloat(), dim)
-    canvas.drawRect(0f, top, left.coerceAtLeast(0f), top + fh, dim)
-    canvas.drawRect(left + fw, top, longSide.toFloat(), top + fh, dim)
-    return out
+private suspend fun performCrop(
+    uri: Uri,
+    preview: Bitmap,
+    box: RectF,
+    onPublish: suspend (java.io.File) -> Unit
+): Uri? {
+    return try {
+        val full = decodeSampledBitmap(uri, 4096) ?: preview
+        val fx = full.width.toFloat() / preview.width
+        val fy = full.height.toFloat() / preview.height
+        val l = (box.left * fx).toInt().coerceIn(0, full.width - 1)
+        val t = (box.top * fy).toInt().coerceIn(0, full.height - 1)
+        val r = (box.right * fx).toInt().coerceIn(l + 1, full.width)
+        val b = (box.bottom * fy).toInt().coerceIn(t + 1, full.height)
+        val cropped = Bitmap.createBitmap(full, l, t, r - l, b - t)
+        val stamp = java.text.SimpleDateFormat("yyyyMMdd_HHmmss_SSS", java.util.Locale.getDefault())
+            .format(java.util.Date())
+        val f = java.io.File(FileManagerUtils.workDir(), "crop_$stamp.jpg")
+        java.io.FileOutputStream(f).use { cropped.compress(Bitmap.CompressFormat.JPEG, 95, it) }
+        if (cropped !== full) cropped.recycle()
+        if (full !== preview) full.recycle()
+        onPublish(f)
+        Uri.fromFile(f)
+    } catch (e: Exception) {
+        null
+    }
 }
 
 /**
