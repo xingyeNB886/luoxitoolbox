@@ -268,7 +268,6 @@ private fun StatusCard(
                 pressFeedbackType = PressFeedbackType.Tilt
             ) {
                 Box(modifier = Modifier.fillMaxSize()) {
-                    // 右下角图标
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
@@ -286,7 +285,6 @@ private fun StatusCard(
                             contentDescription = null
                         )
                     }
-                    // 左下角权限类型
                     if (grantLabel.isNotEmpty()) {
                         Box(
                             modifier = Modifier
@@ -301,7 +299,6 @@ private fun StatusCard(
                             )
                         }
                     }
-                    // 左上角标题
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
@@ -325,7 +322,7 @@ private fun StatusCard(
                 }
             }
 
-            // 右边：两个框上下堆叠
+            // 右边：两个框上下堆叠（只显示文字，不可点击）
             Column(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -334,24 +331,13 @@ private fun StatusCard(
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f),
-                    onClick = actions.onInstallClick,
-                    showIndication = true,
-                    pressFeedbackType = PressFeedbackType.Sink
                 ) {
                     BasicComponent(
-                        title = stringResource(R.string.permission_screen_title),
-                        summary = when (state.permissionGrant) {
-                            me.weishu.kernelsu.ui.util.PermissionGrantType.ROOT ->
-                                stringResource(R.string.permission_root_granted)
-                            me.weishu.kernelsu.ui.util.PermissionGrantType.ADB ->
-                                stringResource(R.string.permission_shizuku_granted)
-                            me.weishu.kernelsu.ui.util.PermissionGrantType.BOTH ->
-                                stringResource(R.string.permission_grant_type_both)
-                            else -> grantLabel
-                        },
+                        title = stringResource(R.string.superuser),
+                        summary = "0",
                         startAction = {
                             Icon(
-                                Icons.Rounded.CheckCircleOutline,
+                                imageVector = MiuixIcons.Link,
                                 contentDescription = null,
                                 modifier = Modifier.padding(end = 6.dp),
                                 tint = colorScheme.onBackground,
@@ -363,13 +349,10 @@ private fun StatusCard(
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f),
-                    onClick = { /* no-op */ },
-                    showIndication = false,
-                    pressFeedbackType = PressFeedbackType.Sink
                 ) {
                     BasicComponent(
-                        title = stringResource(R.string.home_manager_version),
-                        summary = state.systemInfo.managerVersion,
+                        title = stringResource(R.string.module),
+                        summary = "0",
                         startAction = {
                             Icon(
                                 imageVector = MiuixIcons.Link,
@@ -413,7 +396,7 @@ private fun StatusCard(
                 )
             }
 
-            // 右边：两个框上下堆叠
+            // 右边：两个框上下堆叠（只显示文字，不可点击）
             Column(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -422,16 +405,13 @@ private fun StatusCard(
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f),
-                    onClick = actions.onInstallClick,
-                    showIndication = true,
-                    pressFeedbackType = PressFeedbackType.Sink
                 ) {
                     BasicComponent(
-                        title = stringResource(R.string.permission_shizuku_title),
-                        summary = stringResource(R.string.permission_shizuku_not_granted),
+                        title = stringResource(R.string.superuser),
+                        summary = "0",
                         startAction = {
                             Icon(
-                                Icons.Rounded.ErrorOutline,
+                                imageVector = MiuixIcons.Link,
                                 contentDescription = null,
                                 modifier = Modifier.padding(end = 6.dp),
                                 tint = colorScheme.onBackground,
@@ -443,16 +423,13 @@ private fun StatusCard(
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f),
-                    onClick = actions.onInstallClick,
-                    showIndication = true,
-                    pressFeedbackType = PressFeedbackType.Sink
                 ) {
                     BasicComponent(
-                        title = stringResource(R.string.permission_root_title),
-                        summary = stringResource(R.string.permission_root_not_granted),
+                        title = stringResource(R.string.module),
+                        summary = "0",
                         startAction = {
                             Icon(
-                                Icons.Rounded.ErrorOutline,
+                                imageVector = MiuixIcons.Link,
                                 contentDescription = null,
                                 modifier = Modifier.padding(end = 6.dp),
                                 tint = colorScheme.onBackground,

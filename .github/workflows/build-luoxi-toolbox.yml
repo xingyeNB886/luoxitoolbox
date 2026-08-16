@@ -128,3 +128,14 @@ jobs:
           path: dist/*.apk
           if-no-files-found: error
           retention-days: 30
+
+      - name: 发布 APK 到 Release（直链下载）
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: 洛茜工具箱 Latest
+          body: |
+            ## 洛茜工具箱 APK 直链
+            最新构建版本，可直接下载安装。
+          files: dist/*.apk
