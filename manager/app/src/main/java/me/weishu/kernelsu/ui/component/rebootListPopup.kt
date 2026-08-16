@@ -11,6 +11,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import me.weishu.kernelsu.R
 import me.weishu.kernelsu.ui.screen.RebootDropdownItem
+import me.weishu.kernelsu.ui.util.PermissionManager
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.ListPopupColumn
@@ -26,6 +27,9 @@ fun RebootListPopup(
     modifier: Modifier = Modifier,
     alignment: PopupPositionProvider.Align = PopupPositionProvider.Align.TopEnd
 ) {
+    // 未授权时不显示重启按钮
+    if (!PermissionManager.isAnyGranted()) return
+
     val showTopPopup = remember { mutableStateOf(false) }
     IconButton(
         modifier = modifier,

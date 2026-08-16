@@ -3,7 +3,6 @@ package me.weishu.kernelsu.ui.util
 import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
-import android.text.Html
 import android.util.Base64
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -138,21 +137,24 @@ object CloudUpdateManager {
      */
     private fun cleanHtml(raw: String): String {
         // 把块级标签（div、br、p）替换为换行符，保留内容结构
-        val withBreaks = raw
+        var result = raw
             .replace(Regex("<br\\s*/?>"), "\n")
             .replace(Regex("<div[^>]*>"), "\n")
             .replace(Regex("</div>"), "")
             .replace(Regex("<p[^>]*>"), "\n")
             .replace(Regex("</p>"), "")
         // 去除剩余 HTML 标签
-        val noTags = withBreaks.replace(Regex("<[^>]*>"), "")
-        // 解码 HTML 实体（&nbsp; → 空格, &lt; → <, &amp; → & 等）
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-            Html.fromHtml(noTags, Html.FROM_HTML_MODE_LEGACY).toString()
-        } else {
-            @Suppress("DEPRECATION")
-            Html.fromHtml(noTags).toString()
-        }
+        result = result.replace(Regex("<[^>]*>"), "")
+        // 手动解码 HTML 实体（不用 Html.fromHtml，它会吞掉换行符）
+        result = result
+            .replace("&nbsp;", " ")
+            .replace("&lt;", "<")
+            .replace("&gt;", ">")
+            .replace("&amp;", "&")
+            .replace("&quot;", "\"")
+            .replace("&apos;", "'")
+        // 去掉开头多余的空白行
+        return result.trimStart('\n')
     }
 
     /**
