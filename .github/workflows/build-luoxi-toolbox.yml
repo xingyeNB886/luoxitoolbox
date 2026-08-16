@@ -133,8 +133,8 @@ jobs:
         if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: latest
-          name: 洛茜工具箱 Latest
+          tag_name: luoxi-${{ github.run_number }}
+          name: 洛茜工具箱 #${{ github.run_number }}
           body: |
             ## 洛茜工具箱 APK 直链
             最新构建版本，可直接下载安装。
