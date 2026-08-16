@@ -52,16 +52,16 @@ object PermissionManager {
     /** 永远不要缓存，实时才可靠 */
     private val listeners = mutableListOf<() -> Unit>()
 
-    private val permissionChangedListeners = mutableListOf<Shizuku.OnRequestPermissionResultListener>()
     private var binderReceived: Shizuku.OnBinderReceivedListener? = null
-    private var binderDied: Shizuku.OnBinderDiedListener? = null
 
     @Volatile
     private var listenersInstalled = false
 
     /**
-     * 安装 Shizuku Binder 监听 + 授权结果监听（主进程 Application.onCreate 里调用一次）。
-     * 不依赖 ShizukuProvider，所有监听是最佳努力，失败了就算（也不会崩）。
+     * 安装 Shizuku Binder 监听（主进程 Application.onCreate 里调用一次）。
+     * Shizuku 13.1.5 的公开 API 只有 addBinderReceivedListener；
+     * Binder 断开（died）由首页 onResume 周期性重测覆盖。
+     * 全程 runCatching，不会崩。
      */
     fun installListenersIfNeeded() {
         if (listenersInstalled) return
@@ -71,13 +71,8 @@ object PermissionManager {
                 val received = Shizuku.OnBinderReceivedListener {
                     notifyChanged("binder_received")
                 }
-                val died = Shizuku.OnBinderDiedListener {
-                    notifyChanged("binder_died")
-                }
                 Shizuku.addBinderReceivedListener(received)
-                Shizuku.addBinderDiedListener(died)
                 binderReceived = received
-                binderDied = died
             }
             listenersInstalled = true
         }
