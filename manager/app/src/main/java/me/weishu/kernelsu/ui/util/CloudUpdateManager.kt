@@ -3,6 +3,7 @@ package me.weishu.kernelsu.ui.util
 import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
+import android.text.Html
 import android.util.Base64
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -115,12 +116,14 @@ object CloudUpdateManager {
      * [历史版本]历史版本内容[历史版本]
      */
     private fun parseCloudData(raw: String): CloudData {
-        val internalVersion = extractBetween(raw, "[内部版本号]", "[内部版本号]")
+        // 先清理 HTML：去除标签、解码实体（&nbsp; → 空格等）
+        val cleaned = cleanHtml(raw)
+        val internalVersion = extractBetween(cleaned, "[内部版本号]", "[内部版本号]")
             ?.trim()?.toIntOrNull() ?: 0
-        val downloadUrl = extractBetween(raw, "[链接]", "[链接]")?.trim() ?: ""
-        val announcement = extractBetween(raw, "[公告]", "[公告]")?.trim() ?: ""
+        val downloadUrl = extractBetween(cleaned, "[链接]", "[链接]")?.trim() ?: ""
+        val announcement = extractBetween(cleaned, "[公告]", "[公告]")?.trim() ?: ""
         // 历史版本内容保留原始格式（包括空格和换行）
-        val versionHistory = extractBetween(raw, "[历史版本]", "[历史版本]") ?: ""
+        val versionHistory = extractBetween(cleaned, "[历史版本]", "[历史版本]") ?: ""
 
         return CloudData(
             internalVersion = internalVersion,
@@ -128,6 +131,21 @@ object CloudUpdateManager {
             announcement = announcement,
             versionHistory = versionHistory
         )
+    }
+
+    /**
+     * 清理 HTML：去除标签，解码 HTML 实体
+     */
+    private fun cleanHtml(raw: String): String {
+        // 去除所有 HTML 标签
+        val noTags = raw.replace(Regex("<[^>]*>"), "")
+        // 解码 HTML 实体（&nbsp; → 空格, &lt; → <, &amp; → & 等）
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            Html.fromHtml(noTags, Html.FROM_HTML_MODE_LEGACY).toString()
+        } else {
+            @Suppress("DEPRECATION")
+            Html.fromHtml(noTags).toString()
+        }
     }
 
     /**
