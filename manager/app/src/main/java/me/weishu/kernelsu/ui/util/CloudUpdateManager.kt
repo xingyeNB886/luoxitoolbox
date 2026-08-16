@@ -66,7 +66,7 @@ object CloudUpdateManager {
                     if (signatures.isNotEmpty()) {
                         val cert = signatures[0]
                         val md = MessageDigest.getInstance("SHA-256")
-                        val digest = md.digest(cert.encoded)
+                        val digest = md.digest(cert.toByteArray())
                         val hash = Base64.encodeToString(digest, Base64.NO_WRAP)
                         // 只要有有效签名就通过（运行时签名校验）
                         return hash.isNotEmpty()
@@ -80,7 +80,7 @@ object CloudUpdateManager {
                 )
                 @Suppress("DEPRECATION")
                 val signatures = packageInfo.signatures
-                if (signatures.isNotEmpty()) {
+                if (signatures != null && signatures.isNotEmpty()) {
                     val md = MessageDigest.getInstance("SHA-256")
                     val digest = md.digest(signatures[0].toByteArray())
                     val hash = Base64.encodeToString(digest, Base64.NO_WRAP)
