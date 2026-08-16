@@ -59,6 +59,8 @@ import me.weishu.kernelsu.ui.component.bottombar.NavigationBadgeState
 import me.weishu.kernelsu.ui.component.bottombar.SideRail
 import me.weishu.kernelsu.ui.component.bottombar.rememberMainPagerState
 import me.weishu.kernelsu.ui.component.bottombar.useNavigationRail
+import me.weishu.kernelsu.ui.crash.EarlyCrashHandler
+import me.weishu.kernelsu.ui.crash.NativeCrashActivity
 import me.weishu.kernelsu.ui.navigation3.IntentDispatcher
 import me.weishu.kernelsu.ui.navigation3.LocalNavigator
 import me.weishu.kernelsu.ui.navigation3.Navigator
@@ -108,7 +110,25 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        if (Natives.isManager && !Natives.requireNewKernel()) install()
+        // --- 最优先：如果上次启动发生了极早期崩溃，直接跳原生 View 崩溃页 ---
+        runCatching {
+            val pending = EarlyCrashHandler.readPending()
+            if (!pending.isNullOrBlank()) {
+                val i = Intent(this, NativeCrashActivity::class.java).apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                    putExtra(NativeCrashActivity.EXTRA_STACKTRACE, pending)
+                    putExtra(NativeCrashActivity.EXTRA_PENDING_EARLY, true)
+                }
+                // 先跳崩溃页，崩溃页处理完后用户点重启才真正进首页
+                startActivity(i)
+                finish()
+                return
+            }
+        }
+
+        runCatching {
+            if (Natives.isManager && !Natives.requireNewKernel()) install()
+        }
         // 洛茜工具箱：移除首页 root 检测门禁，强制解锁全部页面
 
         if (savedInstanceState == null) intent?.let { intentChannel.trySend(it) }

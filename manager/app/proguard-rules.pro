@@ -1,8 +1,18 @@
 # 洛茜工具箱 ProGuard 规则
+# Application：入口类 + 顶层 ksuApp 属性不能被混淆 / 删除
+-keep class me.weishu.kernelsu.KernelSUApplication { *; }
+-keep class me.weishu.kernelsu.KernelSUApplication$* { *; }
+-keepnames class **.KernelSUApplication { *; }
+# 顶层 ksuApp 属性 / 方法由 Kotlin 生成在 KernelSUApplicationKt，也保留
+-keep class me.weishu.kernelsu.KernelSUApplicationKt { *; }
+
 # 保留 Natives 类（JNI name-based 绑定依赖原始类名/方法名）
 -keep class me.weishu.kernelsu.Natives { *; }
 -keep class me.weishu.kernelsu.Natives$* { *; }
 -keep class me.weishu.kernelsu.Natives$Profile$* { *; }
+
+# 崩溃处理器 + 崩溃 Activity 不允许被混淆
+-keep class me.weishu.kernelsu.ui.crash.** { *; }
 
 # 保留 magica 包（AppZygotePreload / MagicaService 等 manifest 引用的类）
 -keep class me.weishu.kernelsu.magica.** { *; }

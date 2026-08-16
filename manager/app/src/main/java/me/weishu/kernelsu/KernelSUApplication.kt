@@ -1,6 +1,8 @@
 package me.weishu.kernelsu
 
+import android.app.ActivityManager
 import android.app.Application
+import android.content.Context
 import android.content.pm.ApplicationInfo
 import android.os.Build
 import android.os.UserManager
@@ -9,6 +11,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.ViewModelStore
 import androidx.lifecycle.ViewModelStoreOwner
 import me.weishu.kernelsu.data.repository.SettingsRepositoryImpl
+import me.weishu.kernelsu.ui.crash.EarlyCrashHandler
 import me.weishu.kernelsu.ui.crash.GlobalCrashHandler
 import me.weishu.kernelsu.ui.viewmodel.SuperUserViewModel
 import okhttp3.Cache
@@ -17,7 +20,24 @@ import org.lsposed.hiddenapibypass.HiddenApiBypass
 import java.io.File
 import java.util.Locale
 
-lateinit var ksuApp: KernelSUApplication
+@Volatile
+private var _ksuApp: KernelSUApplication? = null
+
+/**
+ * 访问全局 Application 实例的安全入口。
+ * 任何时候都返回非空；如果 Application 尚未就绪则抛出带明确提示的异常
+ * （不会是无信息的 UninitializedPropertyAccessException）。
+ */
+val ksuApp: KernelSUApplication
+    get() = _ksuApp
+        ?: error("KernelSUApplication 尚未初始化（当前进程可能正处于 attachBaseContext 之前）。" +
+                "请检查 EarlyCrashHandler 或 ContentProvider 中是否有代码过早引用 ksuApp。")
+
+/**
+ * 非空保证版：对于仅在 UI 正常运行期间、或 runCatching 内使用的场景，
+ * 直接返回已赋值实例（和 ksuApp 等价，避免上层大改）。
+ */
+fun ksuAppOrThrow(): KernelSUApplication = ksuApp
 
 class KernelSUApplication : Application(), ViewModelStoreOwner {
 
@@ -36,14 +56,54 @@ class KernelSUApplication : Application(), ViewModelStoreOwner {
     private val appViewModelStore by lazy { ViewModelStore() }
 
     private fun isUserUnlocked(): Boolean =
-        getSystemService(UserManager::class.java)?.isUserUnlocked == true
+        runCatching { getSystemService(UserManager::class.java)?.isUserUnlocked == true }.getOrDefault(false)
+
+    /** 当前进程名 */
+    private val processName: String by lazy {
+        runCatching {
+            val pid = android.os.Process.myPid()
+            val am = getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
+            am.runningAppProcesses?.firstOrNull { it.pid == pid }?.processName ?: packageName
+        }.getOrDefault(packageName)
+    }
+
+    /**
+     * 是否是主进程（=包名本身）。
+     * :error_report / :webui 等子进程中应跳过所有业务初始化，
+     * 避免子进程里重复触发 Natives / SuperUser / Root Shell 等导致闪退。
+     */
+    private fun isMainProcess(): Boolean = processName == packageName
+
+    /**
+     * 最早入口：Android 系统第一个调用到的 Application 方法。
+     * 这里做三件事：
+     *  1) 立刻把 this 赋给 _ksuApp（避免 lateinit 未初始化崩）
+     *  2) 立刻装 EarlyCrashHandler（只写崩溃日志到文件，不启动 Activity，不依赖任何初始化）
+     *  3) 读上次崩溃日志 → 如果有 → 记录下来给 MainActivity / CrashActivity 展示
+     */
+    override fun attachBaseContext(base: Context?) {
+        super.attachBaseContext(base)
+        _ksuApp = this
+
+        // 最早的异常捕获：只能做极简写文件操作，不可启动 Activity / 访问其他 SDK
+        runCatching { EarlyCrashHandler.install(base ?: this) }
+    }
 
     override fun onCreate() {
-        // 1. 优先初始化全局异常处理器（最早捕获崩溃）
+        super.onCreate()
+
+        // 如果是 :error_report / :webui 等子进程，到此为止，跳过所有业务初始化
+        if (!isMainProcess()) {
+            return
+        }
+
+        // 主进程：装上完整版异常处理器（会启动 CrashActivity）
         runCatching { GlobalCrashHandler.init() }
 
-        super.onCreate()
-        ksuApp = this
+        // 有上次遗留的崩溃日志 → 主动展示给用户（由 MainActivity 首帧再弹更安全，
+        // 这里仅做：把 EarlyCrashHandler 的日志同步到 GlobalCrashHandler，由 MainActivity
+        // 首帧 LaunchedEffect 读取并展示 —— 我们这里加一个 Intent 标志更简单）。
+        runCatching { EarlyCrashHandler.handlePendingCrash() }
 
         if (!isUserUnlocked()) {
             return
@@ -57,8 +117,6 @@ class KernelSUApplication : Application(), ViewModelStoreOwner {
             }
         }
 
-        // 2. 超级用户页应用列表：延后到 UI 打开对应 tab 再加载，
-        //    避免 onCreate 里因 PackageManager / Natives 访问异常崩溃
         runCatching {
             val superUserViewModel = ViewModelProvider(this)[SuperUserViewModel::class.java]
             superUserViewModel.loadAppList()
@@ -72,7 +130,6 @@ class KernelSUApplication : Application(), ViewModelStoreOwner {
         }
 
         runCatching {
-            // Provide working env for rust's temp_dir()
             Os.setenv("TMPDIR", cacheDir.absolutePath, true)
         }
 

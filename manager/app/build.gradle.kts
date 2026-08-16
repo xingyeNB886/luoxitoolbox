@@ -52,7 +52,9 @@ android {
         }
         release {
             isMinifyEnabled = true
-            isShrinkResources = true
+            // 洛茜工具箱：关闭资源压缩。之前 shrink 可能误删必要资源导致启动白屏/闪退；
+            // 等应用完全稳定后再考虑打开。
+            isShrinkResources = false
             vcsInfo.include = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             externalNativeBuild {
