@@ -109,6 +109,12 @@ class KernelSUApplication : Application(), ViewModelStoreOwner {
             runCatching { GlobalCrashHandler.init() }
             EarlyCrashHandler.markStage("onCreate_GlobalCrashHandlerReady")
 
+            // 洛茜工具箱：主进程启动即安装 Shizuku Binder/授权监听（不依赖 ShizukuProvider）
+            runCatching {
+                me.weishu.kernelsu.ui.util.PermissionManager.installListenersIfNeeded()
+            }
+            EarlyCrashHandler.markStage("onCreate_PermissionListenersReady")
+
             // 读上次崩溃 / 启动阶段日志 —— 由 MainActivity 首帧统一展示
             runCatching { EarlyCrashHandler.handlePendingCrash() }
 
