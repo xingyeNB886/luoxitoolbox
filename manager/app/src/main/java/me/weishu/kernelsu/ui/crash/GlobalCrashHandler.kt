@@ -106,7 +106,7 @@ object GlobalCrashHandler : Thread.UncaughtExceptionHandler {
                 val app = appContext()
                 writeCrashLog(app, "GlobalCrashHandler 内部异常:\n${t.stackTraceToString()}\n\n原始异常:\n${t.stackTraceToString()}")
             }
-            defaultHandler?.uncaughtException(t, t)
+            defaultHandler?.uncaughtException(Thread.currentThread(), t)
         }
     }
 
