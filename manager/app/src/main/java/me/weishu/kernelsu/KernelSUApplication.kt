@@ -98,16 +98,18 @@ class KernelSUApplication : Application(), ViewModelStoreOwner {
             EarlyCrashHandler.markStage("onCreate_mainProcess")
 
             // 主进程：防篡改签名校验
+        val prefs = getSharedPreferences("settings", Context.MODE_PRIVATE)
         runCatching {
             if (!CloudUpdateManager.verifyAppSignature(this)) {
                 EarlyCrashHandler.markStage("onCreate_signatureInvalid")
-                // 签名校验失败，标记为无效签名（由 HomePager 弹窗处理）
-                val prefs = getSharedPreferences("settings", Context.MODE_PRIVATE)
                 prefs.edit().putBoolean("signature_invalid", true).apply()
             } else {
-                val prefs = getSharedPreferences("settings", Context.MODE_PRIVATE)
                 prefs.edit().putBoolean("signature_invalid", false).apply()
             }
+        }.onFailure {
+            // 签名校验过程自身异常 → 视为无效签名，安全优先
+            EarlyCrashHandler.markStage("onCreate_signatureCheckError", it.message ?: "unknown")
+            prefs.edit().putBoolean("signature_invalid", true).apply()
         }
         EarlyCrashHandler.markStage("onCreate_signatureVerified")
 

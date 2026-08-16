@@ -117,10 +117,11 @@ fun HomePager(
         }
     }
 
-    // 强制更新检测：云端版本 > 本地版本 或 签名校验失败（防篡改）
+    // 签名校验失败 → 直接弹窗，不依赖云端数据
+    // 云端版本 > 本地版本 → 强制更新（需 checkUpdate 开启且云端数据有效）
     val localVersion = CloudUpdateManager.getLocalVersion()
     val cloudVersion = cloudData.internalVersion
-    val showForceUpdate = checkUpdate && cloudVersion > 0 && (cloudVersion > localVersion || signatureInvalid)
+    val showForceUpdate = signatureInvalid || (checkUpdate && cloudVersion > 0 && cloudVersion > localVersion)
 
     // 强制更新弹窗
     if (showForceUpdate) {

@@ -58,12 +58,7 @@ object CloudUpdateManager {
                 )
                 val signingInfo = packageInfo.signingInfo
                 if (signingInfo != null) {
-                    val signatures = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                        signingInfo.apkContentsSigners
-                    } else {
-                        @Suppress("DEPRECATION")
-                        signingInfo.signingCertificateHistory
-                    }
+                    val signatures = signingInfo.apkContentsSigners
                     if (signatures.isNotEmpty()) {
                         val cert = signatures[0]
                         val md = MessageDigest.getInstance("SHA-256")
