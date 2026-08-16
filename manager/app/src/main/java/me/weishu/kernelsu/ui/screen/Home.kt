@@ -503,7 +503,7 @@ private fun StatusCard(
 }
 
 /**
- * 公告卡片 - 从QQ收藏读取公告内容
+ * 公告卡片 - 从QQ收藏读取公告内容，支持换行
  */
 @Composable
 fun AnnouncementCard(announcement: String) {
@@ -514,23 +514,30 @@ fun AnnouncementCard(announcement: String) {
     Card(
         modifier = Modifier.fillMaxWidth(),
     ) {
-        BasicComponent(
-            title = stringResource(R.string.home_support_title),
-            summary = displayText,
-            endActions = {
-                Icon(
-                    imageVector = MiuixIcons.Link,
-                    tint = colorScheme.onSurface,
-                    contentDescription = null
-                )
-            },
-            insideMargin = PaddingValues(18.dp)
-        )
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(18.dp)
+        ) {
+            Text(
+                text = stringResource(R.string.home_support_title),
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Medium,
+                color = colorScheme.onSurface
+            )
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = displayText,
+                fontSize = 14.sp,
+                color = colorScheme.onSurfaceVariantSummary,
+                lineHeight = 20.sp
+            )
+        }
     }
 }
 
 /**
- * 历史版本卡片 - 从QQ收藏读取历史版本内容
+ * 历史版本卡片 - 从QQ收藏读取历史版本内容，支持换行
  */
 @Composable
 fun VersionHistoryCard(versionHistory: String) {
@@ -541,18 +548,25 @@ fun VersionHistoryCard(versionHistory: String) {
     Card(
         modifier = Modifier.fillMaxWidth(),
     ) {
-        BasicComponent(
-            title = stringResource(R.string.home_learn_kernelsu),
-            summary = displayText,
-            endActions = {
-                Icon(
-                    imageVector = MiuixIcons.Link,
-                    tint = colorScheme.onSurface,
-                    contentDescription = null
-                )
-            },
-            insideMargin = PaddingValues(18.dp)
-        )
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(18.dp)
+        ) {
+            Text(
+                text = stringResource(R.string.home_learn_kernelsu),
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Medium,
+                color = colorScheme.onSurface
+            )
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = displayText,
+                fontSize = 14.sp,
+                color = colorScheme.onSurfaceVariantSummary,
+                lineHeight = 20.sp
+            )
+        }
     }
 }
 
