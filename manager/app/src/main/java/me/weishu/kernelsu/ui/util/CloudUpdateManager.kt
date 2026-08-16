@@ -137,8 +137,15 @@ object CloudUpdateManager {
      * 清理 HTML：去除标签，解码 HTML 实体
      */
     private fun cleanHtml(raw: String): String {
-        // 去除所有 HTML 标签
-        val noTags = raw.replace(Regex("<[^>]*>"), "")
+        // 把块级标签（div、br、p）替换为换行符，保留内容结构
+        val withBreaks = raw
+            .replace(Regex("<br\\s*/?>"), "\n")
+            .replace(Regex("<div[^>]*>"), "\n")
+            .replace(Regex("</div>"), "")
+            .replace(Regex("<p[^>]*>"), "\n")
+            .replace(Regex("</p>"), "")
+        // 去除剩余 HTML 标签
+        val noTags = withBreaks.replace(Regex("<[^>]*>"), "")
         // 解码 HTML 实体（&nbsp; → 空格, &lt; → <, &amp; → & 等）
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
             Html.fromHtml(noTags, Html.FROM_HTML_MODE_LEGACY).toString()
