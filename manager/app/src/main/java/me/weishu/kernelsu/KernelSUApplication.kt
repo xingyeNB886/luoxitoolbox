@@ -17,7 +17,6 @@ import me.weishu.kernelsu.ui.viewmodel.SuperUserViewModel
 import okhttp3.Cache
 import okhttp3.OkHttpClient
 import org.lsposed.hiddenapibypass.HiddenApiBypass
-import rikka.shizuku.Shizuku
 import java.io.File
 import java.util.Locale
 
@@ -131,14 +130,8 @@ class KernelSUApplication : Application(), ViewModelStoreOwner {
             runCatching { GlobalCrashHandler.init() }
             EarlyCrashHandler.markStage("onCreate_GlobalCrashHandlerReady")
 
-            // 洛茜工具箱：官方 Shizuku SDK 初始化（替代 ShizukuProvider 的功能，
-            // 不声明 Provider 就不会触发 native SIGABRT 闪退，但需要手动 initialize）
-            runCatching {
-                Shizuku.initialize(this)
-            }
-            EarlyCrashHandler.markStage("onCreate_ShizukuInitializeDone")
-
-            // 安装 Shizuku Binder 监听（授权弹窗结果 / Binder 变化 → 推 Flow）
+            // 洛茜工具箱：安装 Shizuku Binder 监听（授权弹窗结果 / Binder 变化 → 推 Flow）
+            // ShizukuProvider 已通过 Manifest 声明，SDK 内部自动初始化，无需手动 initialize
             runCatching {
                 me.weishu.kernelsu.ui.util.PermissionManager.installListenersIfNeeded()
             }
