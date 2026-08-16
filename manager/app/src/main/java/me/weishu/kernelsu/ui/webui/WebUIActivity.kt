@@ -1,73 +1,53 @@
 package me.weishu.kernelsu.ui.webui
 
 import android.annotation.SuppressLint
-import android.content.SharedPreferences
+import android.os.Build
 import android.os.Bundle
-import android.view.WindowManager
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import me.weishu.kernelsu.data.repository.SettingsRepositoryImpl
-import me.weishu.kernelsu.ui.LocalUiMode
-import me.weishu.kernelsu.ui.UiMode
 import me.weishu.kernelsu.ui.theme.KernelSUTheme
-import me.weishu.kernelsu.ui.theme.ThemeController
 import top.yukonga.miuix.kmp.basic.InfiniteProgressIndicator
 
 @SuppressLint("SetJavaScriptEnabled")
 class WebUIActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
 
+        // Enable edge to edge
         enableEdgeToEdge()
-        window.isNavigationBarContrastEnforced = false
-        window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            window.isNavigationBarContrastEnforced = false
+        }
 
         super.onCreate(savedInstanceState)
 
         setContent {
-            val context = LocalContext.current
-            val prefs = context.getSharedPreferences("settings", MODE_PRIVATE)
-            val settingsRepo = remember { SettingsRepositoryImpl() }
-            var appSettings by remember { mutableStateOf(ThemeController.getAppSettings()) }
-            var uiModeValue by remember { mutableStateOf(settingsRepo.uiMode) }
-            val uiMode = remember(uiModeValue) {
-                UiMode.fromValue(uiModeValue)
-            }
-
-            DisposableEffect(prefs) {
-                val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
-                    if (key in listOf("color_mode", "key_color", "color_style", "color_spec")) {
-                        appSettings = ThemeController.getAppSettings()
-                    } else if (key == "ui_mode") {
-                        uiModeValue = settingsRepo.uiMode
-                    }
+            val prefs = LocalContext.current.getSharedPreferences("settings", MODE_PRIVATE)
+            var colorMode by remember { mutableIntStateOf(prefs.getInt("color_mode", 0)) }
+            var keyColorInt by remember { mutableIntStateOf(prefs.getInt("key_color", 0)) }
+            val keyColor =
+                remember(keyColorInt) {
+                    if (keyColorInt == 0) null else androidx.compose.ui.graphics.Color(
+                        keyColorInt
+                    )
                 }
-                prefs.registerOnSharedPreferenceChangeListener(listener)
-                onDispose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
-            }
-
-            CompositionLocalProvider(LocalUiMode provides uiMode) {
-                KernelSUTheme(appSettings = appSettings, uiMode = uiMode) {
-                    MainContent(activity = this, onFinish = { finish() })
-                }
+            KernelSUTheme(colorMode = colorMode, keyColor = keyColor) {
+                MainContent(activity = this, onFinish = { finish() })
             }
         }
     }
@@ -75,8 +55,9 @@ class WebUIActivity : ComponentActivity() {
 
 @Composable
 private fun MainContent(activity: ComponentActivity, onFinish: () -> Unit) {
-    val moduleId = remember { activity.intent.data?.getQueryParameter("id") }
+    val moduleId = remember { activity.intent.getStringExtra("id") }
     val webUIState = remember { WebUIState() }
+
 
     LaunchedEffect(moduleId) {
         if (moduleId == null) {
@@ -87,7 +68,7 @@ private fun MainContent(activity: ComponentActivity, onFinish: () -> Unit) {
     }
 
     DisposableEffect(Unit) {
-        onDispose { webUIState.dispose(activity) }
+        onDispose { webUIState.dispose() }
     }
 
     when (val event = webUIState.uiEvent) {
@@ -108,34 +89,11 @@ private fun MainContent(activity: ComponentActivity, onFinish: () -> Unit) {
 
     Crossfade(targetState = isLoading, animationSpec = tween(300)) { loading ->
         if (loading) {
-            LoadingContent()
-        } else {
-            WebUIScreen(webUIState = webUIState)
-        }
-    }
-}
-
-@Composable
-private fun LoadingContent() {
-    when (LocalUiMode.current) {
-        UiMode.Miuix -> {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 InfiniteProgressIndicator()
             }
-        }
-
-        UiMode.Material -> {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(MaterialTheme.colorScheme.background),
-                contentAlignment = Alignment.Center
-            ) {
-                androidx.compose.material3.LoadingIndicator()
-            }
+        } else {
+            WebUIScreen(webUIState = webUIState)
         }
     }
 }

@@ -6,17 +6,6 @@ Untuk aplikasi yang diberi izin root (misalnya dapat memakai `su`), App Profile 
 
 Untuk aplikasi biasa tanpa izin root, App Profile dapat mengendalikan bagaimana kernel dan sistem modul bersikap terhadap aplikasi tersebut. Misalnya, App Profile bisa menentukan apakah perubahan yang disebabkan oleh modul harus tetap terlihat. Kernel dan sistem modul kemudian dapat membuat keputusan berdasarkan konfigurasi ini, seperti melakukan operasi serupa “menyembunyikan”.
 
-:::tip tip
-Anda dapat mengaktifkan flag `NO_NEW_PRIVS` di `App Profile` kustom Anda.
-
-Ini mencegah proses tersebut keluar dan meningkatkan hak akses lagi melalui perintah `su`.
-
-Namun, flag ini **hanya** mencegah KernelSU meningkatkan hak akses untuk proses tersebut; proses tersebut masih dapat keluar menggunakan mekanisme Linux lainnya.
-
-Oleh karena itu, harap berhati-hati dengan pengaturan izin Anda.
-
-:::
-
 ## Root Profile
 
 ### UID, GID, dan Groups
@@ -87,7 +76,7 @@ Menjelaskan SELinux secara tuntas sangatlah kompleks dan berada di luar cakupan 
 
 Root Profile KernelSU memungkinkan kita menyesuaikan konteks SELinux dari proses root setelah menjalankan `su`. Kita bisa menetapkan aturan kontrol akses khusus untuk konteks ini sehingga hak root dapat diatur secara sangat granular.
 
-Dalam skenario umum, ketika sebuah aplikasi menjalankan `su`, prosesnya berpindah ke domain SELinux dengan **akses tidak terbatas**, seperti `u:r:ksu:s0`. Melalui Root Profile, domain ini bisa diganti menjadi domain kustom seperti `u:r:app1:s0`, lalu serangkaian aturan dapat ditetapkan untuk domain tersebut:
+Dalam skenario umum, ketika sebuah aplikasi menjalankan `su`, prosesnya berpindah ke domain SELinux dengan **akses tidak terbatas**, seperti `u:r:su:s0`. Melalui Root Profile, domain ini bisa diganti menjadi domain kustom seperti `u:r:app1:s0`, lalu serangkaian aturan dapat ditetapkan untuk domain tersebut:
 
 ```sh
 type app1

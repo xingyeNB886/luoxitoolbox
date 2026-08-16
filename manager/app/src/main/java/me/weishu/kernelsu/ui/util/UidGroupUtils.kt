@@ -3,7 +3,6 @@ package me.weishu.kernelsu.ui.util
 import me.weishu.kernelsu.Natives
 import me.weishu.kernelsu.ksuApp
 import me.weishu.kernelsu.ui.viewmodel.SuperUserViewModel
-import java.util.concurrent.ConcurrentHashMap
 
 private val PREFERRED_PKG_BY_SUID = mapOf(
     "android.uid.system" to "android",
@@ -30,10 +29,10 @@ fun pickPrimary(apps: List<SuperUserViewModel.AppInfo>): SuperUserViewModel.AppI
     return group.minWith(compareBy({ it.packageName.length }, { it.packageName }))
 }
 
-val ownerNameCache = ConcurrentHashMap<Int, String>()
-fun ownerNameForUid(uid: Int, appSource: List<SuperUserViewModel.AppInfo>? = null): String {
+val ownerNameCache = mutableMapOf<Int, String>()
+fun ownerNameForUid(uid: Int): String {
     ownerNameCache[uid]?.let { return it.ifEmpty { uid.toString() } }
-    val apps = appSource ?: SuperUserViewModel.apps.filter { it.uid == uid }
+    val apps = SuperUserViewModel.apps.filter { it.uid == uid }
     val labeledApp = apps.firstOrNull { it.packageInfo.sharedUserLabel != 0 }
     val name = if (labeledApp != null) {
         val pm = ksuApp.packageManager

@@ -76,7 +76,7 @@ Explaining the full concept of SELinux is complex and beyond the scope of this d
 
 KernelSU's Root Profile allows customization of the SELinux context of the root process after executing `su`. Specific access control rules can be set for this context, enabling fine-grained control over root permissions.
 
-In typical scenarios, when an app executes `su`, it switches the process to a SELinux domain with **unrestricted access**, such as `u:r:ksu:s0`. Through the Root Profile, this domain can be switched to a custom domain, such as `u:r:app1:s0`, and a series of rules can be defined for this domain:
+In typical scenarios, when an app executes `su`, it switches the process to a SELinux domain with **unrestricted access**, such as `u:r:su:s0`. Through the Root Profile, this domain can be switched to a custom domain, such as `u:r:app1:s0`, and a series of rules can be defined for this domain:
 
 ```sh
 type app1
@@ -96,13 +96,10 @@ For example, if you grant root permission to an ADB shell user (which is a commo
 1. The first execution of `su` will be subject to the App Profile and will switch to UID `2000` (ADB shell) instead of `0` (root).
 2. The second execution of `su`, since the UID is `2000` and root access has been granted to UID `2000` (ADB shell) in the configuration, the app will gain full root privileges.
 
-:::tip tip
-You can enable the `NO_NEW_PRIVS` flag in your custom `App Profile`.
-This prevents the process from escaping and escalating privileges again via the `su` command.
+::: warning NOTE
+This behavior is fully expected and isn't a bug. Therefore, we recommend the following:
 
-However, this flag **only** prevents KernelSU from escalating privileges for the process; it can still escape using other Linux mechanisms.
-
-Therefore, please be very careful with your permission settings.
+If you genuinely need to grant root permissions to ADB (e.g., as a developer), it isn't advisable to change the UID to `2000` when configuring the Root Profile. Using `1000` (system) would be a better choice.
 :::
 
 ## Non-root profile

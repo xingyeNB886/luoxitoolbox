@@ -14,8 +14,11 @@
 # 崩溃处理器 + 崩溃 Activity 不允许被混淆
 -keep class me.weishu.kernelsu.ui.crash.** { *; }
 
-# 保留 magica 包（AppZygotePreload / MagicaService 等 manifest 引用的类）
--keep class me.weishu.kernelsu.magica.** { *; }
+# PermissionManager / 权限相关工具类保留（被 Manifest / Shizuku 反射引用）
+-keep class me.weishu.kernelsu.ui.util.PermissionManager { *; }
+-keep class me.weishu.kernelsu.ui.util.PermissionManager$* { *; }
+-keep class me.weishu.kernelsu.ui.util.PermissionGrantType { *; }
+-keep class me.weishu.kernelsu.ui.util.PermissionGrantType$* { *; }
 
 # 保留 BuildConfig
 -keep class me.weishu.kernelsu.BuildConfig { *; }
@@ -23,6 +26,9 @@
 # 保留 Shizuku SDK（ContentProvider / Binder 接口需要原始类名）
 -keep class rikka.shizuku.** { *; }
 -keep class moe.shizuku.** { *; }
+
+# 保留 HiddenApiBypass（被 attachBaseContext 反射调用）
+-keep class org.lsposed.hiddenapibypass.** { *; }
 
 # 保留所有带 native 方法的类
 -keepclasseswithmembernames class * {

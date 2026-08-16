@@ -1,12 +1,12 @@
 package me.weishu.kernelsu.ui.util
 
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.res.stringResource
 import com.topjohnwu.superuser.Shell
+import me.weishu.kernelsu.R
 
-/**
- * Returns the raw SELinux status string ("Enforcing", "Permissive", "Disabled", or "Unknown").
- * Safe to call from any thread (IO recommended).
- */
-fun getSELinuxStatusRaw(): String {
+@Composable
+fun getSELinuxStatus(): String {
     val shell = Shell.Builder.create().build("sh")
 
     val stdoutList = ArrayList<String>()
@@ -19,14 +19,16 @@ fun getSELinuxStatusRaw(): String {
 
     if (result.isSuccess) {
         return when (stdout) {
-            "Enforcing", "Permissive", "Disabled" -> stdout
-            else -> "Unknown"
+            "Enforcing" -> stringResource(R.string.selinux_status_enforcing)
+            "Permissive" -> stringResource(R.string.selinux_status_permissive)
+            "Disabled" -> stringResource(R.string.selinux_status_disabled)
+            else -> stringResource(R.string.selinux_status_unknown)
         }
     }
 
     return if (stderr.endsWith("Permission denied")) {
-        "Enforcing"
+        stringResource(R.string.selinux_status_enforcing)
     } else {
-        "Unknown"
+        stringResource(R.string.selinux_status_unknown)
     }
 }

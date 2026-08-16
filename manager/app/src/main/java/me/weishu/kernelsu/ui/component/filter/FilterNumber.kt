@@ -46,7 +46,7 @@ class FilterNumber(
                     if (tempText != "-" && tempText.isNotEmpty()) {
                         try {
                             val tempValue = tempText.toInt()
-                            if (tempValue !in minValue..maxValue) {
+                            if (tempValue > maxValue || tempValue < minValue) {
                                 newString.deleteCharAt(newString.lastIndex)
                             }
                         } catch (e: NumberFormatException) {

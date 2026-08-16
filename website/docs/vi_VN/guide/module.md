@@ -71,9 +71,6 @@ Mô-đun KernelSU là một thư mục được đặt trong `/data/adb/modules`
 |   ├── uninstall.sh        <--- Tập lệnh này sẽ được thực thi khi KernelSU xóa mô-đun của bạn
 │   ├── system.prop         <--- Các thuộc tính trong tệp này sẽ được tải dưới dạng thuộc tính hệ thống bằng resetprop
 │   ├── sepolicy.rule       <--- Quy tắc riêng biệt tùy chỉnh bổ sung
-│   ├── initrc/             <--- Các tệp .rc trong thư mục này sẽ được chèn vào init.rc khi khởi động
-│   │   ├── myservice.rc
-│   │   └── ...
 │   │
 │   │      *** Được Tạo Tự Động, KHÔNG TẠO HOẶC SỬA ĐỔI THỦ CÔNG ***
 │   │
@@ -188,80 +185,6 @@ Tệp này có cùng định dạng với `build.prop`. Mỗi dòng bao gồm `[
 
 Nếu mô-đun của bạn yêu cầu một số bản vá lỗi chính sách bổ sung, vui lòng thêm các quy tắc đó vào tệp này. Mỗi dòng trong tệp này sẽ được coi là một tuyên bố chính sách.
 
-### Chèn initrc (initrc Injection) {#initrc-injection}
-
-KernelSU cung cấp cơ chế chèn các chỉ thị Android Init RC tùy chỉnh vào `init.rc` của hệ thống. Điều này cho phép các mô-đun đăng ký các dịch vụ Android tùy chỉnh, thiết lập trình kích hoạt thuộc tính hoặc thực hiện các hành động ngôn ngữ Init khác mà không cần sửa đổi phân vùng hệ thống.
-
-Trong quá trình khởi động, mô-đun hạt nhân KernelSU chặn các lệnh gọi hệ thống `read()` và `fstat()`. Khi quá trình init của Android đọc `/system/etc/init/hw/init.rc`, KernelSU sẽ thêm nội dung RC tùy chỉnh vào cuối tệp một cách minh bạch. Quá trình init phân tích các chỉ thị được chèn này giống như nội dung init.rc gốc.
-
-Ở phía không gian người dùng, ksud nối tất cả các tệp `.rc` từ các mô-đun đã bật thành một tệp `modules.rc` duy nhất, được lưu trữ trên phân vùng `/metadata`. Tệp này tự động được tạo lại bất cứ khi nào trạng thái của mô-đun thay đổi (cài đặt, bật, tắt, gỡ cài đặt, v.v.).
-
-#### Tệp initrc của mô-đun
-
-Tạo một thư mục con `initrc/` trong thư mục mô-đun của bạn và đặt các tệp `.rc` của bạn vào đó:
-
-```txt
-/data/adb/modules/<MODID>/
-├── initrc/
-│   ├── myservice.rc
-│   └── another.rc
-└── ...
-```
-
-::: tip
-- Các tệp phải có đuôi mở rộng là `.rc`.
-- Miễn là mô-đun được bật, tất cả các tệp `.rc` trong thư mục `initrc/` sẽ được bao gồm (không cần quyền thực thi).
-- Các tệp được xử lý theo **thứ tự bảng chữ cái của tên tệp** trong thư mục và các mô-đun được xử lý theo **thứ tự bảng chữ cái của ID mô-đun**.
-:::
-
-#### Tệp initrc chung
-
-Ngoài các tệp RC ở cấp mô-đun, bạn có thể đặt các tệp `.rc` trong thư mục toàn cầu:
-
-```txt
-/data/adb/initrc.d/
-├── myservice.rc
-└── another.rc
-```
-
-::: warning Các tệp initrc chung yêu cầu quyền thực thi
-Khác với thư mục `initrc/` của mô-đun, các tệp trong `/data/adb/initrc.d/` **phải có quyền thực thi** để được bao gồm. Các tệp `.rc` không thực thi được sẽ bị bỏ qua một cách âm thầm.
-:::
-
-Các tệp `initrc.d/` chung được xử lý trước bất kỳ tệp RC mô-đun nào.
-
-#### Ví dụ
-
-Dưới đây là ví dụ về tệp `.rc` đăng ký một dịch vụ Android tùy chỉnh:
-
-```rc
-service myservice /data/adb/modules/mymodule/bin/myservice
-    user root
-    group root
-    disabled
-    seclabel u:r:ksu:s0
-
-on property:sys.boot_completed=1
-    start myservice
-```
-
-Nếu tệp này được đặt tại `/data/adb/modules/mymodule/initrc/myservice.rc`, nó sẽ đăng ký một dịch vụ có tên là `myservice` khi khởi động và bắt đầu nó khi đạt đến `sys.boot_completed=1`.
-
-#### Làm mới thủ công
-
-Bạn có thể kích hoạt thủ công việc tạo lại `modules.rc` bằng lệnh sau (các thay đổi sẽ có hiệu lực trong lần khởi động tiếp theo):
-
-```sh
-ksud initrc refresh
-```
-
-::: tip
-- Việc chèn initrc xảy ra rất sớm trong quá trình khởi động (khi init đọc init.rc), **trước** post-fs-data và bất kỳ tập lệnh mô-đun nào được thực thi.
-- Nội dung RC được chèn được init coi là một phần của init.rc gốc, hỗ trợ tất cả cú pháp ngôn ngữ Android Init (định nghĩa dịch vụ, trình kích hoạt, cài đặt thuộc tính, v.v.).
-- Chèn initrc **không khả dụng** trong **chế độ late-load**, vì các móc gọi hệ thống không được cài đặt trong chế độ đó.
-- Có thể tắt chèn RC mô-đun bằng cách truyền tham số `--no-custom-rc` khi vá hình ảnh bằng ksud.
-:::
-
 ## Trình cài đặt mô-đun
 
 Trình cài đặt mô-đun KernelSU là mô-đun KernelSU được đóng gói trong tệp zip có thể được flash trong APP KernelSU manager. Trình cài đặt mô-đun KernelSU đơn giản chỉ là mô-đun KernelSU được đóng gói dưới dạng tệp zip.
@@ -301,9 +224,6 @@ Tập lệnh `customize.sh` chạy trong shell `ash` BusyBox của KernelSU vớ
 - `ARCH` (chuỗi): kiến trúc CPU của thiết bị. Giá trị là `arm`, `arm64`, `x86` hoặc `x64`
 - `IS64BIT` (bool): `true` nếu `$ARCH` là `arm64` hoặc `x64`
 - `API` (int): cấp độ API (phiên bản Android) của thiết bị (ví dụ: `23` cho Android 6.0)
-- `KSU_UAPI_VER` (int): phiên bản UAPI của không gian người dùng KernelSU (ksud) (ví dụ: `2`). Phiên bản này được tăng lên khi có thay đổi phá vỡ tương thích trong driver kernel, và có thể được module sử dụng để kiểm tra tính tương thích.
-- `KSU_RUNTIME_MODE` (string): chế độ chạy hiện tại của KernelSU. Các giá trị có thể là `built-in` (chế độ GKI, được biên dịch vào kernel), `lkm` (được tải dưới dạng mô-đun kernel khi khởi động), hoặc `late-load` (được tải dưới dạng mô-đun kernel sau khi khởi động).
-- `KSU_LATE_LOAD` (int?): nếu KernelSU được tải muộn sau khi khởi động, biến này được đặt thành `1`; nếu không, biến này không được đặt.
 
 ::: warning
 Trong KernelSU, MAGISK_VER_CODE luôn là 25200 và MAGISK_VER luôn là v25.2. Vui lòng không sử dụng hai biến này để xác định xem nó có chạy trên KernelSU hay không.
@@ -362,71 +282,3 @@ Trong KernelSU, tập lệnh khởi động được chia thành hai loại dự
    - `post-fs-data.sh` chạy ở chế độ post-fs-data, `service.sh` chạy ở chế độ dịch vụ late_start, `boot-completed.sh` chạy khi khởi động xong, `post-mount.sh` chạy trên overlayfs được gắn kết.
 
 Tất cả các tập lệnh khởi động sẽ chạy trong shell `ash` BusyBox của KernelSU với "Standalone Mode" được bật.
-
-## Chế độ late-load {#late-load-mode}
-
-Ngoài quy trình khởi động tiêu chuẩn được mô tả ở trên, KernelSU hỗ trợ **chế độ late-load** cho các tình huống LKM (Loadable Kernel Module). Trong chế độ này, mô-đun kernel KernelSU được tải **sau khi hệ thống đã khởi động hoàn toàn**, thay vì trong quá trình init.
-
-### Khi nào late-load xảy ra?
-
-Late-load được kích hoạt bằng cách chạy lệnh `ksud late-load`. Lệnh này:
-
-1. Phát hiện phiên bản KMI hiện tại và tải `kernelsu.ko` tương ứng từ tài nguyên nhúng.
-2. Thực hiện khởi tạo mô-đun (quy tắc SELinux, danh sách cho phép, tính năng, v.v.) thường xảy ra trong quá trình khởi động.
-
-Vì hệ thống đã chạy hoàn toàn, một số cơ chế thời gian khởi động không khả dụng hoặc không cần thiết.
-
-### Sự khác biệt so với khởi động tiêu chuẩn
-
-| Hành vi | Khởi động tiêu chuẩn | Chế độ late-load |
-|---------|:---:|:---:|
-| Mô-đun kernel được tải bởi init (PID 1) | Có | Không (tải sau khi khởi động) |
-| Hook kprobe của ksud (execve/read/fstat/input) | Có | Bỏ qua |
-| Phát hiện chế độ an toàn (phím âm lượng) | Có | Luôn tắt |
-| Thu thập nhật ký khởi động (logcat/dmesg) | Có | Bỏ qua |
-| Kiểm tra cùng tồn tại với Magisk | Có | Bỏ qua |
-| Sự kiện `post-fs-data` báo cáo cho kernel | Có | Bỏ qua |
-| Sự kiện `boot-completed` báo cáo cho kernel | Có | Đặt trực tiếp khi khởi tạo |
-| Tập lệnh `post-fs-data.sh` / `post-fs-data.d/` | Có | Thay thế bằng giai đoạn `late-load` |
-| Tải `system.prop` | Có | Có |
-| Gắn kết OverlayFS (metamodule) | Có | Có |
-| Tập lệnh `post-mount.sh` / `post-mount.d/` | Có | Có |
-| Tập lệnh `service.sh` / `service.d/` | Có | Có |
-| Tập lệnh `boot-completed.sh` / `boot-completed.d/` | Có | Có |
-| Biến môi trường `KSU_LATE_LOAD` | Không đặt | Đặt thành `1` |
-| Cờ info kernel `0x4` | Không đặt | Đã đặt |
-
-### Thứ tự thực thi tập lệnh
-
-Trong chế độ late-load, thứ tự thực thi tập lệnh như sau:
-
-```txt
-ksud late-load:
-  1. Tải kernelsu.ko (nếu chưa được tải)
-  2. Giải nén tệp nhị phân, xử lý cập nhật mô-đun, tải quy tắc SELinux, khởi tạo tính năng
-  3. Thực thi tập lệnh late-load.d/ và tập lệnh late-load của mô-đun (chặn)
-  4. Tải system.prop (resetprop -n)
-  5. Thực thi tập lệnh mount của metamodule (OverlayFS)
-  6. Thực thi tập lệnh post-mount.d/ và post-mount.sh của mô-đun (chặn)
-  7. Thực thi tập lệnh service.d/ và service.sh của mô-đun (không chặn)
-  8. Thực thi tập lệnh boot-completed.d/ và boot-completed.sh của mô-đun (không chặn)
-```
-
-### Tập lệnh dành riêng cho late-load
-
-Mô-đun có thể cung cấp tập lệnh `late-load.sh` chỉ chạy **trong chế độ late-load**, thay thế cho `post-fs-data.sh`. Tập lệnh này chạy trước khi gắn kết OverlayFS, tương tự như `post-fs-data.sh` trong luồng tiêu chuẩn.
-
-Ngoài ra, các tập lệnh chung có thể được đặt trong `/data/adb/late-load.d/` để thực thi trong giai đoạn này.
-
-### Phát hiện chế độ late-load trong tập lệnh
-
-Mô-đun có thể phát hiện chế độ late-load bằng cách kiểm tra biến môi trường `KSU_LATE_LOAD`:
-
-```sh
-if [ "$KSU_LATE_LOAD" = "1" ]; then
-    # Đang chạy trong chế độ late-load
-    echo "Late-load mode detected"
-fi
-```
-
-Điều này cho phép các mô-đun điều chỉnh hành vi của mình, ví dụ bỏ qua các thao tác chỉ cần thiết trong quá trình khởi động sớm.

@@ -3,14 +3,18 @@
 #include <sys/prctl.h>
 #include <linux/capability.h>
 #include <pwd.h>
-#include <unistd.h>
-#include <sys/wait.h>
 
 #include <android/log.h>
 #include <cstring>
 
 #include "ksu.h"
-#include "logging.h"
+
+#define LOG_TAG "KernelSU"
+#ifdef NDEBUG
+#define LOGD(...) (void)0
+#else
+#define LOGD(...) __android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, __VA_ARGS__)
+#endif
 
 extern "C"
 JNIEXPORT jint JNICALL
@@ -24,25 +28,16 @@ Java_me_weishu_kernelsu_Natives_getVersion(JNIEnv *env, jobject) {
 }
 
 extern "C"
-JNIEXPORT jint JNICALL
-Java_me_weishu_kernelsu_Natives_getKernelUAPIVersion(JNIEnv *env, jobject) {
-    return get_kernel_uapi_version();
-}
-
-extern "C"
-JNIEXPORT jint JNICALL
-Java_me_weishu_kernelsu_Natives_getManagerUAPIVersion(JNIEnv *env, jobject) {
-    return get_manager_uapi_version();
-}
-
-extern "C"
-JNIEXPORT jint JNICALL
-Java_me_weishu_kernelsu_Natives_getSuperuserCount(JNIEnv *env, jobject) {
-    struct ksu_new_get_allow_list_cmd cmd = {
-        .count = 0
-    };
+JNIEXPORT jintArray JNICALL
+Java_me_weishu_kernelsu_Natives_getAllowList(JNIEnv *env, jobject) {
+    struct ksu_get_allow_list_cmd cmd = {};
     bool result = get_allow_list(&cmd);
-    return result ? cmd.total_count : 0;
+    if (result) {
+        auto array = env->NewIntArray(cmd.count);
+        env->SetIntArrayRegion(array, 0, cmd.count, reinterpret_cast<const jint *>(cmd.uids));
+        return array;
+    }
+    return env->NewIntArray(0);
 }
 
 extern "C"
@@ -59,20 +54,8 @@ Java_me_weishu_kernelsu_Natives_isLkmMode(JNIEnv *env, jclass clazz) {
 
 extern "C"
 JNIEXPORT jboolean JNICALL
-Java_me_weishu_kernelsu_Natives_isLateLoadMode(JNIEnv *env, jclass clazz) {
-    return is_late_load_mode();
-}
-
-extern "C"
-JNIEXPORT jboolean JNICALL
 Java_me_weishu_kernelsu_Natives_isManager(JNIEnv *env, jclass clazz) {
     return is_manager();
-}
-
-extern "C"
-JNIEXPORT jboolean JNICALL
-Java_me_weishu_kernelsu_Natives_isPrBuild(JNIEnv *env, jclass clazz) {
-    return is_pr_build();
 }
 
 static void fillIntArray(JNIEnv *env, jobject list, int *data, int count) {
@@ -148,7 +131,7 @@ Java_me_weishu_kernelsu_Natives_getAppProfile(JNIEnv *env, jobject, jstring pkg,
     profile.version = KSU_APP_PROFILE_VER;
 
     strcpy(profile.key, key);
-    profile.curr_uid = uid;
+    profile.current_uid = uid;
 
     bool useDefaultProfile = get_app_profile(&profile) != 0;
 
@@ -168,13 +151,12 @@ Java_me_weishu_kernelsu_Natives_getAppProfile(JNIEnv *env, jobject, jstring pkg,
     auto capabilitiesField = env->GetFieldID(cls, "capabilities", "Ljava/util/List;");
     auto domainField = env->GetFieldID(cls, "context", "Ljava/lang/String;");
     auto namespacesField = env->GetFieldID(cls, "namespace", "I");
-    jfieldID flagsField = env->GetFieldID(cls, "flags", "J");
 
     auto nonRootUseDefaultField = env->GetFieldID(cls, "nonRootUseDefault", "Z");
     auto umountModulesField = env->GetFieldID(cls, "umountModules", "Z");
 
     env->SetObjectField(obj, keyField, env->NewStringUTF(profile.key));
-    env->SetIntField(obj, currentUidField, profile.curr_uid);
+    env->SetIntField(obj, currentUidField, profile.current_uid);
 
     if (useDefaultProfile) {
         // no profile found, so just use default profile:
@@ -220,7 +202,6 @@ Java_me_weishu_kernelsu_Natives_getAppProfile(JNIEnv *env, jobject, jstring pkg,
                 env->NewStringUTF(profile.rp_config.profile.selinux_domain));
         env->SetIntField(obj, namespacesField, profile.rp_config.profile.namespaces);
         env->SetBooleanField(obj, allowSuField, profile.allow_su);
-        env->SetLongField(obj, flagsField, (jlong) profile.rp_config.profile.flags);
     } else {
         env->SetBooleanField(obj, nonRootUseDefaultField,
                 (jboolean) profile.nrp_config.use_default);
@@ -248,7 +229,6 @@ Java_me_weishu_kernelsu_Natives_setAppProfile(JNIEnv *env, jobject clazz, jobjec
     auto capabilitiesField = env->GetFieldID(cls, "capabilities", "Ljava/util/List;");
     auto domainField = env->GetFieldID(cls, "context", "Ljava/lang/String;");
     auto namespacesField = env->GetFieldID(cls, "namespace", "I");
-    jfieldID flagsField = env->GetFieldID(cls, "flags", "J");
 
     auto nonRootUseDefaultField = env->GetFieldID(cls, "nonRootUseDefault", "Z");
     auto umountModulesField = env->GetFieldID(cls, "umountModules", "Z");
@@ -281,7 +261,7 @@ Java_me_weishu_kernelsu_Natives_setAppProfile(JNIEnv *env, jobject clazz, jobjec
 
     strcpy(p.key, p_key);
     p.allow_su = allowSu;
-    p.curr_uid = currentUid;
+    p.current_uid = currentUid;
 
     if (allowSu) {
         p.rp_config.use_default = env->GetBooleanField(profile, rootUseDefaultField);
@@ -310,8 +290,6 @@ Java_me_weishu_kernelsu_Natives_setAppProfile(JNIEnv *env, jobject clazz, jobjec
         env->ReleaseStringUTFChars((jstring) domain, cdomain);
 
         p.rp_config.profile.namespaces = env->GetIntField(profile, namespacesField);
-
-        p.rp_config.profile.flags = env->GetLongField(profile, flagsField);
     } else {
         p.nrp_config.use_default = env->GetBooleanField(profile, nonRootUseDefaultField);
         p.nrp_config.profile.umount_modules = umountModules;
@@ -348,18 +326,6 @@ Java_me_weishu_kernelsu_Natives_setKernelUmountEnabled(JNIEnv *env, jobject thiz
 }
 
 extern "C"
-JNIEXPORT jboolean JNICALL
-Java_me_weishu_kernelsu_Natives_isSelinuxHideEnabled(JNIEnv *env, jobject thiz) {
-    return is_selinux_hide_enabled();
-}
-
-extern "C"
-JNIEXPORT jint JNICALL
-Java_me_weishu_kernelsu_Natives_setSelinuxHideEnabled(JNIEnv *env, jobject thiz, jboolean enabled) {
-    return set_selinux_hide_enabled(enabled);
-}
-
-extern "C"
 JNIEXPORT jstring JNICALL
 Java_me_weishu_kernelsu_Natives_getUserName(JNIEnv *env, jobject thiz, jint uid) {
     struct passwd *pw = getpwuid((uid_t) uid);
@@ -367,51 +333,4 @@ Java_me_weishu_kernelsu_Natives_getUserName(JNIEnv *env, jobject thiz, jint uid)
         return env->NewStringUTF(pw->pw_name);
     }
     return nullptr;
-}
-
-int fork_dont_care_and_exec_ksud(const char *path, const char *pkg) {
-    int pid = fork();
-    if (pid < 0) {
-        PLOGE("fork");
-        return pid;
-    } else if (pid > 0) {
-        int status = 0;
-        if (TEMP_FAILURE_RETRY(waitpid(pid, &status, 0)) < 0) {
-            PLOGE("waitpid");
-            return -1;
-        }
-        if (!WIFEXITED(status) || WEXITSTATUS(status) != 0) {
-            LOGE("magica bootstrap child failed, status=%d", status);
-        }
-        return pid;
-    }
-
-    if (setuid(0) != 0) {
-        PLOGE("setuid");
-        _exit(1);
-    }
-
-    pid = fork();
-    if (pid < 0) {
-        PLOGE("fork 2");
-        _exit(1);
-    } else if (pid > 0) {
-        _exit(0);
-    }
-
-    execl(path, "ksud", "late-load", "--magica", "5555", "--package-name", pkg, nullptr);
-    PLOGE("exec magica");
-    _exit(1);
-}
-
-extern "C"
-JNIEXPORT void JNICALL
-Java_me_weishu_kernelsu_magica_AppZygotePreload_forkDontCareAndExecKsud(JNIEnv *env, jclass clazz,
-                                                                        jstring ksud_path, jstring pkg_name) {
-    auto path = env->GetStringUTFChars(ksud_path, nullptr);
-    auto pkg = env->GetStringUTFChars(pkg_name, nullptr);
-    LOGD("executing magica %s (pkg %s)", path, pkg);
-    fork_dont_care_and_exec_ksud(path, pkg);
-    env->ReleaseStringUTFChars(ksud_path, path);
-    env->ReleaseStringUTFChars(pkg_name, pkg);
 }

@@ -1,5 +1,6 @@
 use anyhow::Result;
 use rust_embed::RustEmbed;
+use std::path::Path;
 
 #[cfg(target_os = "android")]
 mod android {
@@ -22,12 +23,6 @@ mod android {
                 Asset::get(&file).ok_or_else(|| anyhow::anyhow!("asset not found: {file}"))?;
             ensure_binary(format!("{BINARY_DIR}{file}"), &asset.data, ignore_if_exist)?;
         }
-
-        // Create resetprop -> ksud symlink (resetprop is now built into ksud)
-        let resetprop_link = RESETPROP_PATH;
-        let _ = std::fs::remove_file(resetprop_link);
-        std::os::unix::fs::symlink("/data/adb/ksud", resetprop_link)?;
-
         Ok(())
     }
 }
@@ -40,26 +35,16 @@ pub use android::*;
 #[folder = "bin/x86_64"]
 struct Asset;
 
-#[cfg(all(target_arch = "aarch64", target_os = "android"))]
+// IF NOT x86_64 ANDROID, ie. macos, linux, windows, always use aarch64
+#[cfg(not(all(target_arch = "x86_64", target_os = "android")))]
 #[derive(RustEmbed)]
 #[folder = "bin/aarch64"]
 struct Asset;
 
-// If not Android, ie. macos, linux, windows, include both
-#[cfg(not(target_os = "android"))]
-#[derive(RustEmbed)]
-#[folder = "bin"]
-struct Asset;
-
-#[allow(unused)]
-pub fn get_asset_data(name: &str) -> Result<std::borrow::Cow<'static, [u8]>> {
+pub fn copy_assets_to_file(name: &str, dst: impl AsRef<Path>) -> Result<()> {
     let asset = Asset::get(name).ok_or_else(|| anyhow::anyhow!("asset not found: {name}"))?;
-    Ok(asset.data)
-}
-
-pub fn get_asset(name: &str) -> Result<Box<dyn AsRef<[u8]>>> {
-    let asset = Asset::get(name).ok_or_else(|| anyhow::anyhow!("asset not found: {name}"))?;
-    Ok(Box::new(asset.data))
+    std::fs::write(dst, asset.data)?;
+    Ok(())
 }
 
 pub fn list_supported_kmi() -> std::vec::Vec<std::string::String> {

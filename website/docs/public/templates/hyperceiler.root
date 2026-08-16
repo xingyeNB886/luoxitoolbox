@@ -20,7 +20,7 @@
         "CAP_SETFCAP",
         "CAP_BLOCK_SUSPEND"
     ],
-    "context":"u:r:ksu:s0",
+    "context":"u:r:su:s0",
     "rules":"",
     "locales": {
         "zh_CN": {
@@ -51,8 +51,5 @@
             "name": "Modello Root Ufficiale di HyperCeiler",
             "description": "Autorizzazioni minime per garantire il corretto funzionamento delle funzioni principali di HyperCeiler."
         }
-    },
-    "flags":[
-        "NO_NEW_PRIVS"
-    ]
+    }
 }

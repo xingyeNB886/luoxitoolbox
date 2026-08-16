@@ -5,7 +5,6 @@ import androidx.annotation.Keep
 import androidx.compose.runtime.Immutable
 import kotlinx.parcelize.Parcelize
 import kotlinx.serialization.Serializable
-import me.weishu.kernelsu.Natives.Profile.RootProfileFlag
 
 /**
  * @author weishu
@@ -19,18 +18,13 @@ object Natives {
     // 10977: change groups_count and groups to avoid overflow write
     // 11071: Fix the issue of failing to set a custom SELinux type.
     // 12143: breaking: new supercall impl
-    // 32310: new get_allow_list ioctl
-    // 32336: new set_sepolicy ioctl
-    // 32377: add set_init_pgrp ioctl
-    // 32513: add uapi version
-    const val MINIMAL_SUPPORTED_KERNEL = 32513
+    const val MINIMAL_SUPPORTED_KERNEL = 22000
 
-    const val KERNEL_SU_DOMAIN = "u:r:ksu:s0"
+    const val KERNEL_SU_DOMAIN = "u:r:su:s0"
 
     const val ROOT_UID = 0
     const val ROOT_GID = 0
 
-    // Natives 对象里被 getAppProfile fallback 用到的常量，必须放在属性定义最前。
     private const val NON_ROOT_DEFAULT_PROFILE_KEY = "$"
     private const val NOBODY_UID = 9999
 
@@ -47,6 +41,11 @@ object Natives {
     val version: Int
         get() = if (isLibLoaded) runCatching { version0 }.getOrDefault(-1) else -1
 
+    private val allowList0: IntArray
+        external get
+    val allowList: IntArray
+        get() = if (isLibLoaded) runCatching { allowList0 }.getOrDefault(IntArray(0)) else IntArray(0)
+
     private val isSafeMode0: Boolean
         external get
     val isSafeMode: Boolean
@@ -57,20 +56,10 @@ object Natives {
     val isLkmMode: Boolean
         get() = if (isLibLoaded) runCatching { isLkmMode0 }.getOrDefault(false) else false
 
-    private val isLateLoadMode0: Boolean
-        external get
-    val isLateLoadMode: Boolean
-        get() = if (isLibLoaded) runCatching { isLateLoadMode0 }.getOrDefault(false) else false
-
     private val isManager0: Boolean
         external get
     val isManager: Boolean
         get() = if (isLibLoaded) runCatching { isManager0 }.getOrDefault(false) else false
-
-    private val isPrBuild0: Boolean
-        external get
-    val isPrBuild: Boolean
-        get() = if (isLibLoaded) runCatching { isPrBuild0 }.getOrDefault(false) else false
 
     private external fun uidShouldUmount0(uid: Int): Boolean
     fun uidShouldUmount(uid: Int): Boolean =
@@ -121,29 +110,11 @@ object Natives {
         if (isLibLoaded) runCatching { setKernelUmountEnabled0(enabled) }.getOrDefault(false) else false
 
     /**
-     * SELinux hide can be disabled temporarily.
-     *  0: disabled
-     *  1: enabled
-     *  negative : error
-     */
-    private external fun isSelinuxHideEnabled0(): Boolean
-    fun isSelinuxHideEnabled(): Boolean =
-        if (isLibLoaded) runCatching { isSelinuxHideEnabled0() }.getOrDefault(false) else false
-
-    private external fun setSelinuxHideEnabled0(enabled: Boolean): Int
-    fun setSelinuxHideEnabled(enabled: Boolean): Int =
-        if (isLibLoaded) runCatching { setSelinuxHideEnabled0(enabled) }.getOrDefault(-1) else -1
-
-    /**
      * Get the user name for the uid.
      */
     private external fun getUserName0(uid: Int): String?
     fun getUserName(uid: Int): String? =
         if (isLibLoaded) runCatching { getUserName0(uid) }.getOrNull() else null
-
-    private external fun getSuperuserCount0(): Int
-    fun getSuperuserCount(): Int =
-        if (isLibLoaded) runCatching { getSuperuserCount0() }.getOrDefault(0) else 0
 
     fun setDefaultUmountModules(umountModules: Boolean): Boolean {
         Profile(
@@ -162,23 +133,7 @@ object Natives {
         }
     }
 
-    private val kernelUAPIVersion0: Int
-        external get
-    val kernelUAPIVersion: Int
-        get() = if (isLibLoaded) runCatching { kernelUAPIVersion0 }.getOrDefault(-1) else -1
-
-    private val managerUAPIVersion0: Int
-        external get
-    val managerUAPIVersion: Int
-        get() = if (isLibLoaded) runCatching { managerUAPIVersion0 }.getOrDefault(-1) else -1
-
-    fun checkUAPIMismatch(): Boolean = runCatching {
-        kernelUAPIVersion != -1 && managerUAPIVersion != -1 && kernelUAPIVersion != managerUAPIVersion
-    }.getOrDefault(false)
-
-    fun requireNewKernel(): Boolean = runCatching {
-        (version != -1 && version < MINIMAL_SUPPORTED_KERNEL) || checkUAPIMismatch()
-    }.getOrDefault(false)
+    fun requireNewKernel(): Boolean = false
 
     @Keep
     @Immutable
@@ -207,17 +162,7 @@ object Natives {
         val nonRootUseDefault: Boolean = true,
         val umountModules: Boolean = true,
         var rules: String = "", // this field is save in ksud!!
-
-        val flags: Long = FLAG_KSU_NO_NEW_PRIVS,
     ) : Parcelable {
-        @Keep
-        enum class RootProfileFlag(val display: String, val desc: Int) {
-            NO_NEW_PRIVS(
-                "NO_NEW_PRIVS",
-                R.string.profile_flags_desc_no_new_privs
-            )
-        }
-
         enum class Namespace {
             INHERITED,
             GLOBAL,
@@ -226,15 +171,4 @@ object Natives {
 
         constructor() : this("")
     }
-
-    const val FLAG_KSU_NO_NEW_PRIVS = 1L
 }
-
-fun List<RootProfileFlag>.toRawFlags(): Long =
-    fold(0L) { acc, flag -> acc.or(1L.shl(flag.ordinal)) }
-
-fun List<RootProfileFlag>.toOrdinalList(): List<Int> =
-    map { it.ordinal }
-
-fun Long.toRootProfileFlags(): List<RootProfileFlag> =
-    RootProfileFlag.entries.filter { 1L.shl(it.ordinal).and(this) != 0L }.toList()

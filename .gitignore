@@ -1,24 +1,4 @@
-# IDE
-.idea/
-*.iml
-.vscode/
-.kotlin/
-
-# OS
-.DS_Store
-Thumbs.db
-
-# Gradle
-.gradle/
-build/
-**/build/
-**/.cxx/
-captures/
-local.properties
-*.apk
-*.aab
-
-# Signing
-*.jks
-*.keystore
-.signing/
+.idea
+.vscode
+CLAUDE.md
+AGENTS.md

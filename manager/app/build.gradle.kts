@@ -8,22 +8,19 @@ plugins {
     id("kotlin-parcelize")
 }
 
-val androidCompileSdkVersion = rootProject.extra["androidCompileSdkVersion"] as Int
-val androidCompileSdkVersionMinor = rootProject.extra["androidCompileSdkVersionMinor"] as Int
-val androidCompileNdkVersion = rootProject.extra["androidCompileNdkVersion"] as String
-val androidBuildToolsVersion = rootProject.extra["androidBuildToolsVersion"] as String
-val androidMinSdkVersion = rootProject.extra["androidMinSdkVersion"] as Int
-val androidTargetSdkVersion = rootProject.extra["androidTargetSdkVersion"] as Int
-val androidSourceCompatibility = rootProject.extra["androidSourceCompatibility"] as JavaVersion
-val androidTargetCompatibility = rootProject.extra["androidTargetCompatibility"] as JavaVersion
-val managerVersionCode = rootProject.extra["managerVersionCode"] as Int
-val managerVersionName = rootProject.extra["managerVersionName"] as String
+val androidCompileSdkVersion: Int by rootProject.extra
+val androidCompileNdkVersion: String by rootProject.extra
+val androidBuildToolsVersion: String by rootProject.extra
+val androidMinSdkVersion: Int by rootProject.extra
+val androidTargetSdkVersion: Int by rootProject.extra
+val androidSourceCompatibility: JavaVersion by rootProject.extra
+val androidTargetCompatibility: JavaVersion by rootProject.extra
+val managerVersionCode: Int by rootProject.extra
+val managerVersionName: String by rootProject.extra
 
-val isPrBuild = project.findProperty("IS_PR_BUILD")?.toString()?.toBoolean() ?: false
+// 洛茜工具箱：默认包名 / 应用名
 val defaultManagerPackageName = "me.luoxi.toolbox"
 val defaultManagerName = "洛茜工具箱"
-val managerPackageName = project.findProperty("KSU_PACKAGE_NAME")?.toString() ?: defaultManagerPackageName
-val managerName = project.findProperty("KSU_NAME")?.toString() ?: defaultManagerName
 
 apksign {
     storeFileProperty = "KEYSTORE_FILE"
@@ -52,8 +49,6 @@ android {
         }
         release {
             isMinifyEnabled = true
-            // 洛茜工具箱：关闭资源压缩。之前 shrink 可能误删必要资源导致启动白屏/闪退；
-            // 等应用完全稳定后再考虑打开。
             isShrinkResources = false
             vcsInfo.include = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
@@ -84,18 +79,13 @@ android {
     buildFeatures {
         aidl = true
         buildConfig = true
-        resValues = true
         compose = true
         prefab = true
     }
 
     packaging {
-        dex {
-            useLegacyPackaging = true
-        }
         jniLibs {
             useLegacyPackaging = true
-            excludes += "lib/*/libandroidx.graphics.path.so"
         }
     }
 
@@ -113,24 +103,17 @@ android {
     androidResources {
         generateLocaleConfig = true
     }
-    compileSdk {
-        version =
-            release(androidCompileSdkVersion) {
-                minorApiLevel = androidCompileSdkVersionMinor
-            }
-    }
-    buildToolsVersion = androidBuildToolsVersion
+
+    compileSdk = androidCompileSdkVersion
     ndkVersion = androidCompileNdkVersion
+    buildToolsVersion = androidBuildToolsVersion
 
     defaultConfig {
         minSdk = androidMinSdkVersion
         targetSdk = androidTargetSdkVersion
         versionCode = managerVersionCode
         versionName = managerVersionName
-        applicationId = managerPackageName
-
-        buildConfigField("boolean", "IS_PR_BUILD", isPrBuild.toString())
-        resValue("string", "app_name", managerName)
+        applicationId = defaultManagerPackageName
 
         externalNativeBuild {
             cmake {
@@ -158,13 +141,13 @@ android {
 
 androidComponents {
     onVariants(selector().withBuildType("release")) {
-        it.packaging.resources.excludes.addAll(listOf("META-INF/**", "kotlin/**", "**.bin"))
+        it.packaging.resources.excludes.addAll(listOf("META-INF/**", "kotlin/**", "org/**", "**.bin"))
     }
 }
 
 base {
     archivesName.set(
-        "${managerName.replace(" ", "_")}_${managerVersionName}_${managerVersionCode}"
+        "LuoxiToolbox_${managerVersionName}_${managerVersionCode}"
     )
 }
 
@@ -173,7 +156,6 @@ dependencies {
 
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.material.icons.extended)
-    implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.ui.tooling.preview)
 
@@ -196,40 +178,23 @@ dependencies {
 
     implementation(libs.kotlinx.coroutines.core)
 
-    implementation(libs.commonmark)
-    implementation(libs.commonmark.ext.gfm.tables)
-    implementation(libs.commonmark.ext.gfm.strikethrough)
-    implementation(libs.commonmark.ext.autolink)
-    implementation(libs.commonmark.ext.task.list.items)
+    implementation(libs.markwon)
 
     implementation(libs.androidx.webkit)
 
     implementation(libs.lsposed.cxx)
 
-    implementation(libs.hiddenapibypass)
-
-    implementation(libs.miuix.ui)
+    implementation(libs.miuix)
     implementation(libs.miuix.icons)
     implementation(libs.miuix.navigation3.ui)
-    implementation(libs.miuix.preference)
-    implementation(libs.miuix.blur)
 
     implementation(platform(libs.okhttp.bom))
     implementation(libs.okhttp)
 
-    implementation(libs.material.kolor)
+    implementation(libs.haze)
+    implementation(libs.capsule)
 
-    implementation(libs.appiconloader)
-
+    implementation(libs.hiddenapibypass)
     implementation(libs.rikka.shizuku.api)
     implementation(libs.rikka.shizuku.provider)
-}
-
-kotlin {
-    compilerOptions {
-        freeCompilerArgs.addAll(
-            "-opt-in=androidx.compose.material3.ExperimentalMaterial3Api",
-            "-opt-in=androidx.compose.material3.ExperimentalMaterial3ExpressiveApi",
-        )
-    }
 }

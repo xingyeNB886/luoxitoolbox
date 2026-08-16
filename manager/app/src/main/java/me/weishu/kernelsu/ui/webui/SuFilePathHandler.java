@@ -1,7 +1,6 @@
 package me.weishu.kernelsu.ui.webui;
 
 import android.content.Context;
-import android.content.SharedPreferences;
 import android.util.Log;
 import android.webkit.WebResourceResponse;
 
@@ -194,11 +193,9 @@ public final class SuFilePathHandler implements WebViewAssetLoader.PathHandler {
             );
         }
         if ("internal/colors.css".equals(path)) {
-            SharedPreferences prefs = mContext.getSharedPreferences("settings", Context.MODE_PRIVATE);
-            int colorMode = prefs.getInt("color_mode", 0);
-            String uiMode = prefs.getString("ui_mode", "miuix");
+            int colorMode = mContext.getSharedPreferences("settings", Context.MODE_PRIVATE).getInt("color_mode", 0);
             String css = "";
-            if ((colorMode >= 3 && colorMode <= 6) || "material".equals(uiMode)) {
+            if (colorMode >= 3 && colorMode <= 5) {
                 css = MonetColorsProvider.INSTANCE.getColorsCss();
             }
             return new WebResourceResponse(

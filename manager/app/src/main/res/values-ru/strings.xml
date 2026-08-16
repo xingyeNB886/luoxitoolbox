@@ -4,7 +4,7 @@
     <string name="home_not_installed">Не установлен</string>
     <string name="home_click_to_install">Нажмите, чтобы установить</string>
     <string name="home_working">Работает</string>
-    <string name="home_working_version">Версия: %s</string>
+    <string name="home_working_version">Версия: %d</string>
     <!--Don't translate this string!-->
     <string name="home_unsupported">Не поддерживается</string>
     <string name="home_unsupported_reason">Теперь KernelSU поддерживает только ядра GKI, однако вы всё ещё можете пропатчить образ для GKI-устройств.</string>
@@ -139,10 +139,10 @@
     <string name="processing">Обработка…</string>
     <string name="install_upload_lkm_file">Использовать локальный LKM файл</string>
     <string name="install_only_support_ko_file">Поддерживаются только .ko файлы</string>
-    <string name="settings_sucompat">Классическая команда SU</string>
+    <string name="settings_sucompat">Классическая команда su</string>
     <string name="settings_sucompat_summary">Разрешить root-доступ через /system/bin/su в новых процессах.</string>
-    <string name="settings_kernel_umount">Размонтировать модули (на уровне ядра)</string>
-    <string name="settings_kernel_umount_summary">Размонтировать модули в ядре для профиля приложения.</string>
+    <string name="settings_kernel_umount">Размонтирование модулей</string>
+    <string name="settings_kernel_umount_summary">Размонтировать модули в ядре для профиля приложения</string>
     <string name="settings_module_check_update">Проверять обновления модулей</string>
     <string name="install_select_partition">Выбрать раздел</string>
     <string name="app_profile_affects_following_apps">Влияет на следующие приложения</string>
@@ -157,6 +157,7 @@
     <string name="feature_status_managed_summary">Эта функция управляется модулем.</string>
     <string name="feature_status_unsupported_summary">Ядро не поддерживает эту функцию.</string>
     <string name="settings_key_color">Ключевой цвет</string>
+    <string name="settings_key_color_summary">Настройте акцент при использовании Monet.</string>
     <string name="settings_key_color_default">По умолчанию</string>
     <string name="color_blue">Синий</string>
     <string name="color_red">Красный</string>
@@ -166,6 +167,9 @@
     <string name="color_teal">Бирюзовый</string>
     <string name="color_pink">Розовый</string>
     <string name="color_brown">Коричневый</string>
+    <string name="settings_theme_mode_monet_system">Monet (Как в системе)</string>
+    <string name="settings_theme_mode_monet_light">Monet (Светлая)</string>
+    <string name="settings_theme_mode_monet_dark">Monet (Тёмная)</string>
     <string name="settings_theme_mode_light">Светлая</string>
     <string name="settings_theme_mode_dark">Тёмная</string>
     <string name="module_repos">Репозиторий</string>
@@ -185,10 +189,12 @@
     <string name="module_shortcut_title">Создать ярлык</string>
     <string name="module_shortcut_name_label">Название ярлыка</string>
     <string name="module_shortcut_icon_pick">Выбрать пользовательскую иконку</string>
+    <string name="module_shortcut_add">Добавить ярлык</string>
     <string name="module_shortcut_not_supported">Лаунчер не поддерживает ярлыки на рабочем столе.</string>
     <string name="module_shortcut_created">Ярлык создан на рабочем столе.</string>
     <string name="module_shortcut_updated">Ярлык обновлен.</string>
     <string name="module_shortcut_delete">Удалить ярлык</string>
+    <string name="module_shortcut_type_title">Выберите тип</string>
     <string name="module_shortcut_permission_tip_xiaomi">Пожалуйста, включите разрешение «Ярлыки на рабочем столе» для этого приложения в настройках Xiaomi.</string>
     <string name="module_shortcut_permission_tip_oppo">Пожалуйста, включите разрешение «Ярлыки на рабочем столе» для этого приложения в настройках OPPO.</string>
     <string name="module_shortcut_permission_tip_default">Если создание ярлыка не удалось, пожалуйста, включите разрешение на создание ярлыков на рабочем столе для этого приложения в системных настройках.</string>
@@ -197,14 +203,4 @@
     <string name="select_file_tip_nogki">Пожалуйста, выберите файл образа GKI устройства, который вы хотите пропатчить</string>
     <string name="current_kmi">Версия KMI этого устройства: %s</string>
     <string name="current_device_kmi">KMI этого устройства</string>
-    <string name="color_deep_purple">Тёмно-фиолетовый</string>
-    <string name="color_indigo">Индиго</string>
-    <string name="color_cyan">Циан</string>
-    <string name="color_yellow">Желтый</string>
-    <string name="color_amber">Янтарный</string>
-    <string name="color_blue_grey">Серо-голубой</string>
-    <string name="color_sakura">Сакура</string>
-    <string name="profile_flags_desc_no_new_privs">Предотвращает дальнейшее повышение привилегий через KernelSU в контексте этого root-профиля.</string>
-    <string name="install_force_backup">Сохранить резервную копию как оригинальный образ</string>
-    <string name="install_force_backup_summary">Пожалуйста, убедитесь, что выбранный образ boot является оригинальным образом</string>
 </resources>

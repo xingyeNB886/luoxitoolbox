@@ -20,24 +20,11 @@ import androidx.webkit.WebViewAssetLoader
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import me.weishu.kernelsu.R
-import me.weishu.kernelsu.data.repository.ModuleRepositoryImpl
-import me.weishu.kernelsu.ui.util.AppIconCache
 import me.weishu.kernelsu.ui.util.createRootShell
-import me.weishu.kernelsu.ui.util.withMainUserUid
+import me.weishu.kernelsu.ui.viewmodel.ModuleViewModel
 import me.weishu.kernelsu.ui.viewmodel.SuperUserViewModel
 import java.io.File
 
-fun Activity.setTaskDescription(label: String) {
-    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
-        @Suppress("DEPRECATION")
-        setTaskDescription(ActivityManager.TaskDescription(label))
-    } else {
-        val taskDescription = ActivityManager.TaskDescription.Builder()
-            .setLabel(label)
-            .build()
-        setTaskDescription(taskDescription)
-    }
-}
 
 @SuppressLint("SetJavaScriptEnabled")
 internal suspend fun prepareWebView(
@@ -46,9 +33,12 @@ internal suspend fun prepareWebView(
     webUIState: WebUIState,
 ) {
     withContext(Dispatchers.IO) {
-        val repo = ModuleRepositoryImpl()
-        val modules = repo.getModules().getOrDefault(emptyList())
-        val moduleInfo = modules.find { info -> info.id == moduleId }
+        val viewModel = ModuleViewModel()
+        if (viewModel.moduleList.isEmpty()) {
+            viewModel.loadModuleList()
+        }
+
+        val moduleInfo = viewModel.moduleList.find { info -> info.id == moduleId }
 
         if (moduleInfo == null) {
             withContext(Dispatchers.Main) {
@@ -74,7 +64,15 @@ internal suspend fun prepareWebView(
         webUIState.rootShell = shell
 
         withContext(Dispatchers.Main) {
-            activity.setTaskDescription(activity.getString(R.string.app_name) + " - ${moduleInfo.name}")
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+                @Suppress("DEPRECATION")
+                activity.setTaskDescription(ActivityManager.TaskDescription("KernelSU - ${moduleInfo.name}"))
+            } else {
+                val taskDescription = ActivityManager.TaskDescription.Builder()
+                    .setLabel("KernelSU - ${moduleInfo.name}")
+                    .build()
+                activity.setTaskDescription(taskDescription)
+            }
 
             val webView = WebView(activity)
             webView.setBackgroundColor(Color.TRANSPARENT)
@@ -93,12 +91,7 @@ internal suspend fun prepareWebView(
                 .setDomain("mui.kernelsu.org")
                 .addPathHandler(
                     "/",
-                    SuFilePathHandler(
-                        activity,
-                        webRoot,
-                        shell,
-                        { webUIState.currentInsets },
-                        { enable -> webUIState.isInsetsEnabled = enable })
+                    SuFilePathHandler(activity, webRoot, shell, { webUIState.currentInsets }, { enable -> webUIState.isInsetsEnabled = enable })
                 )
                 .build()
 
@@ -109,29 +102,11 @@ internal suspend fun prepareWebView(
                     if (url.scheme.equals("ksu", ignoreCase = true) && url.host.equals("icon", ignoreCase = true)) {
                         val packageName = url.path?.substring(1)
                         if (!packageName.isNullOrEmpty()) {
-                            val appInfo = SuperUserViewModel.apps
-                                .find { it.packageName == packageName }
-                                ?.packageInfo?.applicationInfo
-                            if (appInfo != null) {
-                                val icon = AppIconCache.loadIconSync(activity, appInfo.withMainUserUid(activity), 512)
+                            val icon = AppIconUtil.loadAppIconSync(activity, packageName, 512)
+                            if (icon != null) {
                                 val stream = java.io.ByteArrayOutputStream()
                                 icon.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, stream)
-                                return WebResourceResponse(
-                                    "image/png", null, 200, "OK",
-                                    mapOf("Access-Control-Allow-Origin" to "*"),
-                                    java.io.ByteArrayInputStream(stream.toByteArray())
-                                )
-                            } else {
-                                val errorMsg = "No such package"
-                                val errorStream = java.io.ByteArrayInputStream(errorMsg.toByteArray(Charsets.UTF_8))
-                                return WebResourceResponse(
-                                    "text/plain",
-                                    "utf-8",
-                                    404,
-                                    "Not Found",
-                                    mapOf("Access-Control-Allow-Origin" to "*"),
-                                    errorStream
-                                )
+                                return WebResourceResponse("image/png", null, java.io.ByteArrayInputStream(stream.toByteArray()))
                             }
                         }
                     }
@@ -159,13 +134,7 @@ internal suspend fun prepareWebView(
                     return true
                 }
 
-                override fun onJsPrompt(
-                    view: WebView?,
-                    url: String?,
-                    message: String?,
-                    defaultValue: String?,
-                    result: JsPromptResult?
-                ): Boolean {
+                override fun onJsPrompt(view: WebView?, url: String?, message: String?, defaultValue: String?, result: JsPromptResult?): Boolean {
                     if (message == null || result == null || defaultValue == null) return false
                     webUIState.uiEvent = WebUIEvent.ShowPrompt(message, defaultValue, result)
                     return true

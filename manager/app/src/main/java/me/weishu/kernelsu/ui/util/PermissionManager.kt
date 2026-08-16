@@ -145,6 +145,26 @@ object PermissionManager {
 
     fun invalidateCache() = notifyChanged("invalidate_cache")
 
+    /**
+     * 是否已任意一种权限（Root 或 Shizuku）授权 —— 用于首页 StatusCard
+     * 判断是否"工作中"。
+     */
+    fun isAnyGranted(): Boolean = isRootGranted() || isShizukuGranted()
+
+    /**
+     * 当前授权类型的展示标签，用于首页 StatusCard 标题后缀，如 " <ADB>"。
+     * 同时授权时优先显示 ROOT。
+     */
+    fun getGrantLabel(): String {
+        val root = isRootGranted()
+        val shizuku = isShizukuGranted()
+        return when {
+            root -> "<Root>"
+            shizuku -> "<ADB>"
+            else -> ""
+        }
+    }
+
     fun <T> withShizukuContext(block: () -> T): Result<T> {
         return runCatching {
             if (!isShizukuGranted()) error("Shizuku not granted")
