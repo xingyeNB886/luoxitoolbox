@@ -124,9 +124,15 @@
             android:exported="false"
             android:foregroundServiceType="dataSync" />
 
-        <!-- 洛茜工具箱：Shizuku Provider（Shizuku SDK 必需，否则 pingBinder/checkSelfPermission 不工作） -->
+        <!--
+            洛茜工具箱：安全版 Shizuku Provider。
+            ShizukuProvider 是 ContentProvider，其 onCreate 时机为：
+                Application.attachBaseContext() → Provider.onCreate() → Application.onCreate()
+            位于 EarlyCrashHandler 之后、GlobalCrashHandler 之前。
+            用自定义子类包裹 try-catch，防止 Provider 内部抛异常直接杀进程。
+        -->
         <provider
-            android:name="rikka.shizuku.ShizukuProvider"
+            android:name=".ui.crash.SafeShizukuProvider"
             android:authorities="${applicationId}.shizuku"
             android:exported="false"
             android:multiprocess="false"
