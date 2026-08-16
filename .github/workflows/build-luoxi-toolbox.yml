@@ -90,7 +90,8 @@ jobs:
             echo "# 洛茜工具箱构建属性"
             echo "KSU_PACKAGE_NAME=me.luoxi.toolbox"
           } >> "$MANAGER_DIR/gradle.properties"
-          cat "$MANAGER_DIR/gradle.properties"
+          # 不打印 gradle.properties，避免泄露签名密码
+          echo "gradle.properties 已写入（含签名密钥，不公开显示）"
           # 注意：KSU_NAME 不在此处写入，因为 Java properties 文件
           # 默认用 ISO-8859-1 读取，中文会乱码。应用名「洛茜工具箱」
           # 由 build.gradle.kts 的 defaultManagerName（UTF-8 源码）提供。
