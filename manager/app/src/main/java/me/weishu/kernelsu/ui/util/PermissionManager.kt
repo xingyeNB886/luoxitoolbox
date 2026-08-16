@@ -39,8 +39,8 @@ enum class PermissionGrantType {
  * 洛茜工具箱改造说明：
  *  1. 不再依赖 ShizukuProvider（Manifest 未声明）— 避免 Provider 类加载阶段
  *     native SIGABRT 直接杀进程，连崩溃日志都没有。
- *  2. Shizuku 授权检测改用"实际执行 id 命令"方式验证，只要能拿到 uid=2000(shell)
- *     即视为授权成功；checkSelfPermission / requestPermission 仅作为最佳努力。
+ *  2. Shizuku 授权检测：优先 SDK 自带接口，同时"实际执行命令"方式用反射调用
+ *     Shizuku 私有方法 newProcess(String[],String[],File) 做兜底验证。
  */
 object PermissionManager {
 
@@ -53,49 +53,59 @@ object PermissionManager {
 
     /**
      * 检测 Shizuku 是否真的可用（已授权 + 能执行 shell 命令）。
-     * 不依赖 checkSelfPermission，因为没声明 ShizukuProvider 时它返回值不稳定。
+     * 不再依赖 checkSelfPermission 做唯一依据，因为没声明 ShizukuProvider 时
+     * 它的返回值不稳定（尤其是 Shizuku 11+ 的新模型）。
      */
     fun isShizukuGranted(): Boolean {
         return runCatching {
             if (!Shizuku.pingBinder()) return false
-            // 新 Shizuku（API 30+）：PreV11 前不需要显式授权
+            // 旧版 Shizuku（<11）：PreV11 前不需要显式授权，binder 通就算通
             if (Shizuku.isPreV11()) return true
-            // 最佳努力：先试 SDK 自带权限检测
+            // 新版 Shizuku：优先 SDK 自带权限检测
             val sdkGranted = runCatching {
                 Shizuku.checkSelfPermission() == android.content.pm.PackageManager.PERMISSION_GRANTED
             }.getOrDefault(false)
             if (sdkGranted) return true
-            // 兜底：实际跑一条命令，能拿到 shell uid 就算授权
+            // 兜底：反射调用 Shizuku.newProcess 执行 id -u
             canExecuteShellIdViaShizuku()
         }.getOrDefault(false)
     }
 
     /**
-     * 尝试通过 Shizuku UserService / newProcess 方式执行 "id"，
-     * 输出里含 "uid=2000" 或 "uid=0" 就认为有权限。
+     * 反射调用 rikka.shizuku.Shizuku#newProcess(cmd, env, dir)：
+     *   public static Process newProcess(String[] cmd, String[] env, File dir)
+     * 如果能成功执行且 stdout 返回 "2000" 或 "0"，说明 Shizuku 确实授权了。
      */
     private fun canExecuteShellIdViaShizuku(): Boolean {
         return runCatching {
-            // 方案：反射 Shizuku.newProcess，和普通 shell 一样执行命令
-            val process = Shizuku.newProcess(arrayOf("id", "-u"), null, null) ?: return false
-            val exitCode = runCatching {
-                val reader = BufferedReader(InputStreamReader(process.inputStream))
-                val uid = reader.readLine()?.trim()?.toIntOrNull()
-                reader.close()
-                process.waitFor()
-                process.destroy()
-                uid
-            }.getOrDefault(null)
-            // shell uid=2000, root uid=0
-            exitCode != null && (exitCode == 2000 || exitCode == 0)
+            val shizukuClass = Shizuku::class.java
+            val newProcessMethod = shizukuClass.getMethod(
+                "newProcess",
+                Array<String>::class.java,
+                Array<String>::class.java,
+                java.io.File::class.java
+            )
+            @Suppress("UNCHECKED_CAST")
+            val process = newProcessMethod.invoke(
+                null,
+                arrayOf("id", "-u"),
+                null,
+                null
+            ) as? Process ?: return false
+            val reader = BufferedReader(InputStreamReader(process.inputStream))
+            val uidStr = reader.readLine()?.trim()
+            val uid = uidStr?.toIntOrNull()
+            runCatching { reader.close() }
+            runCatching { process.waitFor() }
+            runCatching { process.destroy() }
+            // shell uid = 2000, root uid = 0
+            uid == 2000 || uid == 0
         }.getOrDefault(false)
     }
 
     /**
-     * 请求 Shizuku 授权。
-     * 没 ShizukuProvider 时 requestPermission 可能失败，用户需要自己去 Shizuku App 里授权。
-     * 但我们仍然尝试调用 SDK 接口 —— 能弹就弹。
-     * @return true=已经授权，false=需要用户在 Shizuku App 里或即将弹出的对话框授权
+     * 请求 Shizuku 授权。没 ShizukuProvider 时 requestPermission 可能不弹，
+     * 但仍尝试调用，用户也可手动在 Shizuku App 中授权后点刷新按钮重测。
      */
     fun requestShizukuPermission(requestCode: Int = 10001): Boolean {
         return runCatching {
