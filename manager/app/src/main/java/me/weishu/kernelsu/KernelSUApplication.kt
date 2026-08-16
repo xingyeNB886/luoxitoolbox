@@ -17,6 +17,7 @@ import me.weishu.kernelsu.ui.viewmodel.SuperUserViewModel
 import okhttp3.Cache
 import okhttp3.OkHttpClient
 import org.lsposed.hiddenapibypass.HiddenApiBypass
+import rikka.shizuku.Shizuku
 import java.io.File
 import java.util.Locale
 
@@ -130,17 +131,18 @@ class KernelSUApplication : Application(), ViewModelStoreOwner {
             runCatching { GlobalCrashHandler.init() }
             EarlyCrashHandler.markStage("onCreate_GlobalCrashHandlerReady")
 
-            // 洛茜工具箱：主进程启动即安装 Shizuku Binder/授权监听（不依赖 ShizukuProvider）
+            // 洛茜工具箱：官方 Shizuku SDK 初始化（替代 ShizukuProvider 的功能，
+            // 不声明 Provider 就不会触发 native SIGABRT 闪退，但需要手动 initialize）
+            runCatching {
+                Shizuku.initialize(this)
+            }
+            EarlyCrashHandler.markStage("onCreate_ShizukuInitializeDone")
+
+            // 安装 Shizuku Binder 监听（授权弹窗结果 / Binder 变化 → 推 Flow）
             runCatching {
                 me.weishu.kernelsu.ui.util.PermissionManager.installListenersIfNeeded()
             }
             EarlyCrashHandler.markStage("onCreate_PermissionListenersReady")
-
-            // 手动反射补齐 Shizuku SDK 内部 Binder 引用（不声明 Provider 的补救）
-            runCatching {
-                me.weishu.kernelsu.ui.util.PermissionManager.ensureShizukuInitialized(this)
-            }
-            EarlyCrashHandler.markStage("onCreate_PermissionInitDone")
 
             // 读上次崩溃 / 启动阶段日志 —— 由 MainActivity 首帧统一展示
             runCatching { EarlyCrashHandler.handlePendingCrash() }
