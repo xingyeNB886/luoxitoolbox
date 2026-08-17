@@ -142,6 +142,7 @@ fun SuperUserPager(
                 .padding(horizontal = 12.dp)
                 .hazeSource(state = hazeState),
             contentPadding = innerPadding,
+            overscrollEffect = null,
         ) {
             // 拆分为多个 item：图片增减不会导致整页重新锚定（修复滚动跳底）
             item(key = "picker") {
@@ -172,12 +173,8 @@ fun SuperUserPager(
                 }
             }
             item(key = "bottom") {
-                Spacer(
-                    Modifier.height(
-                        WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() +
-                                WindowInsets.captionBar.asPaddingValues().calculateBottomPadding() + 12.dp
-                    )
-                )
+                // 用底部导航栏高度（已含系统导航条），保证替换文件按钮不被底部栏遮挡
+                Spacer(Modifier.height(bottomInnerPadding + 12.dp))
             }
         }
     }

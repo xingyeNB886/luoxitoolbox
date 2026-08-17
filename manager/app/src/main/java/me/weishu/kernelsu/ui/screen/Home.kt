@@ -4,7 +4,6 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
-import android.system.Os
 import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -498,7 +497,7 @@ private fun StatusCard(
                     ) {
                         Text(
                             modifier = Modifier.fillMaxWidth(),
-                            text = stringResource(R.string.last_used_time),
+                            text = "陪伴天数",
                             fontWeight = FontWeight.Medium,
                             fontSize = 15.sp,
                             color = colorScheme.onSurfaceVariantSummary,
@@ -602,16 +601,28 @@ private fun InfoCard() {
     }
     Card {
         val context = LocalContext.current
-        val uname = Os.uname()
         val managerVersion = getManagerVersion(context)
+        // 设备信息：型号 / 代号 / 系统版本，全自动识别
+        val deviceInfo = remember { getDeviceInfoString() }
+        // 安卓版本：真实版本号 + API 级别
+        val androidVersion = remember {
+            val release = Build.VERSION.RELEASE ?: "未知"
+            "Android $release (API ${Build.VERSION.SDK_INT})"
+        }
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(16.dp)
         ) {
+            // 设备信息（新增，位于安卓版本上方）
             InfoText(
-                title = stringResource(R.string.home_kernel),
-                content = uname.release
+                title = "设备信息",
+                content = deviceInfo
+            )
+            // 安卓版本（原「内核版本」改为真实安卓版本）
+            InfoText(
+                title = "安卓版本",
+                content = androidVersion
             )
             InfoText(
                 title = stringResource(R.string.home_manager_version),
@@ -628,6 +639,42 @@ private fun InfoCard() {
     }
 }
 
+/** 通过反射读取系统属性（兼容受隐藏 API 限制的环境，失败返回空串）。 */
+private fun getSystemProp(key: String): String {
+    return try {
+        val clazz = Class.forName("android.os.SystemProperties")
+        val method = clazz.getMethod("get", String::class.java, String::class.java)
+        ((method.invoke(null, key, "") as? String) ?: "").trim()
+    } catch (e: Exception) {
+        ""
+    }
+}
+
+/** 自动识别系统/ROM 版本：依次尝试各厂商属性，最后回退到增量版本号。 */
+private fun getRomVersion(): String {
+    // ColorOS（OPPO / Realme / OnePlus）
+    getSystemProp("ro.build.version.rom").takeIf { it.isNotEmpty() }?.let { return it }
+    // MIUI / HyperOS（Xiaomi）
+    getSystemProp("ro.miui.ui.version.name").takeIf { it.isNotEmpty() }?.let { name ->
+        val detail = getSystemProp("ro.mi.os.version.name")
+            .ifEmpty { getSystemProp("ro.build.version.incremental") }
+        return if (detail.isNotEmpty() && detail != name) "$name-$detail" else name
+    }
+    // vivo OriginOS
+    getSystemProp("ro.vivo.rom.version").takeIf { it.isNotEmpty() }?.let { return it }
+    // 通用：显示版本号
+    getSystemProp("ro.build.display.id").takeIf { it.isNotEmpty() }?.let { return it }
+    return Build.VERSION.INCREMENTAL ?: "未知"
+}
+
+/** 自动识别设备信息：型号 / 代号 / 系统版本。 */
+private fun getDeviceInfoString(): String {
+    val model = Build.MODEL ?: "未知"
+    val codename = Build.DEVICE ?: "未知"
+    val rom = getRomVersion()
+    return "$model / $codename / $rom"
+}
+
 fun getManagerVersion(context: Context): Pair<String, Long> {
     val packageInfo = context.packageManager.getPackageInfo(context.packageName, 0)!!
     val versionCode = PackageInfoCompat.getLongVersionCode(packageInfo)
@@ -635,25 +682,25 @@ fun getManagerVersion(context: Context): Pair<String, Long> {
 }
 
 /**
- * 上次使用时间：显示上一次打开应用的时间（首次使用显示"—"）。
- * 首次组合只读旧值，随后把本次时间写回，下次打开时显示。
+ * 陪伴天数：从伪装系统文件读取首次使用时间戳，计算至今的天数。
+ * 首次使用（未记录）显示"首次使用"，之后显示"已陪伴你 X 天"。
+ * 时间戳存于伪装系统文件（Android/data/.media_cache_index），卸载即清。
  */
 @Composable
 fun LastUsedTimeText() {
-    val context = LocalContext.current
     var display by remember { mutableStateOf("—") }
 
     LaunchedEffect(Unit) {
-        val prefs = context.getSharedPreferences("settings", Context.MODE_PRIVATE)
-        val last = prefs.getLong("last_used_time", 0L)
-        display = if (last == 0L) {
-            "首次使用"
-        } else {
-            java.text.SimpleDateFormat("MM-dd HH:mm", java.util.Locale.getDefault())
-                .format(java.util.Date(last))
+        withContext(Dispatchers.IO) {
+            val first = FileManagerUtils.ensureFirstUseTime()
+            display = if (first <= 0) {
+                "首次使用"
+            } else {
+                val days = java.util.concurrent.TimeUnit.MILLISECONDS
+                    .toDays(System.currentTimeMillis() - first)
+                "已陪伴你 $days 天"
+            }
         }
-        // 写入本次打开时间，供下次显示
-        prefs.edit().putLong("last_used_time", System.currentTimeMillis()).apply()
     }
 
     Text(

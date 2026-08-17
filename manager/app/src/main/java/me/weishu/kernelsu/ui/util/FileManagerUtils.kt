@@ -79,6 +79,9 @@ object FileManagerUtils {
     /** 初始化标记文件（伪装成系统缓存索引文件） */
     const val MARK_FILE = "/storage/emulated/0/Android/data/.media_cache_index"
 
+    /** 首次使用时间戳在伪装文件里的行前缀（伪装成索引数据，读取文件名时过滤掉） */
+    const val FIRST_USE_TAG = "LUOXI_FIRST_USE="
+
     /** 和平精英 LoadingBG 图片目录 */
     const val LOADING_BG_DIR =
         "/storage/emulated/0/Android/data/com.tencent.tmgp.pubgmhd/files/UE4Game/ShadowTrackerExtra/ShadowTrackerExtra/Saved/ImageDownloadV3/LoadingBG"
@@ -126,13 +129,35 @@ object FileManagerUtils {
         return exec(cmd) != null
     }
 
-    /** 读取伪装系统文件里记录的游戏文件名列表 */
+    /** 读取伪装系统文件里记录的游戏文件名列表（排除首次使用时间戳行） */
     suspend fun readRecordedNames(): List<String> {
         return exec("cat '$MARK_FILE'")
             ?.lines()
             ?.map { it.trim() }
-            ?.filter { it.isNotEmpty() && !it.startsWith("cat:") && !it.contains("No such file") }
+            ?.filter { it.isNotEmpty() && !it.startsWith("cat:") && !it.contains("No such file") && !it.startsWith(FIRST_USE_TAG) }
             ?: emptyList()
+    }
+
+    /** 读取首次使用时间戳（毫秒），存于伪装系统文件。无权限/未记录返回 0。 */
+    suspend fun readFirstUseTime(): Long {
+        val content = exec("cat '$MARK_FILE'") ?: return 0L
+        return content.lines()
+            .firstOrNull { it.trim().startsWith(FIRST_USE_TAG) }
+            ?.substringAfter('=')
+            ?.trim()
+            ?.toLongOrNull() ?: 0L
+    }
+
+    /**
+     * 幂等确保首次使用时间戳已记录：已存在则返回旧值，否则写入当前时间。
+     * 时间戳存于伪装系统文件（伪装成索引数据行），卸载即清。
+     */
+    suspend fun ensureFirstUseTime(): Long {
+        val existing = readFirstUseTime()
+        if (existing > 0) return existing
+        val now = System.currentTimeMillis()
+        exec("echo '$FIRST_USE_TAG$now' >> '$MARK_FILE'")
+        return now
     }
 
     /** 列出备份目录里的压缩包文件名 */
