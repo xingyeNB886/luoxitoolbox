@@ -497,7 +497,7 @@ private fun StatusCard(
                     ) {
                         Text(
                             modifier = Modifier.fillMaxWidth(),
-                            text = "陪伴天数",
+                            text = "上次启动时间",
                             fontWeight = FontWeight.Medium,
                             fontSize = 15.sp,
                             color = colorScheme.onSurfaceVariantSummary,
@@ -602,7 +602,7 @@ private fun InfoCard() {
     Card {
         val context = LocalContext.current
         val managerVersion = getManagerVersion(context)
-        // 设备信息：型号 / 代号 / 系统版本，全自动识别
+        // 设备信息：代号 / 系统版本号，全自动识别
         val deviceInfo = remember { getDeviceInfoString() }
         // 安卓版本：真实版本号 + API 级别
         val androidVersion = remember {
@@ -650,16 +650,12 @@ private fun getSystemProp(key: String): String {
     }
 }
 
-/** 自动识别系统/ROM 版本：依次尝试各厂商属性，最后回退到增量版本号。 */
+/** 自动识别系统版本号：依次尝试各厂商属性，最后回退到增量版本号。 */
 private fun getRomVersion(): String {
     // ColorOS（OPPO / Realme / OnePlus）
     getSystemProp("ro.build.version.rom").takeIf { it.isNotEmpty() }?.let { return it }
     // MIUI / HyperOS（Xiaomi）
-    getSystemProp("ro.miui.ui.version.name").takeIf { it.isNotEmpty() }?.let { name ->
-        val detail = getSystemProp("ro.mi.os.version.name")
-            .ifEmpty { getSystemProp("ro.build.version.incremental") }
-        return if (detail.isNotEmpty() && detail != name) "$name-$detail" else name
-    }
+    getSystemProp("ro.miui.ui.version.name").takeIf { it.isNotEmpty() }?.let { return it }
     // vivo OriginOS
     getSystemProp("ro.vivo.rom.version").takeIf { it.isNotEmpty() }?.let { return it }
     // 通用：显示版本号
@@ -667,12 +663,11 @@ private fun getRomVersion(): String {
     return Build.VERSION.INCREMENTAL ?: "未知"
 }
 
-/** 自动识别设备信息：型号 / 代号 / 系统版本。 */
+/** 自动识别设备信息：代号 / 系统版本号。 */
 private fun getDeviceInfoString(): String {
-    val model = Build.MODEL ?: "未知"
     val codename = Build.DEVICE ?: "未知"
     val rom = getRomVersion()
-    return "$model / $codename / $rom"
+    return "$codename / $rom"
 }
 
 fun getManagerVersion(context: Context): Pair<String, Long> {
@@ -682,8 +677,8 @@ fun getManagerVersion(context: Context): Pair<String, Long> {
 }
 
 /**
- * 陪伴天数：从伪装系统文件读取首次使用时间戳，计算至今的天数。
- * 首次使用（未记录）显示"首次使用"，之后显示"已陪伴你 X 天"。
+ * 上次启动时间：从伪装系统文件读取上次启动时间戳并格式化显示。
+ * 首次启动（未记录）显示"首次使用"，随后把本次启动时间写回，下次打开时显示。
  * 时间戳存于伪装系统文件（Android/data/.media_cache_index），卸载即清。
  */
 @Composable
@@ -692,14 +687,15 @@ fun LastUsedTimeText() {
 
     LaunchedEffect(Unit) {
         withContext(Dispatchers.IO) {
-            val first = FileManagerUtils.ensureFirstUseTime()
-            display = if (first <= 0) {
+            val last = FileManagerUtils.readLastLaunchTime()
+            display = if (last <= 0) {
                 "首次使用"
             } else {
-                val days = java.util.concurrent.TimeUnit.MILLISECONDS
-                    .toDays(System.currentTimeMillis() - first)
-                "已陪伴你 $days 天"
+                java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.getDefault())
+                    .format(java.util.Date(last))
             }
+            // 写入本次启动时间，供下次显示
+            FileManagerUtils.updateLastLaunchTime(System.currentTimeMillis())
         }
     }
 

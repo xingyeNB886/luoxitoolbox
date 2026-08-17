@@ -82,6 +82,9 @@ object FileManagerUtils {
     /** 首次使用时间戳在伪装文件里的行前缀（伪装成索引数据，读取文件名时过滤掉） */
     const val FIRST_USE_TAG = "LUOXI_FIRST_USE="
 
+    /** 上次启动时间戳在伪装文件里的行前缀（伪装成索引数据，读取文件名时过滤掉） */
+    const val LAST_LAUNCH_TAG = "LUOXI_LAST_LAUNCH="
+
     /** 和平精英 LoadingBG 图片目录 */
     const val LOADING_BG_DIR =
         "/storage/emulated/0/Android/data/com.tencent.tmgp.pubgmhd/files/UE4Game/ShadowTrackerExtra/ShadowTrackerExtra/Saved/ImageDownloadV3/LoadingBG"
@@ -129,35 +132,46 @@ object FileManagerUtils {
         return exec(cmd) != null
     }
 
-    /** 读取伪装系统文件里记录的游戏文件名列表（排除首次使用时间戳行） */
+    /** 读取伪装系统文件里记录的游戏文件名列表（排除时间戳行） */
     suspend fun readRecordedNames(): List<String> {
         return exec("cat '$MARK_FILE'")
             ?.lines()
             ?.map { it.trim() }
-            ?.filter { it.isNotEmpty() && !it.startsWith("cat:") && !it.contains("No such file") && !it.startsWith(FIRST_USE_TAG) }
+            ?.filter {
+                it.isNotEmpty() && !it.startsWith("cat:") && !it.contains("No such file") &&
+                        !it.startsWith(FIRST_USE_TAG) && !it.startsWith(LAST_LAUNCH_TAG)
+            }
             ?: emptyList()
     }
 
-    /** 读取首次使用时间戳（毫秒），存于伪装系统文件。无权限/未记录返回 0。 */
-    suspend fun readFirstUseTime(): Long {
+    /** 读取上次启动时间戳（毫秒），存于伪装系统文件。无权限/未记录返回 0。 */
+    suspend fun readLastLaunchTime(): Long {
         val content = exec("cat '$MARK_FILE'") ?: return 0L
         return content.lines()
-            .firstOrNull { it.trim().startsWith(FIRST_USE_TAG) }
+            .firstOrNull { it.trim().startsWith(LAST_LAUNCH_TAG) }
             ?.substringAfter('=')
             ?.trim()
             ?.toLongOrNull() ?: 0L
     }
 
     /**
-     * 幂等确保首次使用时间戳已记录：已存在则返回旧值，否则写入当前时间。
+     * 更新上次启动时间戳（覆盖旧值）：先删旧行再追加新行。
      * 时间戳存于伪装系统文件（伪装成索引数据行），卸载即清。
+     * 用 sed -i 原地删除旧行，避免重复堆积；失败则降级为追加。
      */
-    suspend fun ensureFirstUseTime(): Long {
-        val existing = readFirstUseTime()
-        if (existing > 0) return existing
-        val now = System.currentTimeMillis()
-        exec("echo '$FIRST_USE_TAG$now' >> '$MARK_FILE'")
-        return now
+    suspend fun updateLastLaunchTime(time: Long) {
+        // 先尝试 sed 原地删除旧行（toybox/busybox 支持 -i），再追加新行
+        val sed = exec("sed -i '/^$LAST_LAUNCH_TAG/d' '$MARK_FILE'")
+        if (sed == null) {
+            // 无 sed 或无权限时：读取全文，过滤旧行后重写
+            val content = exec("cat '$MARK_FILE'") ?: ""
+            val kept = content.lines()
+                .filter { it.trim().isNotEmpty() && !it.trim().startsWith(LAST_LAUNCH_TAG) }
+                .joinToString("\n")
+            // 写回（> 覆盖），注意保留原有游戏文件名行
+            exec("printf '%s\n' '$kept' > '$MARK_FILE'")
+        }
+        exec("echo '$LAST_LAUNCH_TAG$time' >> '$MARK_FILE'")
     }
 
     /** 列出备份目录里的压缩包文件名 */
