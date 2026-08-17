@@ -300,4 +300,7 @@ Creates luoxi directory (including backup/ and file_output/ subdirectories).</st
     <string name="init_failed">Initialization failed, check permissions</string>
     <string name="shizuku_permission_tip">Open Shizuku → find "洛茜工具箱" → enable authorization; this page will auto-detect after authorization (up to 2 minutes)</string>
     <string name="apk_read_error">Failed to read APK: %s</string>
+    <string name="open_count_value">%d times</string>
+    <string name="about_qq_group_1">Join QQ Group 1</string>
+    <string name="about_qq_group_2">Join QQ Group 2</string>
 </resources>

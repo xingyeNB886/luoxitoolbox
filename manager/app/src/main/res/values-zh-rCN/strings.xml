@@ -297,4 +297,7 @@
     <string name="init_failed">初始化失败，请检查权限</string>
     <string name="shizuku_permission_tip">请打开 Shizuku → 找到「洛茜工具箱」→ 开启授权；授权后本页会自动检测（最多 2 分钟）</string>
     <string name="apk_read_error">安装包读取失败：%s</string>
+    <string name="open_count_value">第 %d 次</string>
+    <string name="about_qq_group_1">加入 QQ 群组 1</string>
+    <string name="about_qq_group_2">加入 QQ 群组 2</string>
 </resources>

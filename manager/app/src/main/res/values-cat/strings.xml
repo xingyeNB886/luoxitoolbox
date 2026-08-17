@@ -180,4 +180,9 @@
     <string name="init_failed">初始化失败了喵，看看权限给了没喵~</string>
     <string name="shizuku_permission_tip">打开 Shizuku → 找到「洛茜工具箱」→ 打开授权；授权完凛会自己检测（最多等 2 分钟）的说喵~</string>
     <string name="apk_read_error">安装包读不出来喵：%s</string>
+    <string name="open_count_value">第 %d 次的说喵~</string>
+    <string name="about_join_channel"><![CDATA[凛的 Telegram 频道在这里的说喵~ %1$s]]></string>
+    <string name="about_source_code"><![CDATA[在 %1$s 看源码的说喵~<br/>凛的 %2$s 频道<br/>凛的 <b><a href="https://pd.qq.com/s/8lipl1brp">QQ</a></b> 频道喵~]]></string>
+    <string name="about_qq_group_1">加凛的 QQ 群的说喵~ (1)</string>
+    <string name="about_qq_group_2">加凛的 QQ 群的说喵~ (2)</string>
 </resources>

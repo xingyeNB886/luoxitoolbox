@@ -169,12 +169,12 @@ fun AboutScreen() {
                     }
                     // 加入 QQ 群组 1
                     SuperArrow(
-                        title = "加入 QQ 群组 1",
+                        title = stringResource(R.string.about_qq_group_1),
                         startAction = {
                             Icon(
                                 Icons.Rounded.Groups,
                                 modifier = Modifier.padding(end = 16.dp),
-                                contentDescription = "加入 QQ 群组 1",
+                                contentDescription = stringResource(R.string.about_qq_group_1),
                                 tint = colorScheme.onBackground
                             )
                         },
@@ -184,12 +184,12 @@ fun AboutScreen() {
                     )
                     // 加入 QQ 群组 2
                     SuperArrow(
-                        title = "加入 QQ 群组 2",
+                        title = stringResource(R.string.about_qq_group_2),
                         startAction = {
                             Icon(
                                 Icons.Rounded.Groups,
                                 modifier = Modifier.padding(end = 16.dp),
-                                contentDescription = "加入 QQ 群组 2",
+                                contentDescription = stringResource(R.string.about_qq_group_2),
                                 tint = colorScheme.onBackground
                             )
                         },

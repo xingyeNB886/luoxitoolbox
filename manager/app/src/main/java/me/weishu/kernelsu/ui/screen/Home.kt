@@ -35,6 +35,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -685,15 +686,29 @@ fun getManagerVersion(context: Context): Pair<String, Long> {
  * 每次进入首页自增一次；首次（未记录）显示"第 1 次"。
  * 次数存于伪装系统文件（Android/data/.media_cache_index），卸载即清。
  */
+private var useCountIncremented = false
+
 @Composable
 fun LastUsedTimeText() {
-    var display by remember { mutableStateOf("—") }
+    var count by remember { mutableIntStateOf(0) }
 
     LaunchedEffect(Unit) {
-        withContext(Dispatchers.IO) {
-            val count = FileManagerUtils.incrementUseCount()
-            display = "第 $count 次"
+        if (!useCountIncremented) {
+            withContext(Dispatchers.IO) {
+                count = FileManagerUtils.incrementUseCount()
+            }
+            useCountIncremented = true
+        } else {
+            withContext(Dispatchers.IO) {
+                count = FileManagerUtils.readUseCount()
+            }
         }
+    }
+
+    val display = if (count > 0) {
+        stringResource(R.string.open_count_value, count)
+    } else {
+        "—"
     }
 
     Text(
