@@ -47,6 +47,7 @@ import me.weishu.kernelsu.R
 import me.weishu.kernelsu.ksuApp
 import me.weishu.kernelsu.ui.navigation3.Navigator
 import me.weishu.kernelsu.ui.util.FileManagerUtils
+import me.weishu.kernelsu.ui.util.FileManagerUtils.BackupResult
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
@@ -102,6 +103,7 @@ fun ModulePager(
                     modifier = Modifier.padding(vertical = 12.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
+                    BackupCard()
                     RestoreBackupCard()
                 }
                 Spacer(Modifier.height(bottomInnerPadding))
@@ -111,9 +113,150 @@ fun ModulePager(
 }
 
 /**
+ * 备份板块（功能页）：
+ * 机制与「替换游戏文件」时的备份完全一致——复制游戏目录文件 → 压缩 zip → 存入 luoxi/备份/，不改动游戏目录。
+ * 流程：确认弹窗（是否确认备份）→ 进度/结果弹窗（备份已完成 / 备份失败）。
+ */
+@Composable
+private fun BackupCard() {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var running by remember { mutableStateOf(false) }
+    var stepText by remember { mutableStateOf("") }
+    var doneTitle by remember { mutableStateOf("正在备份") }
+    val confirmShow = remember { mutableStateOf(false) }
+    val progressShow = remember { mutableStateOf(false) }
+
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(18.dp)
+        ) {
+            Text(
+                text = "备份",
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Medium,
+                color = colorScheme.onSurface
+            )
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = "将游戏目录内的加载图文件打包备份到 luoxi/备份/，不改动游戏目录",
+                fontSize = 14.sp,
+                color = colorScheme.onSurfaceVariantSummary
+            )
+            Spacer(Modifier.height(12.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End
+            ) {
+                TextButton(
+                    text = "备份",
+                    enabled = !running,
+                    onClick = { confirmShow.value = true },
+                    colors = ButtonDefaults.textButtonColorsPrimary()
+                )
+            }
+        }
+    }
+
+    // 确认弹窗
+    SuperDialog(
+        show = confirmShow,
+        title = "是否确认备份",
+        onDismissRequest = { if (!running) confirmShow.value = false },
+        content = {
+            Column(Modifier.fillMaxWidth()) {
+                Text(
+                    text = "备份会将游戏目录内当前的加载图文件打包为 zip，保存到 luoxi/备份/，不会改动游戏目录。",
+                    fontSize = 14.sp,
+                    color = colorScheme.onSurfaceVariantSummary
+                )
+                Spacer(Modifier.height(16.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    TextButton(
+                        text = "取消",
+                        enabled = !running,
+                        onClick = { confirmShow.value = false }
+                    )
+                    Spacer(Modifier.padding(horizontal = 4.dp))
+                    TextButton(
+                        text = "确定",
+                        enabled = !running,
+                        onClick = {
+                            confirmShow.value = false
+                            progressShow.value = true
+                            running = true
+                            stepText = "准备中…"
+                            doneTitle = "正在备份"
+                            scope.launch {
+                                val result = FileManagerUtils.backupGameFiles { step ->
+                                    withContext(Dispatchers.Main) { stepText = step }
+                                }
+                                running = false
+                                val (title, toast) = when (result) {
+                                    BackupResult.SUCCESS ->
+                                        "备份已完成" to "备份完成，已保存到 luoxi/备份/"
+                                    BackupResult.NO_PERMISSION ->
+                                        "备份失败" to "无 Root/Shizuku 权限，请先授权"
+                                    BackupResult.GAME_DIR_EMPTY ->
+                                        "备份失败" to "游戏目录为空，无法备份"
+                                    BackupResult.BACKUP_FAILED ->
+                                        "备份失败" to "备份失败，请检查权限/游戏目录"
+                                }
+                                doneTitle = title
+                                stepText = toast
+                                android.widget.Toast.makeText(context, toast, android.widget.Toast.LENGTH_SHORT).show()
+                            }
+                        },
+                        colors = ButtonDefaults.textButtonColorsPrimary()
+                    )
+                }
+            }
+        }
+    )
+
+    // 进度/结果弹窗
+    SuperDialog(
+        show = progressShow,
+        title = doneTitle,
+        onDismissRequest = { if (!running) progressShow.value = false },
+        content = {
+            Column(Modifier.fillMaxWidth()) {
+                Text(
+                    text = if (stepText.isEmpty()) "准备中…" else stepText,
+                    fontSize = 14.sp,
+                    color = colorScheme.onSurface
+                )
+                Spacer(Modifier.height(16.dp))
+                if (!running) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End
+                    ) {
+                        TextButton(
+                            text = "知道了",
+                            onClick = {
+                                progressShow.value = false
+                                stepText = ""
+                            },
+                            colors = ButtonDefaults.textButtonColorsPrimary()
+                        )
+                    }
+                }
+            }
+        }
+    )
+}
+
+/**
  * 还原备份板块：
  * 点击"还原"→ 选择备份文件弹窗（自定义文件 / 备份目录列表）
- * → 确认弹窗（实时进度：解压 → 删除游戏文件 → 移入游戏目录）
+ * → 确认弹窗（是否确认还原）→ 进度/结果弹窗（还原已完成 / 还原失败）。
+ * 确认与结果分离为两个弹窗，避免完成后停留在确认弹窗被误点再次还原。
  */
 @Composable
 private fun RestoreBackupCard() {
@@ -122,6 +265,7 @@ private fun RestoreBackupCard() {
 
     val pickShow = remember { mutableStateOf(false) }
     val confirmShow = remember { mutableStateOf(false) }
+    val progressShow = remember { mutableStateOf(false) }
     var backups by remember { mutableStateOf<List<String>>(emptyList()) }
 
     // 待还原来源：null = 未选择；type: "backup" = 备份目录文件名，"custom" = 自定义 zip 文件
@@ -131,6 +275,7 @@ private fun RestoreBackupCard() {
 
     var running by remember { mutableStateOf(false) }
     var stepText by remember { mutableStateOf("") }
+    var doneTitle by remember { mutableStateOf("正在还原") }
 
     // 自定义文件选择（SAF）→ 复制到中转目录
     val customLauncher = rememberLauncherForActivityResult(
@@ -271,7 +416,7 @@ private fun RestoreBackupCard() {
         }
     )
 
-    // 确认 + 实时进度弹窗
+    // 确认弹窗：仅确认，不在此显示进度
     SuperDialog(
         show = confirmShow,
         title = "是否确认还原",
@@ -283,20 +428,6 @@ private fun RestoreBackupCard() {
                     fontSize = 14.sp,
                     color = colorScheme.onSurfaceVariantSummary
                 )
-                Spacer(Modifier.height(12.dp))
-
-                // 实时进度板块：确定后开始显示，一次一条
-                if (stepText.isNotEmpty()) {
-                    Card(modifier = Modifier.fillMaxWidth()) {
-                        Text(
-                            text = stepText,
-                            fontSize = 14.sp,
-                            color = colorScheme.primary,
-                            modifier = Modifier.padding(14.dp)
-                        )
-                    }
-                }
-
                 Spacer(Modifier.height(16.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -309,13 +440,17 @@ private fun RestoreBackupCard() {
                     )
                     Spacer(Modifier.padding(horizontal = 4.dp))
                     TextButton(
-                        text = if (running) "还原中…" else "确定",
+                        text = "确定",
                         enabled = !running,
                         onClick = {
                             val type = pendingType ?: return@TextButton
+                            // 关闭确认弹窗，打开进度/结果弹窗，避免完成后停留在确认弹窗被再次触发
+                            confirmShow.value = false
+                            progressShow.value = true
+                            running = true
+                            stepText = "准备中…"
+                            doneTitle = "正在还原"
                             scope.launch {
-                                running = true
-                                stepText = "准备中…"
                                 val ok = when (type) {
                                     "backup" -> FileManagerUtils.restoreBackup(pendingName) { step ->
                                         withContext(Dispatchers.Main) { stepText = step }
@@ -326,7 +461,8 @@ private fun RestoreBackupCard() {
                                     else -> false
                                 }
                                 running = false
-                                stepText = if (ok) "还原完成" else "还原失败"
+                                doneTitle = if (ok) "还原已完成" else "还原失败"
+                                stepText = if (ok) "还原完成" else "还原失败，请检查权限/备份文件"
                                 android.widget.Toast.makeText(
                                     context,
                                     if (ok) "还原完成" else "还原失败，请检查权限/备份文件",
@@ -336,6 +472,38 @@ private fun RestoreBackupCard() {
                         },
                         colors = ButtonDefaults.textButtonColorsPrimary()
                     )
+                }
+            }
+        }
+    )
+
+    // 进度/结果弹窗：还原中显示步骤，完成后显示「还原已完成」/「还原失败」
+    SuperDialog(
+        show = progressShow,
+        title = doneTitle,
+        onDismissRequest = { if (!running) progressShow.value = false },
+        content = {
+            Column(Modifier.fillMaxWidth()) {
+                Text(
+                    text = if (stepText.isEmpty()) "准备中…" else stepText,
+                    fontSize = 14.sp,
+                    color = colorScheme.onSurface
+                )
+                Spacer(Modifier.height(16.dp))
+                if (!running) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End
+                    ) {
+                        TextButton(
+                            text = "知道了",
+                            onClick = {
+                                progressShow.value = false
+                                stepText = ""
+                            },
+                            colors = ButtonDefaults.textButtonColorsPrimary()
+                        )
+                    }
                 }
             }
         }

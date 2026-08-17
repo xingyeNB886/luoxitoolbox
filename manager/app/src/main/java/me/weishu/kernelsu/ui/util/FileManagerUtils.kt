@@ -47,6 +47,23 @@ object FileManagerUtils {
         MOVE_FAILED
     }
 
+    /**
+     * 独立备份游戏文件的执行结果（功能页「备份」卡片用，机制与替换游戏文件时的备份一致）。
+     */
+    enum class BackupResult {
+        /** 备份成功 */
+        SUCCESS,
+
+        /** 无 Root/Shizuku 权限 */
+        NO_PERMISSION,
+
+        /** 游戏目录为空，无法备份 */
+        GAME_DIR_EMPTY,
+
+        /** 备份失败（复制/压缩/写入备份目录失败） */
+        BACKUP_FAILED
+    }
+
     /** 初始化目录 */
     const val LUOXI_DIR = "/storage/emulated/0/luoxi"
 
@@ -285,6 +302,24 @@ object FileManagerUtils {
         runCatching { zip.delete() }
         cleanDir(bakDir)
         return "$stamp.zip"
+    }
+
+    /**
+     * 独立备份游戏文件（功能页「备份」卡片入口）：
+     * 先校验权限与游戏目录非空 → 复制 游戏目录 → work/bak → 压缩 zip → 备份目录时间戳.zip。
+     * 机制与替换游戏文件时的备份完全一致，仅做独立备份，不替换任何文件。
+     * @return 备份结果（成功时新备份可在 listBackups 中看到）
+     */
+    suspend fun backupGameFiles(onStep: suspend (String) -> Unit): BackupResult {
+        // 先确认有权限且游戏目录非空，给出明确提示
+        val gameCount = exec("ls -A '$LOADING_BG_DIR' 2>/dev/null | wc -l")?.trim()
+            ?: return BackupResult.NO_PERMISSION
+        if (gameCount == "0") {
+            onStep("游戏目录为空，无法备份（$LOADING_BG_DIR）")
+            return BackupResult.GAME_DIR_EMPTY
+        }
+        val name = backupGameFiles(workDir().absolutePath, onStep)
+        return if (name != null) BackupResult.SUCCESS else BackupResult.BACKUP_FAILED
     }
 
     /**
