@@ -52,7 +52,8 @@ manager/
 | 内存限制 | 沙箱 ~2GB，daemon 易被 cgroup OOM kill。构建用 `-Dorg.gradle.workers.max=2`；必要时把 gradle.properties 的 Xmx 临时降到 1200m、parallel=false，**构建完必须 `git checkout gradle.properties` 还原** |
 | 命令 | `cd manager && mise exec java@temurin-21 -- ./gradlew assembleRelease --console=plain -Dorg.gradle.workers.max=2` |
 | 产物 | `manager/app/build/outputs/apk/release/*.apk` |
-| CI | push main 即触发 GitHub Actions，自动签名（见 §2.1 密钥章节）并发布 Release，tag 为 `luoxi-<run_number>`，APK 直链：`releases/download/luoxi-NN/LuoxiToolbox_1.0.0_1000000-release.apk` |
+| CI | push main 即触发 GitHub Actions（仅 `build-luoxi-toolbox.yml`，自动签名见 §2.1 并发布 Release），tag 为 `luoxi-<run_number>`，APK 直链：`releases/download/luoxi-NN/LuoxiToolbox_1.0.0_1000000-release.apk` |
+| CI 现状 | 上游 KernelSU 的 root 基建工作流（Build Manager / build-lkm / ddk-lkm / ksud / ksud-extra / ksuinit / release / clippy / rustfmt）已全部删除——本 fork 是管理器 App，不发布内核模块/ksud，仅保留 APK 构建、网站部署、shellcheck、clang-format |
 | 版本号 | 在 `manager/build.gradle.kts`（rootProject extra：managerVersionCode/Name），当前 1.0.0(1000000) |
 
 ### 2.1 打包签名密钥（★绝不可删）
