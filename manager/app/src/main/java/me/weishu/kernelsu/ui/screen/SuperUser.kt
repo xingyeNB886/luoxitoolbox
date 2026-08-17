@@ -73,6 +73,7 @@ import me.weishu.kernelsu.R
 import me.weishu.kernelsu.ksuApp
 import me.weishu.kernelsu.ui.navigation3.Navigator
 import me.weishu.kernelsu.ui.util.FileManagerUtils
+import me.weishu.kernelsu.ui.util.FileManagerUtils.ReplaceResult
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.Icon
@@ -843,16 +844,22 @@ private fun startReplace(
 ) {
     scope.launch {
         onUpdate("准备中…", true)
-        val ok = FileManagerUtils.replaceGameFiles(withBackup) { step ->
+        val result = FileManagerUtils.replaceGameFiles(withBackup) { step ->
             withContext(Dispatchers.Main) { onUpdate(step, true) }
         }
         withContext(Dispatchers.Main) {
-            onUpdate(if (ok) "替换完成" else "替换失败", false)
-            android.widget.Toast.makeText(
-                context,
-                if (ok) "替换完成" else "替换失败，请检查权限/先制作文件",
-                android.widget.Toast.LENGTH_SHORT
-            ).show()
+            val (done, toast) = when (result) {
+                ReplaceResult.SUCCESS -> "替换完成" to "替换完成"
+                ReplaceResult.NO_OUTPUT_FILES -> "没有制作好的文件" to "请先选择图片并制作文件"
+                ReplaceResult.NO_PERMISSION -> "无权限" to "无 Root/Shizuku 权限，请先授权"
+                ReplaceResult.GAME_DIR_EMPTY ->
+                    "游戏目录为空" to "游戏目录为空，无法备份（可先选「不备份」重试）"
+                ReplaceResult.BACKUP_FAILED -> "备份失败" to "备份失败，游戏目录未改动，可重试"
+                ReplaceResult.MOVE_FAILED ->
+                    "移动失败" to "移动文件失败，已尝试从备份回滚"
+            }
+            onUpdate(done, false)
+            android.widget.Toast.makeText(context, toast, android.widget.Toast.LENGTH_SHORT).show()
         }
     }
 }

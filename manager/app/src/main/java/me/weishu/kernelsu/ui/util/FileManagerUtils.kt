@@ -19,10 +19,33 @@ import kotlin.coroutines.resume
  * 文件管理页的命令执行工具
  *
  * 重要：所有 Java 层 ↔ shell 层的文件中转都走 app 外部私有目录
- * （/storage/emulated/0/Android/data/<pkg>/files/luoxi/）。
+ * （/storage/emulated/0/Android/data/<pkg>/files/luoxi_work/）。
  * 不能用 /data/data 内部 cache——Shizuku(adb) 权限访问不到，这是之前替换/备份失败的根因。
  */
 object FileManagerUtils {
+
+    /**
+     * 替换游戏文件的执行结果，UI 据此给出明确提示。
+     */
+    enum class ReplaceResult {
+        /** 替换成功 */
+        SUCCESS,
+
+        /** 文件输出目录为空（请先制作文件） */
+        NO_OUTPUT_FILES,
+
+        /** 无 Root/Shizuku 权限 */
+        NO_PERMISSION,
+
+        /** 游戏目录为空，无法备份 */
+        GAME_DIR_EMPTY,
+
+        /** 备份失败（压缩/写入备份目录失败），游戏目录未改动 */
+        BACKUP_FAILED,
+
+        /** 移动文件至游戏目录失败（已尝试从备份回滚） */
+        MOVE_FAILED
+    }
 
     /** 初始化目录 */
     const val LUOXI_DIR = "/storage/emulated/0/luoxi"
@@ -132,48 +155,64 @@ object FileManagerUtils {
     }
 
     /**
-     * 替换游戏文件：
-     * 文件输出/ → work/out（中转）→ [备份游戏文件] → 删游戏文件 → work/out 全部文件 → 游戏目录
-     * 移入失败且已有备份时自动从备份回滚，避免游戏目录被清空。
+     * 替换游戏文件（严格按「先检查 → 先备份 → 再清空 → 最后移动」的顺序）：
+     * 1. 检查文件输出目录有成品（没有就直接失败，绝不动任何东西）
+     * 2. 需要备份时先备份：游戏文件 复制 → work/bak → 压缩 zip → 备份/时间戳.zip
+     * 3. 清空游戏目录
+     * 4. 文件输出目录内文件 移动（mv）→ 游戏目录
+     * 5. 移入失败且已有备份 → 自动从备份回滚
+     *
+     * 关键：文件输出目录只在最后一步才被移动，中间任何一步失败都不会消费用户文件。
      */
-    suspend fun replaceGameFiles(withBackup: Boolean, onStep: suspend (String) -> Unit): Boolean {
+    suspend fun replaceGameFiles(withBackup: Boolean, onStep: suspend (String) -> Unit): ReplaceResult {
         val work = workDir().absolutePath
 
+        // 1. 先确认有成品（只读检查，不移动，避免失败时用户文件消失）
         onStep("正在读取制作好的文件")
-        // 中转目录清空，把文件输出目录的内容移进来
-        exec("rm -rf '$work/out'; mkdir -p '$work/out'")
-        exec("mkdir -p '$OUTPUT_DIR'; mv '$OUTPUT_DIR'/* '$work/out' 2>/dev/null; echo moved")
-        val outCount = exec("ls -A '$work/out' 2>/dev/null | wc -l")?.trim() ?: return false
-        if (outCount == "0") return false // 没有成品文件，绝不动游戏目录
+        val outCount = exec("ls -A '$OUTPUT_DIR' 2>/dev/null | wc -l")?.trim()
+            ?: return ReplaceResult.NO_PERMISSION
+        if (outCount == "0") return ReplaceResult.NO_OUTPUT_FILES
 
+        // 2. 需要备份时先备份；失败立即终止，文件输出目录原封不动
         var backupName: String? = null
         if (withBackup) {
-            backupName = backupGameFiles(work, onStep) ?: return false
-        } else {
-            onStep("正在删除游戏文件")
-            if (exec("rm -rf '$LOADING_BG_DIR'; mkdir -p '$LOADING_BG_DIR'") == null) return false
+            // 先确认游戏目录里有可备份的文件，给出明确的「空目录」提示（而不是笼统失败）
+            val gameCount = exec("ls -A '$LOADING_BG_DIR' 2>/dev/null | wc -l")?.trim()
+                ?: return ReplaceResult.NO_PERMISSION
+            if (gameCount == "0") {
+                onStep("游戏目录为空，无法备份（$LOADING_BG_DIR）")
+                return ReplaceResult.GAME_DIR_EMPTY
+            }
+            backupName = backupGameFiles(work, onStep)
+                ?: return ReplaceResult.BACKUP_FAILED
         }
 
-        onStep("正在移动文件至游戏目录")
-        val ok = moveFilesToDir("$work/out", LOADING_BG_DIR)
-        exec("rm -rf '$work/out'")
+        // 3. 清空游戏目录
+        onStep("正在删除游戏文件")
+        if (exec("rm -rf '$LOADING_BG_DIR'; mkdir -p '$LOADING_BG_DIR'") == null) {
+            return ReplaceResult.NO_PERMISSION
+        }
 
+        // 4. 把文件输出目录的文件移动（mv）到游戏目录
+        onStep("正在移动文件至游戏目录")
+        val ok = moveFilesToDir(OUTPUT_DIR, LOADING_BG_DIR)
+
+        // 5. 移入失败：立即用刚生成的备份回滚
         if (!ok && backupName != null) {
-            // 移入游戏目录失败：立即用刚生成的备份回滚
             onStep("移动失败，正在从备份回滚")
             val zip = java.io.File(work, "rollback.zip")
             if (exec("cp '$BACKUP_DIR/$backupName' '${zip.absolutePath}'") != null) {
                 restoreFromFile(zip, onStep)
             }
         }
-        return ok
+        return if (ok) ReplaceResult.SUCCESS else ReplaceResult.MOVE_FAILED
     }
 
     /**
-     * 备份游戏目录：
-     * 游戏目录内文件 → work/bak（中转，Java 可读）→ Java 压缩 zip → work/xx.zip → 备份/yy.MM.dd HH:mm:ss.zip
+     * 备份游戏目录（复制式，zip 确认写入备份目录前游戏目录保持原样）：
+     * 游戏目录内文件 复制 → work/bak（中转，Java 可读）→ Java 压缩 zip → work/luoxi_backup.zip → 备份/yy.MM.dd HH:mm:ss.zip
      * - 游戏目录为空 → 失败（不生成空备份）
-     * - zip 确认写入备份目录后才清理中转，任一步失败文件原路移回游戏目录
+     * - 压缩或入库任一步失败 → 清理中转即止，游戏目录不受影响（因为是复制，无需回滚）
      * @return 备份文件名；失败返回 null
      */
     private suspend fun backupGameFiles(
@@ -181,7 +220,8 @@ object FileManagerUtils {
         onStep: suspend (String) -> Unit
     ): String? {
         exec("rm -rf '$work/bak'; mkdir -p '$work/bak'")
-        exec("mkdir -p '$LOADING_BG_DIR'; mv '$LOADING_BG_DIR'/* '$work/bak' 2>/dev/null; echo moved")
+        // 复制（不是移动）：用 dir/. 方式连同隐藏文件一起拷到中转
+        exec("mkdir -p '$LOADING_BG_DIR'; cp -rf '$LOADING_BG_DIR'/. '$work/bak' 2>/dev/null; echo copied")
 
         val bakDir = java.io.File(work, "bak")
         val files = bakDir.listFiles()?.filter { it.isFile } ?: emptyList()
@@ -208,20 +248,22 @@ object FileManagerUtils {
         }.isSuccess && zip.length() > 0
 
         if (!zipped) {
-            // 回滚：文件移回游戏目录
-            moveFilesToDir("$work/bak", LOADING_BG_DIR)
+            // 游戏目录没动过，只需清中转
+            cleanDir(bakDir)
+            runCatching { zip.delete() }
             return null
         }
 
         // zip 移入备份目录（文件名含空格，引号包裹）；成功并确认非空后才清理中转
         if (exec("mkdir -p '$BACKUP_DIR'; mv '${zip.absolutePath}' '$BACKUP_DIR/$stamp.zip'") == null) {
-            moveFilesToDir("$work/bak", LOADING_BG_DIR)
+            cleanDir(bakDir)
             runCatching { zip.delete() }
             return null
         }
         val size = exec("stat -c '%s' '$BACKUP_DIR/$stamp.zip' 2>/dev/null")?.trim()
         if (size.isNullOrEmpty() || size == "0") {
-            moveFilesToDir("$work/bak", LOADING_BG_DIR)
+            cleanDir(bakDir)
+            runCatching { zip.delete() }
             return null
         }
         cleanDir(bakDir)
