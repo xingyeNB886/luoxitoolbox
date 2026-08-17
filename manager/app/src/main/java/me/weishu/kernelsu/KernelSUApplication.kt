@@ -53,7 +53,9 @@ class KernelSUApplication : Application(), ViewModelStoreOwner {
     private fun isMainProcess(): Boolean = currentProcessName == packageName
 
     override fun attachBaseContext(base: Context?) {
-        super.attachBaseContext(base)
+        // 洛茜工具箱：应用全局语言 Locale（简中/狐娘语/猫娘语）
+        val wrappedBase = base?.let { me.weishu.kernelsu.ui.util.LuoxiLanguage.wrapContext(it) } ?: base
+        super.attachBaseContext(wrappedBase)
         _ksuApp = this
 
         // 【第一优先】Hidden API 豁免（在系统创建 ContentProvider 之前！）

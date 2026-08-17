@@ -78,6 +78,11 @@ class MainActivity : ComponentActivity() {
 
     private val intentState = MutableStateFlow(0)
 
+    // 洛茜工具箱：语言切换需在 attachBaseContext 应用 Locale，保证 Activity 资源用选定语言
+    override fun attachBaseContext(newBase: android.content.Context) {
+        super.attachBaseContext(me.weishu.kernelsu.ui.util.LuoxiLanguage.wrapContext(newBase))
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
 
         super.onCreate(savedInstanceState)
@@ -209,11 +214,24 @@ fun MainScreen() {
         tint = HazeTint(MiuixTheme.colorScheme.surface.copy(0.8f))
     )
 
+    // 洛茜工具箱：首次进入免责声明弹窗（同意后存 prefs 不再弹）
+    val context = LocalContext.current
+    val disclaimerShow = remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        val prefs = context.getSharedPreferences("settings", android.content.Context.MODE_PRIVATE)
+        if (!prefs.getBoolean("disclaimer_agreed", false)) {
+            disclaimerShow.value = true
+        }
+    }
+
     LaunchedEffect(mainPagerState.pagerState.currentPage) {
         mainPagerState.syncPage()
     }
 
     MainScreenBackHandler(mainPagerState, navController)
+
+    // 免责声明弹窗
+    DisclaimerDialog(disclaimerShow)
 
     CompositionLocalProvider(
         LocalMainPagerState provides mainPagerState
@@ -238,6 +256,53 @@ fun MainScreen() {
             }
         }
     }
+}
+
+
+/**
+ * 洛茜工具箱：首次进入免责声明弹窗。
+ * 同意后写入 prefs "disclaimer_agreed=true"，不再弹出；未同意时不可关闭（点返回键无效）。
+ * 内容：本软件通过修改游戏调用的图片文件实现自定义加载图，由此造成的文件损失等后果由用户自行承担。
+ */
+@Composable
+private fun DisclaimerDialog(show: androidx.compose.runtime.MutableState<Boolean>) {
+    val context = LocalContext.current
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    top.yukonga.miuix.kmp.extra.SuperDialog(
+        show = show,
+        title = "免责声明",
+        onDismissRequest = { /* 未同意不可关闭，拦截返回 */ },
+        content = {
+            androidx.compose.foundation.layout.Column(
+                modifier = androidx.compose.ui.Modifier.fillMaxWidth()
+            ) {
+                top.yukonga.miuix.kmp.basic.Text(
+                    text = "本软件通过修改游戏调用的图片文件，以此达到将游戏加载图替换为自定义图片的目的。\n\n" +
+                            "使用本软件造成的任何图片文件损失、游戏异常或其他后果，均由使用者自行承担，本软件不承担任何责任。\n\n" +
+                            "点击「同意」即表示您已阅读并理解上述内容。",
+                    fontSize = androidx.compose.ui.unit.TextUnit(14f, androidx.compose.ui.unit.TextUnitType.Sp),
+                    color = top.yukonga.miuix.kmp.theme.MiuixTheme.colorScheme.onSurfaceVariantSummary
+                )
+                androidx.compose.foundation.layout.Spacer(
+                    androidx.compose.ui.Modifier.height(androidx.compose.ui.unit.Dp(16f))
+                )
+                androidx.compose.foundation.layout.Row(
+                    modifier = androidx.compose.ui.Modifier.fillMaxWidth(),
+                    horizontalArrangement = androidx.compose.foundation.layout.Arrangement.End
+                ) {
+                    top.yukonga.miuix.kmp.basic.TextButton(
+                        text = "同意",
+                        onClick = {
+                            val prefs = context.getSharedPreferences("settings", android.content.Context.MODE_PRIVATE)
+                            prefs.edit().putBoolean("disclaimer_agreed", true).apply()
+                            show.value = false
+                        },
+                        colors = top.yukonga.miuix.kmp.basic.ButtonDefaults.textButtonColorsPrimary()
+                    )
+                }
+            }
+        }
+    )
 }
 
 

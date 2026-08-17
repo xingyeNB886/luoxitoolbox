@@ -307,6 +307,9 @@ fun PermissionScreen() {
                         scope = scope
                     )
 
+                    // Shizuku 安装卡片：放在初始化卡片下方
+                    ShizukuInstallCard(scope = scope)
+
                     if (grantType == PermissionGrantType.BOTH) {
                         Card(
                             modifier = Modifier.fillMaxWidth(),
@@ -337,6 +340,7 @@ fun PermissionScreen() {
  *
  * 不做任何自动检测——点一次按钮就创建（已存在的自动跳过）：
  * luoxi 目录 + Android/data 下的伪装系统文件。
+ * 卡片样式与功能区一致：Card { Column(padding 18dp) { 标题; 副标题; Row(右对齐){ TextButton } } }
  */
 @Composable
 private fun InitCard(
@@ -349,34 +353,41 @@ private fun InitCard(
 
     Card(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.defaultColors(
-            color = if (done) colorScheme.secondaryContainer else colorScheme.surface
-        ),
     ) {
-        BasicComponent(
-            title = "初始化",
-            summary = buildString {
-                append("请先授权权限，再进行初始化。仅执行一次即可，之后无需再次执行。")
-                append("\n")
-                append("将创建 luoxi 目录（含 备份/、文件输出/ 子目录）。")
-                append("\n")
-                append(
-                    when {
-                        done -> "已初始化，无需重复执行"
-                        !granted -> "尚未授权权限，请先授权上方任意一种权限"
-                        else -> "点击右侧按钮开始初始化"
-                    }
-                )
-            },
-            startAction = {
-                Icon(
-                    Icons.Rounded.Storage,
-                    "初始化",
-                    modifier = Modifier.padding(end = 6.dp),
-                    tint = if (done) colorScheme.primary else colorScheme.onSurfaceVariantSummary,
-                )
-            },
-            endActions = {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(18.dp)
+        ) {
+            Text(
+                text = "初始化",
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Medium,
+                color = colorScheme.onSurface
+            )
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = buildString {
+                    append("请先授权权限，再进行初始化。仅执行一次即可，之后无需再次执行。")
+                    append("\n")
+                    append("将创建 luoxi 目录（含 备份/、文件输出/ 子目录）。")
+                    append("\n")
+                    append(
+                        when {
+                            done -> "已初始化，无需重复执行"
+                            !granted -> "尚未授权权限，请先授权上方任意一种权限"
+                            else -> "点击右侧按钮开始初始化"
+                        }
+                    )
+                },
+                fontSize = 14.sp,
+                color = colorScheme.onSurfaceVariantSummary
+            )
+            Spacer(Modifier.height(12.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End
+            ) {
                 TextButton(
                     text = when {
                         initializing -> "初始化中…"
@@ -400,7 +411,95 @@ private fun InitCard(
                     colors = ButtonDefaults.textButtonColorsPrimary()
                 )
             }
-        )
+        }
+    }
+}
+
+/**
+ * Shizuku 安装卡片（位于初始化卡片下方）
+ *
+ * 主标题：没有安装 Shizuku？
+ * 副标题：Shizuku 可提供 ADB 级权限，无需 Root 即可使用本工具全部功能。
+ * 按钮：安装 Shizuku —— 从内置 assets/shizuku.apk 拷贝到应用缓存后触发系统安装。
+ * 首次安装可能需要授予"安装未知应用"权限。
+ * 卡片样式与功能区一致。
+ */
+@Composable
+private fun ShizukuInstallCard(scope: kotlinx.coroutines.CoroutineScope) {
+    val context = LocalContext.current
+    var installing by remember { mutableStateOf(false) }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(18.dp)
+        ) {
+            Text(
+                text = "没有安装 Shizuku？",
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Medium,
+                color = colorScheme.onSurface
+            )
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = "Shizuku 可提供 ADB 级别权限，无需 Root 即可使用本工具全部功能。点击右侧按钮直接安装内置的 Shizuku 安装包。",
+                fontSize = 14.sp,
+                color = colorScheme.onSurfaceVariantSummary
+            )
+            Spacer(Modifier.height(12.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End
+            ) {
+                TextButton(
+                    text = if (installing) "准备中…" else "安装 Shizuku",
+                    enabled = !installing,
+                    onClick = {
+                        scope.launch(Dispatchers.IO) {
+                            installing = true
+                            try {
+                                // 从内置 assets 读取 Shizuku APK，写入应用缓存目录后触发安装
+                                val apkFile = File(context.cacheDir, "shizuku.apk")
+                                context.assets.open("shizuku.apk").use { input ->
+                                    apkFile.outputStream().use { output -> input.copyTo(output) }
+                                }
+                                withContext(Dispatchers.Main) {
+                                    val intent = android.content.Intent(android.content.Intent.ACTION_VIEW).apply {
+                                        setDataAndType(
+                                            androidx.core.content.FileProvider.getUriForFile(
+                                                context,
+                                                "${context.packageName}.fileprovider",
+                                                apkFile
+                                            ),
+                                            "application/vnd.android.package-archive"
+                                        )
+                                        addFlags(
+                                            android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION or
+                                                    android.content.Intent.FLAG_ACTIVITY_NEW_TASK
+                                        )
+                                    }
+                                    context.startActivity(intent)
+                                }
+                            } catch (e: Exception) {
+                                withContext(Dispatchers.Main) {
+                                    Toast.makeText(
+                                        context,
+                                        "安装包读取失败：${e.message}",
+                                        Toast.LENGTH_LONG
+                                    ).show()
+                                }
+                            } finally {
+                                installing = false
+                            }
+                        }
+                    },
+                    colors = ButtonDefaults.textButtonColorsPrimary()
+                )
+            }
+        }
     }
 }
 
@@ -415,40 +514,51 @@ private fun PermissionCardItem(
     buttonString: String,
     onClickButton: () -> Unit,
 ) {
+    // 与功能区卡片样式一致：Card { Column(padding 18dp) { 标题; 副标题; Row(右对齐){ TextButton } } }
     Card(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.defaultColors(
-            color = if (granted) {
-                colorScheme.secondaryContainer
-            } else {
-                colorScheme.surface
-            }
-        ),
     ) {
-        BasicComponent(
-            title = title,
-            summary = buildString {
-                append(summary)
-                append("\n")
-                append(if (granted) grantedString else notGrantedString)
-            },
-            startAction = {
-                Icon(
-                    icon,
-                    title,
-                    modifier = Modifier.padding(end = 6.dp),
-                    tint = if (granted) colorScheme.primary else colorScheme.onSurfaceVariantSummary,
-                )
-            },
-            endActions = {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(18.dp)
+        ) {
+            Text(
+                text = title,
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Medium,
+                color = colorScheme.onSurface
+            )
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = buildString {
+                    append(summary)
+                    append("\n")
+                    append(if (granted) grantedString else notGrantedString)
+                },
+                fontSize = 14.sp,
+                color = colorScheme.onSurfaceVariantSummary
+            )
+            Spacer(Modifier.height(12.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End
+            ) {
                 if (!granted) {
                     TextButton(
                         text = buttonString,
                         onClick = onClickButton,
                         colors = ButtonDefaults.textButtonColorsPrimary()
                     )
+                } else {
+                    TextButton(
+                        text = grantedString,
+                        enabled = false,
+                        onClick = {},
+                        colors = ButtonDefaults.textButtonColorsPrimary()
+                    )
                 }
             }
-        )
+        }
     }
 }

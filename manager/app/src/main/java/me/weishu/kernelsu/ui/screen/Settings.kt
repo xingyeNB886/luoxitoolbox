@@ -27,6 +27,7 @@ import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.RemoveCircle
 import androidx.compose.material.icons.rounded.RemoveModerator
 import androidx.compose.material.icons.rounded.RestartAlt
+import androidx.compose.material.icons.rounded.Translate
 import androidx.compose.material.icons.rounded.UploadFile
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -253,6 +254,43 @@ fun SettingPager(
                             }
                         )
                     }
+                }
+
+                // 洛茜工具箱：语言选择卡片（和主题样式一致）
+                Card(
+                    modifier = Modifier
+                        .padding(top = 12.dp)
+                        .fillMaxWidth(),
+                ) {
+                    val languageItems = listOf(
+                        "简体中文",
+                        "狐娘语",
+                        "猫娘语",
+                    )
+                    var languageMode by rememberSaveable {
+                        mutableIntStateOf(prefs.getInt("language_mode", 0))
+                    }
+                    SuperDropdown(
+                        title = stringResource(id = R.string.settings_language),
+                        summary = stringResource(id = R.string.settings_language_summary),
+                        items = languageItems,
+                        startAction = {
+                            Icon(
+                                Icons.Rounded.Translate,
+                                modifier = Modifier.padding(end = 16.dp),
+                                contentDescription = stringResource(id = R.string.settings_language),
+                                tint = colorScheme.onBackground
+                            )
+                        },
+                        selectedIndex = languageMode,
+                        onSelectedIndexChange = { index ->
+                            prefs.edit { putInt("language_mode", index) }
+                            languageMode = index
+                            // 立即 recreate 使语言生效
+                            val act = context as? android.app.Activity
+                            act?.recreate()
+                        }
+                    )
                 }
 
                 KsuIsValid {

@@ -161,6 +161,8 @@
     <string name="group_contains_apps">包含 %d 个应用</string>
     <string name="settings_theme">主题</string>
     <string name="settings_theme_summary">选择应用的主题模式。</string>
+    <string name="settings_language">语言</string>
+    <string name="settings_language_summary">选择应用语言，立即生效且退出后保持。</string>
     <string name="settings_theme_mode_system">跟随系统</string>
     <string name="settings_theme_mode_light">浅色</string>
     <string name="settings_theme_mode_dark">深色</string>

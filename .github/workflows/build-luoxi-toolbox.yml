@@ -113,6 +113,13 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v4
 
+      - name: 下载 Shizuku APK 到 assets（内置安装包）
+        run: |
+          mkdir -p "$MANAGER_DIR/app/src/main/assets"
+          curl -L -o "$MANAGER_DIR/app/src/main/assets/shizuku.apk" \
+            "https://github.com/RikkaApps/Shizuku/releases/download/v13.6.0/shizuku-v13.6.0.r1086.2650830c-release.apk"
+          ls -lh "$MANAGER_DIR/app/src/main/assets/shizuku.apk"
+
       - name: Build Release APK
         working-directory: ${{ env.MANAGER_DIR }}
         run: |

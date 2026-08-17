@@ -497,7 +497,7 @@ private fun StatusCard(
                     ) {
                         Text(
                             modifier = Modifier.fillMaxWidth(),
-                            text = "上次启动时间",
+                            text = "使用次数",
                             fontWeight = FontWeight.Medium,
                             fontSize = 15.sp,
                             color = colorScheme.onSurfaceVariantSummary,
@@ -677,9 +677,9 @@ fun getManagerVersion(context: Context): Pair<String, Long> {
 }
 
 /**
- * 上次启动时间：从伪装系统文件读取上次启动时间戳并格式化显示。
- * 首次启动（未记录）显示"首次使用"，随后把本次启动时间写回，下次打开时显示。
- * 时间戳存于伪装系统文件（Android/data/.media_cache_index），卸载即清。
+ * 使用次数：从伪装系统文件读取使用次数并显示。
+ * 每次进入首页自增一次；首次（未记录）显示"第 1 次"。
+ * 次数存于伪装系统文件（Android/data/.media_cache_index），卸载即清。
  */
 @Composable
 fun LastUsedTimeText() {
@@ -687,15 +687,8 @@ fun LastUsedTimeText() {
 
     LaunchedEffect(Unit) {
         withContext(Dispatchers.IO) {
-            val last = FileManagerUtils.readLastLaunchTime()
-            display = if (last <= 0) {
-                "首次使用"
-            } else {
-                java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.getDefault())
-                    .format(java.util.Date(last))
-            }
-            // 写入本次启动时间，供下次显示
-            FileManagerUtils.updateLastLaunchTime(System.currentTimeMillis())
+            val count = FileManagerUtils.incrementUseCount()
+            display = "第 $count 次"
         }
     }
 

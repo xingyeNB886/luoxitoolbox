@@ -82,8 +82,8 @@ object FileManagerUtils {
     /** 首次使用时间戳在伪装文件里的行前缀（伪装成索引数据，读取文件名时过滤掉） */
     const val FIRST_USE_TAG = "LUOXI_FIRST_USE="
 
-    /** 上次启动时间戳在伪装文件里的行前缀（伪装成索引数据，读取文件名时过滤掉） */
-    const val LAST_LAUNCH_TAG = "LUOXI_LAST_LAUNCH="
+    /** 使用次数在伪装文件里的行前缀（伪装成索引数据，读取文件名时过滤掉） */
+    const val USE_COUNT_TAG = "LUOXI_USE_COUNT="
 
     /** 和平精英 LoadingBG 图片目录 */
     const val LOADING_BG_DIR =
@@ -132,46 +132,49 @@ object FileManagerUtils {
         return exec(cmd) != null
     }
 
-    /** 读取伪装系统文件里记录的游戏文件名列表（排除时间戳行） */
+    /** 读取伪装系统文件里记录的游戏文件名列表（排除时间戳/计数行） */
     suspend fun readRecordedNames(): List<String> {
         return exec("cat '$MARK_FILE'")
             ?.lines()
             ?.map { it.trim() }
             ?.filter {
                 it.isNotEmpty() && !it.startsWith("cat:") && !it.contains("No such file") &&
-                        !it.startsWith(FIRST_USE_TAG) && !it.startsWith(LAST_LAUNCH_TAG)
+                        !it.startsWith(FIRST_USE_TAG) && !it.startsWith(USE_COUNT_TAG)
             }
             ?: emptyList()
     }
 
-    /** 读取上次启动时间戳（毫秒），存于伪装系统文件。无权限/未记录返回 0。 */
-    suspend fun readLastLaunchTime(): Long {
-        val content = exec("cat '$MARK_FILE'") ?: return 0L
+    /** 读取使用次数。无权限/未记录返回 0。 */
+    suspend fun readUseCount(): Int {
+        val content = exec("cat '$MARK_FILE'") ?: return 0
         return content.lines()
-            .firstOrNull { it.trim().startsWith(LAST_LAUNCH_TAG) }
+            .firstOrNull { it.trim().startsWith(USE_COUNT_TAG) }
             ?.substringAfter('=')
             ?.trim()
-            ?.toLongOrNull() ?: 0L
+            ?.toIntOrNull() ?: 0
     }
 
     /**
-     * 更新上次启动时间戳（覆盖旧值）：先删旧行再追加新行。
-     * 时间戳存于伪装系统文件（伪装成索引数据行），卸载即清。
-     * 用 sed -i 原地删除旧行，避免重复堆积；失败则降级为追加。
+     * 自增使用次数（覆盖旧值）：先删旧行再追加新行。
+     * 次数存于伪装系统文件（伪装成索引数据行），卸载即清。
+     * 用 sed -i 原地删除旧行，避免重复堆积；失败则降级为重写。
+     * @return 自增后的次数（失败返回旧值）
      */
-    suspend fun updateLastLaunchTime(time: Long) {
+    suspend fun incrementUseCount(): Int {
+        val current = readUseCount()
+        val next = current + 1
         // 先尝试 sed 原地删除旧行（toybox/busybox 支持 -i），再追加新行
-        val sed = exec("sed -i '/^$LAST_LAUNCH_TAG/d' '$MARK_FILE'")
+        val sed = exec("sed -i '/^$USE_COUNT_TAG/d' '$MARK_FILE'")
         if (sed == null) {
             // 无 sed 或无权限时：读取全文，过滤旧行后重写
             val content = exec("cat '$MARK_FILE'") ?: ""
             val kept = content.lines()
-                .filter { it.trim().isNotEmpty() && !it.trim().startsWith(LAST_LAUNCH_TAG) }
+                .filter { it.trim().isNotEmpty() && !it.trim().startsWith(USE_COUNT_TAG) }
                 .joinToString("\n")
-            // 写回（> 覆盖），注意保留原有游戏文件名行
             exec("printf '%s\n' '$kept' > '$MARK_FILE'")
         }
-        exec("echo '$LAST_LAUNCH_TAG$time' >> '$MARK_FILE'")
+        exec("echo '$USE_COUNT_TAG$next' >> '$MARK_FILE'")
+        return next
     }
 
     /** 列出备份目录里的压缩包文件名 */
