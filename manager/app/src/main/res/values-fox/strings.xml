@@ -1,15 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
   洛茜工具箱 · 狐娘语（fox）字符串资源
-  狐娘语：温柔爱撒娇的狐娘口吻，自称"奴家"，常以"嗷~"结尾，语句独立重新措辞。
+  狐娘「奴家」：温柔爱撒娇的狐娘，自称"奴家"，称呼用户"主人"。
+  句尾自然交替使用 嗷~、呢、哦、啦、呐，不机械重复。
 -->
 <resources>
     <string name="home">奴家的窝嗷~</string>
     <string name="home_not_installed">还没装好呢嗷~</string>
     <string name="home_click_to_install">点一下就能装啦嗷~</string>
-    <string name="home_working">奴家正在努力工作中嗷~</string>
+    <string name="home_working">奴家正在努力工作中呢嗷~</string>
     <string name="home_working_version">现在的版本是 %d 嗷~</string>
-    <string name="home_unsupported">这台机器奴家不认得呢嗷~</string>
+    <string name="home_unsupported">这台机器奴家不认得呢…</string>
     <string name="home_unsupported_reason">KernelSU 只认得 GKI 内核，不过可以给 GKI 设备打补丁嗷~</string>
     <string name="home_kernel">内核版本嗷~</string>
     <string name="home_manager_version">工具箱版本嗷~</string>
@@ -18,15 +19,14 @@
     <string name="selinux_status_disabled">被关掉啦嗷~</string>
     <string name="selinux_status_enforcing">严格执行中嗷~</string>
     <string name="selinux_status_permissive">宽容模式嗷~</string>
-    <string name="selinux_status_unknown">奴家也不知道嗷~</string>
+    <string name="selinux_status_unknown">奴家也不知道呢…</string>
     <string name="superuser">超级用户嗷~</string>
     <string name="file_manager">文件管理嗷~</string>
     <string name="file_count">有多少个文件呢嗷~</string>
     <string name="function">功能嗷~</string>
-    <string name="open_count">奴家打开了几次嗷~</string>
+    <string name="open_count">主人打开奴家几次啦？</string>
     <string name="device_info">这台机器的信息嗷~</string>
     <string name="android_version">安卓的版本嗷~</string>
-    <string name="last_used_time">奴家陪了你几次嗷~</string>
     <string name="screen_resolution">屏幕分辨率嗷~</string>
     <string name="uninstall">卸载掉它嗷~</string>
     <string name="module_install">安装嗷~</string>
@@ -53,7 +53,7 @@
     <string name="home_learn_kernelsu">以前的版本嗷~</string>
     <string name="home_click_to_learn_kernelsu">看看以前长啥样嗷~</string>
     <string name="home_support_title">公告嗷~</string>
-    <string name="home_support_content">奴家正在打听消息…嗷~</string>
+    <string name="home_support_content">奴家正在打听消息呢…</string>
     <string name="home_gki_warning">v3.0.0 之后 GKI 只拿来测试啦，奴家不建议平时用嗷~</string>
     <string name="settings_umount_modules_default">默认要不要卸载模块嗷~</string>
     <string name="module_update">更新嗷~</string>
@@ -65,7 +65,7 @@
     <string name="restart_app">重新打开嗷~</string>
     <string name="module_changelog">更新日志嗷~</string>
     <string name="settings_profile_template">App Profile 模版嗷~</string>
-    <string name="settings_profile_template_summary">奴家帮你管本地和在线的模版嗷~</string>
+    <string name="settings_profile_template_summary">奴家帮主人管本地和在线的模版嗷~</string>
     <string name="app_profile_template_create">捏一个新的模版嗷~</string>
     <string name="app_profile_template_edit">改改模版嗷~</string>
     <string name="app_profile_template_name">叫它什么名字嗷~</string>
@@ -109,7 +109,7 @@
     <string name="permission_refresh_button">刷新看看嗷~</string>
     <string name="permission_grant_type_both">两个都给奴家啦嗷~</string>
     <string name="settings_module_check_update">要不要看看模块更新嗷~</string>
-    <string name="settings_check_update_summary">开了之后奴家会帮你盯着有没有新版本嗷~</string>
+    <string name="settings_check_update_summary">开了之后奴家会帮主人盯着有没有新版本嗷~</string>
     <string name="settings_sucompat">SU 兼容嗷~</string>
     <string name="settings_sucompat_summary">给奴家 Shell 权限嗷~</string>
     <string name="settings_kernel_umount">内核卸载嗷~</string>
@@ -129,26 +129,26 @@
 
     <!-- 洛茜工具箱：免责声明、备份还原、图片裁剪、文件输出等功能（狐娘语） -->
     <string name="disclaimer_title">免责声明嗷~</string>
-    <string name="disclaimer_content">奴家呢，是靠着修改游戏里的图片文件，好把加载图变成主人喜欢的样子嗷~\n\n但要是用了之后图片丢了、游戏坏掉了，或者出了别的什么岔子，都得主人自己担着嗷，奴家可不管的嗷~\n\n点一下「奴家同意了的嗷~」就是看懂了上面的话啦嗷~</string>
-    <string name="disclaimer_agree">奴家同意了的嗷~</string>
+    <string name="disclaimer_content">奴家呢，是靠着修改游戏里的图片文件，好把加载图变成主人喜欢的样子嗷~\n\n但要是用了之后图片丢了、游戏坏掉了，或者出了别的什么岔子，都得主人自己担着嗷，奴家可不管的嗷~\n\n点一下「奴家同意啦」就是看懂了上面的话嗷~</string>
+    <string name="disclaimer_agree">奴家同意啦嗷~</string>
     <string name="permission_shizuku_install_title">没有装 Shizuku 嗷？</string>
     <string name="permission_shizuku_install_summary">用 Shizuku 拿 Shell 权限，不用 Root 也能管文件嗷~</string>
     <string name="install_shizuku">装 Shizuku 嗷~</string>
-    <string name="preparing">奴家在准备中嗷~</string>
+    <string name="preparing">奴家在准备呢…</string>
     <string name="backup_title">备份嗷~</string>
     <string name="backup_summary">把游戏目录里的加载图打包到 luoxi/备份/，不动游戏目录嗷~</string>
     <string name="backup_button">备份嗷~</string>
     <string name="backup_dialog_title">真的要备份吗嗷~</string>
     <string name="backup_dialog_content">备份会把游戏目录里现在的加载图打成 zip，存到 luoxi/备份/，不会动游戏目录嗷~</string>
-    <string name="cancel">奴家不要了嗷~</string>
-    <string name="got_it">奴家知道啦嗷~</string>
+    <string name="cancel">不要了嗷~</string>
+    <string name="got_it">知道啦嗷~</string>
     <string name="restore_title">还原备份嗷~</string>
     <string name="restore_summary">从备份压缩包把游戏目录的加载图还原回来嗷~</string>
     <string name="restore_button">还原嗷~</string>
     <string name="restore_custom_file">奴家自己选文件嗷~</string>
     <string name="restore_custom_file_hint">点一下从文件管理器选 zip 压缩包嗷~</string>
     <string name="restore_backup_dir">备份目录（luoxi/备份/）嗷~</string>
-    <string name="restore_no_backup">还没有备份呢嗷~</string>
+    <string name="restore_no_backup">还没有备份呢…</string>
     <string name="restore_dialog_title">真的要还原吗嗷~</string>
     <string name="restore_dialog_content">备份文件：%s\n还原会把游戏目录里的文件删掉，再用备份替换嗷~</string>
     <string name="restore_done_title">还原好啦嗷~</string>
@@ -163,7 +163,7 @@
     <string name="replace_game_files_title">替换游戏文件嗷~</string>
     <string name="replace_game_files_summary">把游戏目录里的加载图删掉，换成奴家做好的文件嗷~</string>
     <string name="replace_files_button">替换文件嗷~</string>
-    <string name="replace_confirm_content">替换会先清空游戏目录里的加载图。选"备份"的话奴家会先把原文件打包存到 luoxi/备份/ 再替换嗷~</string>
+    <string name="replace_confirm_content">替换会先清空游戏目录里的加载图。选「备份」的话奴家会先把原文件打包存到 luoxi/备份/ 再替换嗷~</string>
     <string name="replace_no_backup">奴家不备份了嗷~</string>
     <string name="file_output_done">文件已经做好存到 luoxi/文件输出/ 啦嗷~</string>
     <string name="crash_report_title">洛茜工具箱 · 崩掉啦嗷~</string>
@@ -173,14 +173,14 @@
     <string name="init_status_done">已经初始化好了，不用再弄嗷~</string>
     <string name="init_status_no_grant">还没有给奴家权限呢，先在上面挑一个给奴家嗷~</string>
     <string name="init_status_ready">点右边按钮就能开始初始化嗷~</string>
-    <string name="init_button_initializing">奴家在初始化嗷…</string>
+    <string name="init_button_initializing">奴家在初始化呢…</string>
     <string name="init_button_done">搞定啦嗷~</string>
     <string name="init_button">初始化嗷~</string>
     <string name="init_success">初始化成功啦嗷~</string>
-    <string name="init_failed">初始化失败了嗷，看看权限给了没嗷~</string>
-    <string name="shizuku_permission_tip">打开 Shizuku → 找到「洛茜工具箱」→ 打开授权；授权完奴家会自己检测（最多等 2 分钟）嗷~</string>
+    <string name="init_failed">初始化失败了嗷…看看权限给了没？</string>
+    <string name="shizuku_permission_tip">打开 Shizuku → 找到「洛茜工具箱」→ 打开授权；授权完奴家会自己检测哦（最多等 2 分钟）嗷~</string>
     <string name="apk_read_error">安装包读不出来嗷：%s</string>
-    <string name="open_count_value">第 %d 次嗷~</string>
+    <string name="open_count_value">%d 次嗷~</string>
     <string name="about_join_channel"><![CDATA[奴家的 Telegram 频道在这里嗷~ %1$s]]></string>
     <string name="about_source_code"><![CDATA[在 %1$s 看源码嗷~<br/>奴家的 %2$s 频道<br/>奴家的 <b><a href="https://pd.qq.com/s/8lipl1brp">QQ</a></b> 频道嗷~]]></string>
     <string name="about_qq_group_1">加奴家的 QQ 群嗷~ (1)</string>
