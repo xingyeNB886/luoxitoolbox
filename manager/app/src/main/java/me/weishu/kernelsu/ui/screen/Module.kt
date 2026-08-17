@@ -134,14 +134,14 @@ private fun BackupCard() {
                 .padding(18.dp)
         ) {
             Text(
-                text = "备份",
+                text = stringResource(R.string.backup_title),
                 fontSize = 18.sp,
                 fontWeight = FontWeight.Medium,
                 color = colorScheme.onSurface
             )
             Spacer(Modifier.height(8.dp))
             Text(
-                text = "将游戏目录内的加载图文件打包备份到 luoxi/备份/，不改动游戏目录",
+                text = stringResource(R.string.backup_summary),
                 fontSize = 14.sp,
                 color = colorScheme.onSurfaceVariantSummary
             )
@@ -151,7 +151,7 @@ private fun BackupCard() {
                 horizontalArrangement = Arrangement.End
             ) {
                 TextButton(
-                    text = "备份",
+                    text = stringResource(R.string.backup_button),
                     enabled = !running,
                     onClick = { confirmShow.value = true },
                     colors = ButtonDefaults.textButtonColorsPrimary()
@@ -168,7 +168,7 @@ private fun BackupCard() {
         content = {
             Column(Modifier.fillMaxWidth()) {
                 Text(
-                    text = "备份会将游戏目录内当前的加载图文件打包为 zip，保存到 luoxi/备份/，不会改动游戏目录。",
+                    text = stringResource(R.string.backup_dialog_content),
                     fontSize = 14.sp,
                     color = colorScheme.onSurfaceVariantSummary
                 )
@@ -178,13 +178,13 @@ private fun BackupCard() {
                     horizontalArrangement = Arrangement.End
                 ) {
                     TextButton(
-                        text = "取消",
+                        text = stringResource(R.string.cancel),
                         enabled = !running,
                         onClick = { confirmShow.value = false }
                     )
                     Spacer(Modifier.padding(horizontal = 4.dp))
                     TextButton(
-                        text = "确定",
+                        text = stringResource(R.string.confirm),
                         enabled = !running,
                         onClick = {
                             confirmShow.value = false
@@ -238,7 +238,7 @@ private fun BackupCard() {
                         horizontalArrangement = Arrangement.End
                     ) {
                         TextButton(
-                            text = "知道了",
+                            text = stringResource(R.string.got_it),
                             onClick = {
                                 progressShow.value = false
                                 stepText = ""
@@ -304,14 +304,14 @@ private fun RestoreBackupCard() {
                 .padding(18.dp)
         ) {
             Text(
-                text = "还原备份",
+                text = stringResource(R.string.restore_title),
                 fontSize = 18.sp,
                 fontWeight = FontWeight.Medium,
                 color = colorScheme.onSurface
             )
             Spacer(Modifier.height(8.dp))
             Text(
-                text = "从备份压缩包还原游戏目录的加载图文件",
+                text = stringResource(R.string.restore_summary),
                 fontSize = 14.sp,
                 color = colorScheme.onSurfaceVariantSummary
             )
@@ -321,7 +321,7 @@ private fun RestoreBackupCard() {
                 horizontalArrangement = Arrangement.End
             ) {
                 TextButton(
-                    text = "还原",
+                    text = stringResource(R.string.restore_button),
                     enabled = !running,
                     onClick = {
                         pickShow.value = true
@@ -344,7 +344,7 @@ private fun RestoreBackupCard() {
             Column(Modifier.fillMaxWidth()) {
                 // 上板块：自定义文件
                 Text(
-                    text = "选择自定义文件",
+                    text = stringResource(R.string.restore_custom_file),
                     fontSize = 13.sp,
                     color = colorScheme.onSurfaceVariantSummary
                 )
@@ -357,7 +357,7 @@ private fun RestoreBackupCard() {
                         }
                 ) {
                     Text(
-                        text = "点击从文件管理器选择 zip 压缩包",
+                        text = stringResource(R.string.restore_custom_file_hint),
                         fontSize = 15.sp,
                         color = colorScheme.onSurface,
                         modifier = Modifier.padding(14.dp)
@@ -366,7 +366,7 @@ private fun RestoreBackupCard() {
 
                 Spacer(Modifier.height(14.dp))
                 Text(
-                    text = "备份目录（luoxi/备份/）",
+                    text = stringResource(R.string.restore_backup_dir),
                     fontSize = 13.sp,
                     color = colorScheme.onSurfaceVariantSummary
                 )
@@ -376,7 +376,7 @@ private fun RestoreBackupCard() {
                 if (backups.isEmpty()) {
                     Card(modifier = Modifier.fillMaxWidth()) {
                         Text(
-                            text = "暂无备份",
+                            text = stringResource(R.string.restore_no_backup),
                             fontSize = 15.sp,
                             color = colorScheme.onSurfaceVariantSummary,
                             modifier = Modifier.padding(14.dp)
@@ -424,7 +424,7 @@ private fun RestoreBackupCard() {
         content = {
             Column(Modifier.fillMaxWidth()) {
                 Text(
-                    text = "备份文件：$pendingName\n还原将删除游戏目录内当前文件，并解压备份文件替换。",
+                    text = stringResource(R.string.restore_dialog_content, pendingName),
                     fontSize = 14.sp,
                     color = colorScheme.onSurfaceVariantSummary
                 )
@@ -434,13 +434,13 @@ private fun RestoreBackupCard() {
                     horizontalArrangement = Arrangement.End
                 ) {
                     TextButton(
-                        text = "取消",
+                        text = stringResource(R.string.cancel),
                         enabled = !running,
                         onClick = { confirmShow.value = false }
                     )
                     Spacer(Modifier.padding(horizontal = 4.dp))
                     TextButton(
-                        text = "确定",
+                        text = stringResource(R.string.confirm),
                         enabled = !running,
                         onClick = {
                             val type = pendingType ?: return@TextButton
@@ -448,7 +448,7 @@ private fun RestoreBackupCard() {
                             confirmShow.value = false
                             progressShow.value = true
                             running = true
-                            stepText = "准备中…"
+                            stepText = context.getString(R.string.preparing)
                             doneTitle = "正在还原"
                             scope.launch {
                                 val ok = when (type) {
@@ -461,11 +461,11 @@ private fun RestoreBackupCard() {
                                     else -> false
                                 }
                                 running = false
-                                doneTitle = if (ok) "还原已完成" else "还原失败"
-                                stepText = if (ok) "还原完成" else "还原失败，请检查权限/备份文件"
+                                doneTitle = if (ok) context.getString(R.string.restore_done_title) else "还原失败"
+                                stepText = if (ok) context.getString(R.string.restore_done_title) else "还原失败，请检查权限/备份文件"
                                 android.widget.Toast.makeText(
                                     context,
-                                    if (ok) "还原完成" else "还原失败，请检查权限/备份文件",
+                                    if (ok) context.getString(R.string.restore_done_title) else "还原失败，请检查权限/备份文件",
                                     android.widget.Toast.LENGTH_SHORT
                                 ).show()
                             }
@@ -496,7 +496,7 @@ private fun RestoreBackupCard() {
                         horizontalArrangement = Arrangement.End
                     ) {
                         TextButton(
-                            text = "知道了",
+                            text = stringResource(R.string.got_it),
                             onClick = {
                                 progressShow.value = false
                                 stepText = ""

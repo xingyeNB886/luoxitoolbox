@@ -275,16 +275,14 @@ private fun DisclaimerDialog(show: androidx.compose.runtime.MutableState<Boolean
     val context = LocalContext.current
     top.yukonga.miuix.kmp.extra.SuperDialog(
         show = show,
-        title = "免责声明",
+        title = stringResource(R.string.disclaimer_title),
         onDismissRequest = { /* 未同意不可关闭，拦截返回 */ },
         content = {
             Column(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 top.yukonga.miuix.kmp.basic.Text(
-                    text = "本软件通过修改游戏调用的图片文件，以此达到将游戏加载图替换为自定义图片的目的。\n\n" +
-                            "使用本软件造成的任何图片文件损失、游戏异常或其他后果，均由使用者自行承担，本软件不承担任何责任。\n\n" +
-                            "点击「同意」即表示您已阅读并理解上述内容。",
+                    text = stringResource(R.string.disclaimer_content),
                     fontSize = androidx.compose.ui.unit.TextUnit(14f, androidx.compose.ui.unit.TextUnitType.Sp),
                     color = top.yukonga.miuix.kmp.theme.MiuixTheme.colorScheme.onSurfaceVariantSummary
                 )
@@ -294,7 +292,7 @@ private fun DisclaimerDialog(show: androidx.compose.runtime.MutableState<Boolean
                     horizontalArrangement = Arrangement.End
                 ) {
                     top.yukonga.miuix.kmp.basic.TextButton(
-                        text = "同意",
+                        text = stringResource(R.string.disclaimer_agree),
                         onClick = {
                             val prefs = context.getSharedPreferences("settings", android.content.Context.MODE_PRIVATE)
                             prefs.edit().putBoolean("disclaimer_agreed", true).apply()

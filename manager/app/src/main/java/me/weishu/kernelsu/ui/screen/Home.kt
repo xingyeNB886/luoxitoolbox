@@ -206,11 +206,15 @@ fun ForceUpdateDialog(
     val localVerStr = BuildConfig.VERSION_NAME
     val cloudVerStr = "${cloudVersion / 1000000}.${(cloudVersion % 1000000) / 1000}.${cloudVersion % 1000}"
 
-    val title = if (signatureInvalid) "安全警告" else "发现新版本"
-    val message = if (signatureInvalid) {
-        "检测到应用签名异常，可能存在安全风险，请更新到官方版本后使用。"
+    val title = if (signatureInvalid) {
+        stringResource(R.string.force_update_signature_title)
     } else {
-        "检测到新版本，请更新后使用。"
+        stringResource(R.string.force_update_title)
+    }
+    val message = if (signatureInvalid) {
+        stringResource(R.string.force_update_signature_msg)
+    } else {
+        stringResource(R.string.force_update_version_msg)
     }
 
     SuperDialog(
@@ -222,13 +226,13 @@ fun ForceUpdateDialog(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text(
-                    text = "当前版本：$localVerStr",
+                    text = stringResource(R.string.force_update_current_version, localVerStr),
                     fontSize = 14.sp,
                     color = colorScheme.onSurfaceVariantSummary
                 )
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    text = "最新版本：$cloudVerStr",
+                    text = stringResource(R.string.force_update_latest_version, cloudVerStr),
                     fontSize = 14.sp,
                     color = colorScheme.onSurfaceVariantSummary
                 )
@@ -246,7 +250,7 @@ fun ForceUpdateDialog(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     TextButton(
-                        text = "退出",
+                        text = stringResource(R.string.force_update_exit),
                         onClick = {
                             // 退出应用
                             context.packageManager.getLaunchIntentForPackage(context.packageName)?.let {
@@ -258,7 +262,7 @@ fun ForceUpdateDialog(
                     )
                     Spacer(Modifier.width(12.dp))
                     TextButton(
-                        text = "更新",
+                        text = stringResource(R.string.force_update_update),
                         onClick = {
                             try {
                                 val intent = Intent(Intent.ACTION_VIEW, Uri.parse(downloadUrl))
@@ -497,7 +501,7 @@ private fun StatusCard(
                     ) {
                         Text(
                             modifier = Modifier.fillMaxWidth(),
-                            text = "使用次数",
+                            text = stringResource(R.string.open_count),
                             fontWeight = FontWeight.Medium,
                             fontSize = 15.sp,
                             color = colorScheme.onSurfaceVariantSummary,
@@ -616,12 +620,12 @@ private fun InfoCard() {
         ) {
             // 设备信息（新增，位于安卓版本上方）
             InfoText(
-                title = "设备信息",
+                title = stringResource(R.string.device_info),
                 content = deviceInfo
             )
             // 安卓版本（原「内核版本」改为真实安卓版本）
             InfoText(
-                title = "安卓版本",
+                title = stringResource(R.string.android_version),
                 content = androidVersion
             )
             InfoText(

@@ -217,14 +217,14 @@ private fun ImagePickerCard(
                 .padding(18.dp)
         ) {
             Text(
-                text = "选择图片",
+                text = stringResource(R.string.select_image),
                 fontSize = 18.sp,
                 fontWeight = FontWeight.Medium,
                 color = colorScheme.onSurface
             )
             Spacer(Modifier.height(8.dp))
             Text(
-                text = "点击图片进行裁剪，裁剪结果会替换原图并保存到 luoxi/裁剪/",
+                text = stringResource(R.string.select_image_summary),
                 fontSize = 14.sp,
                 color = colorScheme.onSurfaceVariantSummary
             )
@@ -234,7 +234,7 @@ private fun ImagePickerCard(
                 horizontalArrangement = Arrangement.End
             ) {
                 TextButton(
-                    text = "选择图片",
+                    text = stringResource(R.string.select_image_button),
                     onClick = {
                         launcher.launch(
                             androidx.activity.result.PickVisualMediaRequest(
@@ -358,7 +358,7 @@ private fun CropDialog(
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
-                    text = "虚线裁剪框比例为本机分辨率 ${screen.longSide}×${screen.shortSide}（横屏），始终限制在图片内；按住框内拖动移动，按住四角缩放",
+                    text = stringResource(R.string.crop_guide, "${screen.longSide}×${screen.shortSide}"),
                     fontSize = 12.sp,
                     color = colorScheme.onSurfaceVariantSummary,
                     textAlign = TextAlign.Center
@@ -499,19 +499,19 @@ private fun CropDialog(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "确定后裁剪结果替换原图，并保存到 luoxi/裁剪/",
+                        text = stringResource(R.string.crop_confirm_content),
                         fontSize = 11.sp,
                         color = colorScheme.onSurfaceVariantSummary,
                         modifier = Modifier.weight(1f)
                     )
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         TextButton(
-                            text = "取消",
+                            text = stringResource(R.string.cancel),
                             enabled = !saving,
                             onClick = { show.value = false; onDismiss() }
                         )
                         TextButton(
-                            text = "确定",
+                            text = stringResource(R.string.confirm),
                             enabled = !saving && box != null,
                             onClick = {
                                 val b = box ?: return@TextButton
@@ -568,14 +568,14 @@ private fun MakeFilesCard(images: List<SelectedImage>) {
                 .padding(18.dp)
         ) {
             Text(
-                text = "制作成文件",
+                text = stringResource(R.string.file_output_title),
                 fontSize = 18.sp,
                 fontWeight = FontWeight.Medium,
                 color = colorScheme.onSurface
             )
             Spacer(Modifier.height(8.dp))
             Text(
-                text = "按记录的游戏文件数复制所选图片并逐个命名，保存到 luoxi/文件输出/",
+                text = stringResource(R.string.file_output_summary),
                 fontSize = 14.sp,
                 color = colorScheme.onSurfaceVariantSummary
             )
@@ -647,7 +647,7 @@ private fun MakeFilesCard(images: List<SelectedImage>) {
                         horizontalArrangement = Arrangement.End
                     ) {
                         TextButton(
-                            text = "知道了",
+                            text = stringResource(R.string.got_it),
                             onClick = { stepShow.value = false },
                             colors = ButtonDefaults.textButtonColorsPrimary()
                         )
@@ -729,14 +729,14 @@ private fun ReplaceFilesCard() {
                 .padding(18.dp)
         ) {
             Text(
-                text = "替换游戏文件",
+                text = stringResource(R.string.replace_game_files_title),
                 fontSize = 18.sp,
                 fontWeight = FontWeight.Medium,
                 color = colorScheme.onSurface
             )
             Spacer(Modifier.height(8.dp))
             Text(
-                text = "将删除游戏目录内的文件，替换为制作好的文件",
+                text = stringResource(R.string.replace_game_files_summary),
                 fontSize = 14.sp,
                 color = colorScheme.onSurfaceVariantSummary
             )
@@ -746,7 +746,7 @@ private fun ReplaceFilesCard() {
                 horizontalArrangement = Arrangement.End
             ) {
                 TextButton(
-                    text = "替换文件",
+                    text = stringResource(R.string.replace_files_button),
                     enabled = !running,
                     onClick = { confirmShow.value = true },
                     colors = ButtonDefaults.textButtonColorsPrimary()
@@ -762,7 +762,7 @@ private fun ReplaceFilesCard() {
         content = {
             Column(Modifier.fillMaxWidth()) {
                 Text(
-                    text = "替换会先清空游戏目录内的加载图文件。选择\"备份\"会把原文件打包保存到 luoxi/备份/ 后再替换。",
+                    text = stringResource(R.string.replace_confirm_content),
                     fontSize = 14.sp,
                     color = colorScheme.onSurfaceVariantSummary
                 )
@@ -772,10 +772,10 @@ private fun ReplaceFilesCard() {
                     horizontalArrangement = Arrangement.End,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    TextButton(text = "取消", onClick = { confirmShow.value = false })
+                    TextButton(text = stringResource(R.string.cancel), onClick = { confirmShow.value = false })
                     Spacer(Modifier.padding(horizontal = 3.dp))
                     TextButton(
-                        text = "不备份",
+                        text = stringResource(R.string.replace_no_backup),
                         enabled = !running,
                         onClick = {
                             confirmShow.value = false
@@ -786,7 +786,7 @@ private fun ReplaceFilesCard() {
                     )
                     Spacer(Modifier.padding(horizontal = 3.dp))
                     TextButton(
-                        text = "备份",
+                        text = stringResource(R.string.backup_button),
                         enabled = !running,
                         onClick = {
                             confirmShow.value = false
@@ -819,7 +819,7 @@ private fun ReplaceFilesCard() {
                         horizontalArrangement = Arrangement.End
                     ) {
                         TextButton(
-                            text = "知道了",
+                            text = stringResource(R.string.got_it),
                             onClick = {
                                 progressShow.value = false
                                 stepText = ""

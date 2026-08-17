@@ -280,7 +280,7 @@ fun PermissionScreen() {
                                 withContext(Dispatchers.Main) {
                                     Toast.makeText(
                                         context,
-                                        "请打开 Shizuku → 找到「洛茜工具箱」→ 开启授权；授权后本页会自动检测（最多 2 分钟）",
+                                        context.getString(R.string.shizuku_permission_tip),
                                         Toast.LENGTH_LONG
                                     ).show()
                                 }
@@ -362,7 +362,7 @@ private fun InitCard(
                 .padding(18.dp)
         ) {
             Text(
-                text = "初始化",
+                text = stringResource(R.string.init_title),
                 fontSize = 18.sp,
                 fontWeight = FontWeight.Medium,
                 color = colorScheme.onSurface
@@ -370,15 +370,13 @@ private fun InitCard(
             Spacer(Modifier.height(8.dp))
             Text(
                 text = buildString {
-                    append("请先授权权限，再进行初始化。仅执行一次即可，之后无需再次执行。")
-                    append("\n")
-                    append("将创建 luoxi 目录（含 备份/、文件输出/ 子目录）。")
+                    append(stringResource(R.string.init_summary_prefix))
                     append("\n")
                     append(
                         when {
-                            done -> "已初始化，无需重复执行"
-                            !granted -> "尚未授权权限，请先授权上方任意一种权限"
-                            else -> "点击右侧按钮开始初始化"
+                            done -> stringResource(R.string.init_status_done)
+                            !granted -> stringResource(R.string.init_status_no_grant)
+                            else -> stringResource(R.string.init_status_ready)
                         }
                     )
                 },
@@ -392,9 +390,9 @@ private fun InitCard(
             ) {
                 TextButton(
                     text = when {
-                        initializing -> "初始化中…"
-                        done -> "已完成"
-                        else -> "初始化"
+                        initializing -> stringResource(R.string.init_button_initializing)
+                        done -> stringResource(R.string.init_button_done)
+                        else -> stringResource(R.string.init_button)
                     },
                     enabled = granted && !initializing && !done,
                     onClick = {
@@ -405,7 +403,7 @@ private fun InitCard(
                             done = ok
                             Toast.makeText(
                                 context,
-                                if (ok) "初始化完成" else "初始化失败，请检查权限",
+                                if (ok) context.getString(R.string.init_success) else context.getString(R.string.init_failed),
                                 Toast.LENGTH_SHORT
                             ).show()
                         }
@@ -440,14 +438,14 @@ private fun ShizukuInstallCard(scope: kotlinx.coroutines.CoroutineScope) {
                 .padding(18.dp)
         ) {
             Text(
-                text = "没有安装 Shizuku？",
+                text = stringResource(R.string.permission_shizuku_install_title),
                 fontSize = 18.sp,
                 fontWeight = FontWeight.Medium,
                 color = colorScheme.onSurface
             )
             Spacer(Modifier.height(8.dp))
             Text(
-                text = "Shizuku 可提供 ADB 级别权限，无需 Root 即可使用本工具全部功能。点击右侧按钮直接安装内置的 Shizuku 安装包。",
+                text = stringResource(R.string.permission_shizuku_install_summary),
                 fontSize = 14.sp,
                 color = colorScheme.onSurfaceVariantSummary
             )
@@ -457,7 +455,7 @@ private fun ShizukuInstallCard(scope: kotlinx.coroutines.CoroutineScope) {
                 horizontalArrangement = Arrangement.End
             ) {
                 TextButton(
-                    text = if (installing) "准备中…" else "安装 Shizuku",
+                    text = if (installing) stringResource(R.string.preparing) else stringResource(R.string.install_shizuku),
                     enabled = !installing,
                     onClick = {
                         scope.launch(Dispatchers.IO) {
@@ -489,7 +487,7 @@ private fun ShizukuInstallCard(scope: kotlinx.coroutines.CoroutineScope) {
                                 withContext(Dispatchers.Main) {
                                     Toast.makeText(
                                         context,
-                                        "安装包读取失败：${e.message}",
+                                        context.getString(R.string.apk_read_error, e.message),
                                         Toast.LENGTH_LONG
                                     ).show()
                                 }

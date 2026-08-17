@@ -22,6 +22,7 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.annotation.RequiresApi
 import kotlin.math.roundToInt
+import me.weishu.kernelsu.R
 
 /**
  * **原生 View 版** 崩溃展示页。
@@ -55,7 +56,7 @@ class NativeCrashActivity : Activity() {
         }
 
         val titleTv = TextView(this).apply {
-            text = "洛茜工具箱 · 崩溃报告"
+            text = getString(R.string.crash_report_title)
             setTextColor(Color.WHITE)
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 18f)
             setBackgroundColor(0xFFB3261E.toInt()) // Material error
@@ -64,7 +65,7 @@ class NativeCrashActivity : Activity() {
         root.addView(titleTv, -1, -2)
 
         val tip = TextView(this).apply {
-            text = "应用发生异常，已收集以下错误信息。请点底部「复制堆栈」发给开发者。"
+            text = getString(R.string.crash_report_content)
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
             setTextColor(0xFF333333.toInt())
             setPadding(dp(6f), dp(12f), dp(6f), dp(10f))
