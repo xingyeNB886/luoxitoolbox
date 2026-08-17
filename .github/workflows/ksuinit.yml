@@ -9,11 +9,15 @@ on:
 jobs:
   build:
     runs-on: ${{ inputs.os }}
+    # 本仓库没有根级 Cargo 工作区，ksuinit 是独立 crate（userspace/ksuinit）。
+    # 用 CARGO_TARGET_DIR 把产物固定到仓库根 target/，与下方上传路径保持一致。
+    env:
+      CARGO_TARGET_DIR: target
     steps:
     - uses: actions/checkout@v7
       with:
         fetch-depth: 0
-        
+
     - name: Setup rustup
       run: |
         rustup update stable
@@ -22,7 +26,7 @@ jobs:
 
     - uses: Swatinem/rust-cache@v2
       with:
-        workspaces: . -> target
+        workspaces: userspace/ksuinit -> target
         cache-targets: false
 
     - name: Build ksuinit
@@ -30,7 +34,7 @@ jobs:
         LLVM_BIN=$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin
         export CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_LINKER="$LLVM_BIN/aarch64-linux-android26-clang"
         export RUSTFLAGS="-C link-arg=-no-pie"
-        cargo build --package ksuinit --target=aarch64-unknown-linux-musl --release
+        cargo build --manifest-path userspace/ksuinit/Cargo.toml --target=aarch64-unknown-linux-musl --release
 
     - name: Upload ksuinit artifact
       uses: actions/upload-artifact@v7
@@ -42,7 +46,7 @@ jobs:
       run: |
         LLVM_BIN=$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin
         export CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_LINKER="$LLVM_BIN/x86_64-linux-android26-clang"
-        cargo build --package ksuinit --target=x86_64-unknown-linux-musl --release
+        cargo build --manifest-path userspace/ksuinit/Cargo.toml --target=x86_64-unknown-linux-musl --release
 
     - name: Upload x64 ksuinit artifact
       uses: actions/upload-artifact@v7
