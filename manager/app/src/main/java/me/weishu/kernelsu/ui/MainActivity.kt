@@ -31,6 +31,12 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.core.net.toUri
 import androidx.lifecycle.viewmodel.navigation3.rememberViewModelStoreNavEntryDecorator
 import androidx.navigation3.runtime.entryProvider
@@ -267,14 +273,13 @@ fun MainScreen() {
 @Composable
 private fun DisclaimerDialog(show: androidx.compose.runtime.MutableState<Boolean>) {
     val context = LocalContext.current
-    val scope = androidx.compose.runtime.rememberCoroutineScope()
     top.yukonga.miuix.kmp.extra.SuperDialog(
         show = show,
         title = "免责声明",
         onDismissRequest = { /* 未同意不可关闭，拦截返回 */ },
         content = {
-            androidx.compose.foundation.layout.Column(
-                modifier = androidx.compose.ui.Modifier.fillMaxWidth()
+            Column(
+                modifier = Modifier.fillMaxWidth()
             ) {
                 top.yukonga.miuix.kmp.basic.Text(
                     text = "本软件通过修改游戏调用的图片文件，以此达到将游戏加载图替换为自定义图片的目的。\n\n" +
@@ -283,12 +288,10 @@ private fun DisclaimerDialog(show: androidx.compose.runtime.MutableState<Boolean
                     fontSize = androidx.compose.ui.unit.TextUnit(14f, androidx.compose.ui.unit.TextUnitType.Sp),
                     color = top.yukonga.miuix.kmp.theme.MiuixTheme.colorScheme.onSurfaceVariantSummary
                 )
-                androidx.compose.foundation.layout.Spacer(
-                    androidx.compose.ui.Modifier.height(androidx.compose.ui.unit.Dp(16f))
-                )
-                androidx.compose.foundation.layout.Row(
-                    modifier = androidx.compose.ui.Modifier.fillMaxWidth(),
-                    horizontalArrangement = androidx.compose.foundation.layout.Arrangement.End
+                Spacer(Modifier.height(androidx.compose.ui.unit.Dp(16f)))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
                 ) {
                     top.yukonga.miuix.kmp.basic.TextButton(
                         text = "同意",
