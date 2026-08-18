@@ -173,11 +173,10 @@ object AppData {
     }
 
     /**
-     * 检查是否是完整功能模式
+     * 检查是否是完整功能模式（始终返回 true，空壳模式解锁全部功能）
      */
     fun isFullFeatured(): Boolean {
-        val isManager = Natives.isManager
-        return isManager && !Natives.requireNewKernel() && rootAvailable()
+        return true
     }
 }
 
@@ -186,7 +185,7 @@ object DataRefreshUtils {
         scope.launch(Dispatchers.IO) {
             while (isActive) {
                 AppData.DataRefreshManager.refreshData()
-                delay(5000)
+                delay(30000)
             }
         }
     }
@@ -203,7 +202,7 @@ object DataRefreshUtils {
                     isHideOtherInfo = prefs.getBoolean("is_hide_other_info", false),
                     showKpmInfo = prefs.getBoolean("show_kpm_info", false)
                 )
-                delay(1000)
+                delay(5000)
             }
         }
     }

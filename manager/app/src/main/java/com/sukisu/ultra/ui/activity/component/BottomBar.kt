@@ -56,8 +56,7 @@ fun BottomBar(navController: NavHostController) {
     ) {
         BottomBarDestination.entries.forEach { destination ->
             if (destination == BottomBarDestination.Kpm) {
-                if (kpmVersion.isNotEmpty() && !kpmVersion.startsWith("Error") && !showKpmInfo && Natives.version >= Natives.MINIMAL_SUPPORTED_KPM) {
-                    if (!isFullFeatured && destination.rootRequired) return@forEach
+                if (!showKpmInfo) {
                     val isCurrentDestOnBackStack by navController.isRouteOnBackStackAsState(destination.direction)
                     NavigationBarItem(
                         selected = isCurrentDestOnBackStack,
@@ -100,7 +99,6 @@ fun BottomBar(navController: NavHostController) {
                     )
                 }
             } else if (destination == BottomBarDestination.SuperUser) {
-                if (!isFullFeatured && destination.rootRequired) return@forEach
                 val isCurrentDestOnBackStack by navController.isRouteOnBackStackAsState(destination.direction)
 
                 NavigationBarItem(
@@ -143,7 +141,6 @@ fun BottomBar(navController: NavHostController) {
                     alwaysShowLabel = false
                 )
             } else if (destination == BottomBarDestination.Module) {
-                if (!isFullFeatured && destination.rootRequired) return@forEach
                 val isCurrentDestOnBackStack by navController.isRouteOnBackStackAsState(destination.direction)
 
                 NavigationBarItem(
@@ -186,7 +183,6 @@ fun BottomBar(navController: NavHostController) {
                     alwaysShowLabel = false
                 )
             } else {
-                if (!isFullFeatured && destination.rootRequired) return@forEach
                 val isCurrentDestOnBackStack by navController.isRouteOnBackStackAsState(destination.direction)
 
                 NavigationBarItem(
