@@ -324,6 +324,12 @@
     <string name="background_set_success">Background set successfully</string>
     <string name="background_removed">Removed custom backgrounds</string>
     <string name="root_require_for_install">Requires root privileges</string>
+    <!-- Image crop dialog (copied from backup toolbox) -->
+    <string name="crop_title">Crop Image</string>
+    <string name="crop_guide">Dashed crop frame ratio matches your device resolution %s (portrait), always constrained within the image. Drag inside the frame to move, drag corners to resize.</string>
+    <string name="crop_confirm_content">After confirming, the crop result will replace the custom background.</string>
+    <string name="image_load_failed">Image load failed</string>
+    <string name="cropping">Cropping…</string>
     <!-- KPM display settings -->
     <string name="show_kpm_info">Display KPM Function</string>
     <string name="show_kpm_info_summary">Display KPM information and Function in home and bottom bar (Need to reopen the app)</string>

@@ -320,6 +320,12 @@
     <string name="background_set_success">背景设置成功</string>
     <string name="background_removed">已移除自定义背景</string>
     <string name="root_require_for_install">需要 root 权限</string>
+    <!-- 图片裁剪弹窗（照搬备份工具箱） -->
+    <string name="crop_title">裁剪图片</string>
+    <string name="crop_guide">虚线裁剪框比例为本机分辨率 %s（竖屏），始终限制在图片内；按住框内拖动移动，按住四角缩放</string>
+    <string name="crop_confirm_content">确定后裁剪结果将替换为自定义背景</string>
+    <string name="image_load_failed">图片加载失败</string>
+    <string name="cropping">正在裁剪…</string>
     <!-- KPM 显示设置相关 -->
     <string name="show_kpm_info">显示 KPM 功能</string>
     <string name="show_kpm_info_summary">在主页和底栏显示 KPM 相关功能和信息 (需要重新打开应用)</string>
