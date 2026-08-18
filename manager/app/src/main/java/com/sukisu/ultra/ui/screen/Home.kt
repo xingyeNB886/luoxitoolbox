@@ -104,6 +104,7 @@ import com.sukisu.ultra.ui.theme.CardConfig.cardElevation
 import com.sukisu.ultra.ui.theme.getCardColors
 import com.sukisu.ultra.ui.util.PermissionManager
 import com.sukisu.ultra.ui.util.checkNewVersion
+import com.sukisu.ultra.ui.util.getRealResolution
 import com.sukisu.ultra.ui.util.module.LatestVersionInfo
 import com.sukisu.ultra.ui.util.reboot
 import kotlinx.coroutines.Dispatchers
@@ -687,14 +688,12 @@ private fun InfoCard() {
                 iconTint = Color(0xFF3DDC84)
             )
 
-            // 设备分辨率（原 Linux，图标换色：蓝色）
-            val displayMetrics = context.resources.displayMetrics
-            val screenWidth = displayMetrics.widthPixels
-            val screenHeight = displayMetrics.heightPixels
-            val densityDpi = displayMetrics.densityDpi
+            // 设备分辨率（原 Linux 行，图标换色：蓝色）—— 真实物理分辨率
+            val (realWidth, realHeight) = context.getRealResolution()
+            val densityDpi = context.resources.displayMetrics.densityDpi
             InfoCardItem(
                 "设备分辨率",
-                "${screenWidth} × ${screenHeight} (${densityDpi}dpi)",
+                "$realWidth × $realHeight (${densityDpi}dpi)",
                 icon = Icons.Default.PhoneAndroid,
                 iconTint = Color(0xFF4285F4)
             )

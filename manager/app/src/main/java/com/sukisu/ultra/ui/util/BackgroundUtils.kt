@@ -7,7 +7,10 @@ import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Matrix
 import android.net.Uri
+import android.os.Build
 import android.util.Log
+import android.view.Display
+import android.view.WindowManager
 import java.io.File
 import java.io.FileOutputStream
 import java.io.InputStream
@@ -20,14 +23,36 @@ data class BackgroundTransformation(
 )
 
 /**
- * 裁剪信息：归一化坐标 (0~1)
+ * 获取屏幕真实物理分辨率（含状态栏/导航栏，与实际显示一致）。
+ *
+ * resources.displayMetrics 在竖屏手机上会扣除系统栏（如 1080x2400 被报成 1080x2280），
+ * 导致裁剪输出与实际背景有偏差 —— 所以这里必须用真实分辨率：
+ *   - API 30+: WindowManager.maximumWindowMetrics（系统栏外完整屏幕）
+ *   - API <30:  Display.getRealMetrics
  */
-data class CropInfo(
-    val normX: Float,      // 裁剪框左上角 X (0~1)
-    val normY: Float,      // 裁剪框左上角 Y (0~1)
-    val normWidth: Float,  // 裁剪框宽度 (0~1)
-    val normHeight: Float  // 裁剪框高度 (0~1)
-)
+fun Context.getRealResolution(): Pair<Int, Int> {
+    return try {
+        val wm = getSystemService(Context.WINDOW_SERVICE) as WindowManager
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            val bounds = wm.maximumWindowMetrics.bounds
+            Pair(bounds.width(), bounds.height())
+        } else {
+            val display: Display? = wm.defaultDisplay
+            val out = android.util.DisplayMetrics()
+            @Suppress("DEPRECATION")
+            display?.getRealMetrics(out)
+            if (out.widthPixels > 0 && out.heightPixels > 0) {
+                Pair(out.widthPixels, out.heightPixels)
+            } else {
+                val dm = resources.displayMetrics
+                Pair(dm.widthPixels, dm.heightPixels)
+            }
+        }
+    } catch (e: Exception) {
+        val dm = resources.displayMetrics
+        Pair(dm.widthPixels, dm.heightPixels)
+    }
+}
 
 fun Context.getImageBitmap(uri: Uri): Bitmap? {
     return try {
@@ -46,9 +71,8 @@ fun Context.applyTransformationToBitmap(bitmap: Bitmap, transformation: Backgrou
     val width = bitmap.width
     val height = bitmap.height
 
-    val displayMetrics = resources.displayMetrics
-    val screenWidth = displayMetrics.widthPixels
-    val screenHeight = displayMetrics.heightPixels
+    // 用真实物理分辨率计算裁剪比例（竖屏手机为竖向比例）
+    val (screenWidth, screenHeight) = getRealResolution()
     val screenRatio = screenHeight.toFloat() / screenWidth.toFloat()
 
     val targetWidth: Int
@@ -106,40 +130,6 @@ fun Context.saveTransformedBackground(uri: Uri, transformation: BackgroundTransf
         return Uri.fromFile(file)
     } catch (e: Exception) {
         Log.e("BackgroundUtils", "Failed to save transformed image: ${e.message}", e)
-        return null
-    }
-}
-
-/**
- * 根据裁剪信息从原图中精确裁剪
- * 所见即所得：裁剪框内的内容就是最终输出
- */
-fun Context.cropBackground(uri: Uri, cropInfo: CropInfo): Uri? {
-    try {
-        val bitmap = getImageBitmap(uri) ?: return null
-        val origWidth = bitmap.width
-        val origHeight = bitmap.height
-
-        // 将归一化坐标转换为像素坐标
-        val cropX = (cropInfo.normX * origWidth).toInt().coerceIn(0, origWidth - 1)
-        val cropY = (cropInfo.normY * origHeight).toInt().coerceIn(0, origHeight - 1)
-        val cropW = (cropInfo.normWidth * origWidth).toInt().coerceIn(1, origWidth - cropX)
-        val cropH = (cropInfo.normHeight * origHeight).toInt().coerceIn(1, origHeight - cropY)
-
-        // 精确裁剪
-        val croppedBitmap = Bitmap.createBitmap(bitmap, cropX, cropY, cropW, cropH)
-
-        val fileName = "custom_background_cropped.jpg"
-        val file = File(filesDir, fileName)
-        val outputStream = FileOutputStream(file)
-
-        croppedBitmap.compress(Bitmap.CompressFormat.JPEG, 95, outputStream)
-        outputStream.flush()
-        outputStream.close()
-
-        return Uri.fromFile(file)
-    } catch (e: Exception) {
-        Log.e("BackgroundUtils", "Failed to crop image: ${e.message}", e)
         return null
     }
 }
