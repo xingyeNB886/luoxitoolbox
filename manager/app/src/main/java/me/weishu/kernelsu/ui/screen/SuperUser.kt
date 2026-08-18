@@ -66,6 +66,7 @@ import dev.chrisbanes.haze.HazeStyle
 import dev.chrisbanes.haze.HazeTint
 import dev.chrisbanes.haze.hazeEffect
 import dev.chrisbanes.haze.hazeSource
+import kotlin.math.roundToInt
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -322,9 +323,12 @@ private fun SelectedImageItem(
 /**
  * 裁剪弹窗：
  * - 图片按原始比例完整显示（画布比例 = 图片比例）
- * - 裁剪框比例固定为本机分辨率（横屏 长边:短边），始终限制在图片内部
- * - 按住框内拖动 = 移动；按住四个角任意一角拖动 = 缩放（保持比例，对角固定）
+ * - 裁剪框比例固定为本机分辨率横屏比例（短边/长边），不可更改
+ * - 裁剪框内部原色不变，外部压暗
+ * - 按住框内拖动 = 移动；按住四角任意一角拖动 = 等比例缩放（对角固定）
+ * - 裁剪框始终被图片边界限制，不会超出图片
  * - 确定后直接裁剪：结果替换列表中的原图，并保存到 luoxi/裁剪/
+ * - 裁剪框使用归一化坐标（0-1），消除 inSampleSize 取整导致的精度偏差
  */
 @Composable
 private fun CropDialog(
@@ -337,16 +341,17 @@ private fun CropDialog(
     val scope = rememberCoroutineScope()
     val screen = remember { getScreenSize(context) }
 
-    // 裁剪框高/宽 = 本机分辨率横屏比例（短边/长边）
-    val ratio = screen.shortSide.toFloat() / screen.longSide.toFloat()
+    // 裁剪框比例 = 短边/长边（横屏下高/宽）
+    val cropRatio = screen.shortSide.toFloat() / screen.longSide.toFloat()
 
     val src = remember(image.uri) { decodeSampledBitmap(image.uri, 2048) }
-    // 裁剪框（图片像素坐标），默认 = 图片内能放下的最大等比框，居中
-    var box by remember(image.uri) {
-        mutableStateOf(src?.let { defaultCropBox(it.width.toFloat(), it.height.toFloat(), ratio) })
+    // 归一化裁剪框（0-1），默认 = 图片内能放下的最大等比框，居中
+    var normBox by remember(image.uri) {
+        mutableStateOf(src?.let { defaultNormBox(it.width.toFloat(), it.height.toFloat(), cropRatio) })
     }
     var saving by remember { mutableStateOf(false) }
     val show = remember { mutableStateOf(true) }
+    val density = androidx.compose.ui.platform.LocalDensity.current
 
     SuperDialog(
         show = show,
@@ -365,17 +370,20 @@ private fun CropDialog(
                 )
                 Spacer(Modifier.height(10.dp))
 
-                if (src != null && box != null) {
+                if (src != null && normBox != null) {
+                    val imgW = src.width.toFloat()
+                    val imgH = src.height.toFloat()
+                    val imgAspect = imgW / imgH
+
                     // 画布尺寸跟随图片比例（宽上限 300dp、高上限 280dp）
                     val maxW = 300.dp
                     val maxH = 280.dp
-                    val aspect = src.width.toFloat() / src.height.toFloat()
                     val dispW: Dp
                     val dispH: Dp
-                    if (maxW / maxH > aspect) {
-                        dispW = maxH * aspect; dispH = maxH
+                    if (maxW / maxH > imgAspect) {
+                        dispW = maxH * imgAspect; dispH = maxH
                     } else {
-                        dispW = maxW; dispH = maxW / aspect
+                        dispW = maxW; dispH = maxW / imgAspect
                     }
 
                     Canvas(
@@ -388,22 +396,25 @@ private fun CropDialog(
                                 var corner = 0 // 0=左上 1=右上 2=左下 3=右下
                                 detectDragGestures(
                                     onDragStart = { p ->
-                                        val s = size.width.toFloat() / src.width
-                                        val b = box ?: return@detectDragGestures
-                                        val grab = 26.dp.toPx()
+                                        val nb = normBox ?: return@detectDragGestures
+                                        // 画布实际像素尺寸（取整）
+                                        val cwR = size.width.roundToInt().toFloat()
+                                        val chR = size.height.roundToInt().toFloat()
+                                        val s = cwR / imgW
+                                        // 裁剪框四角在画布上的像素位置
+                                        val bl = nb.left * imgW * s
+                                        val bt = nb.top * imgH * s
+                                        val br = nb.right * imgW * s
+                                        val bb = nb.bottom * imgH * s
+                                        val grab = with(density) { 26.dp.toPx() }
                                         val corners = arrayOf(
-                                            Offset(b.left * s, b.top * s),
-                                            Offset(b.right * s, b.top * s),
-                                            Offset(b.left * s, b.bottom * s),
-                                            Offset(b.right * s, b.bottom * s)
+                                            Offset(bl, bt), Offset(br, bt),
+                                            Offset(bl, bb), Offset(br, bb)
                                         )
                                         val hit = corners.indexOfFirst { (it - p).getDistance() <= grab }
                                         if (hit >= 0) {
                                             mode = 2; corner = hit
-                                        } else if (
-                                            p.x >= b.left * s && p.x <= b.right * s &&
-                                            p.y >= b.top * s && p.y <= b.bottom * s
-                                        ) {
+                                        } else if (p.x >= bl && p.x <= br && p.y >= bt && p.y <= bb) {
                                             mode = 1
                                         } else {
                                             mode = 0
@@ -411,39 +422,48 @@ private fun CropDialog(
                                     },
                                     onDrag = { change, drag ->
                                         change.consume()
-                                        val b = box ?: return@detectDragGestures
-                                        val s = size.width.toFloat() / src.width
-                                        val imgW = src.width.toFloat()
-                                        val imgH = src.height.toFloat()
+                                        val nb = normBox ?: return@detectDragGestures
+                                        // 使用取整后的画布尺寸计算缩放因子，保证与绘制一致
+                                        val cwR = size.width.roundToInt().toFloat()
+                                        val chR = size.height.roundToInt().toFloat()
+                                        val s = cwR / imgW
+                                        // 当前裁剪框像素尺寸
+                                        val bw = (nb.right - nb.left) * imgW
+                                        val bh = (nb.bottom - nb.top) * imgH
                                         if (mode == 1) {
-                                            // 整体移动，钳制在图片内
-                                            val w = b.width(); val h = b.height()
-                                            val nl = (b.left + drag.x / s).coerceIn(0f, imgW - w)
-                                            val nt = (b.top + drag.y / s).coerceIn(0f, imgH - h)
-                                            box = RectF(nl, nt, nl + w, nt + h)
+                                            // 整体移动：归一化偏移，钳制在 [0, 1-尺寸]
+                                            val dnX = drag.x / s / imgW
+                                            val dnY = drag.y / s / imgH
+                                            val nw = nb.right - nb.left
+                                            val nh = nb.bottom - nb.top
+                                            val nl = (nb.left + dnX).coerceIn(0f, 1f - nw)
+                                            val nt = (nb.top + dnY).coerceIn(0f, 1f - nh)
+                                            normBox = RectF(nl, nt, nl + nw, nt + nh)
                                         } else if (mode == 2) {
-                                            // 对角固定，向拖动方向缩放，保持比例且不越出图片
+                                            // 对角固定缩放：对角点不动，拖动点向拖动方向移动，保持比例
                                             val px = change.position.x / s
                                             val py = change.position.y / s
-                                            val fixX = if (corner == 0 || corner == 2) b.right else b.left
-                                            val fixY = if (corner == 0 || corner == 1) b.bottom else b.top
+                                            // 对角固定点（像素坐标）
+                                            val fixX = if (corner == 0 || corner == 2) nb.right * imgW else nb.left * imgW
+                                            val fixY = if (corner == 0 || corner == 1) nb.bottom * imgH else nb.top * imgH
                                             val dx = px - fixX
                                             val dy = py - fixY
                                             val dirX = if (dx >= 0f) 1f else -1f
                                             val dirY = if (dy >= 0f) 1f else -1f
+                                            // 可用宽度（像素）
                                             val availX = if (dirX > 0f) imgW - fixX else fixX
                                             val availY = if (dirY > 0f) imgH - fixY else fixY
-                                            val wMax = minOf(availX, availY / ratio, minOf(imgW, imgH / ratio))
+                                            val wMax = minOf(availX, availY / cropRatio, minOf(imgW, imgH / cropRatio))
                                             val wMin = minOf(24f, wMax)
-                                            var w = maxOf(kotlin.math.abs(dx), kotlin.math.abs(dy) / ratio)
+                                            var w = maxOf(kotlin.math.abs(dx), kotlin.math.abs(dy) / cropRatio)
                                             w = w.coerceIn(wMin, wMax)
-                                            val h = w * ratio
-                                            box = RectF(
-                                                minOf(fixX, fixX + dirX * w),
-                                                minOf(fixY, fixY + dirY * h),
-                                                maxOf(fixX, fixX + dirX * w),
-                                                maxOf(fixY, fixY + dirY * h)
-                                            )
+                                            val h = w * cropRatio
+                                            // 新裁剪框像素坐标 → 归一化
+                                            val nl = (minOf(fixX, fixX + dirX * w) / imgW).coerceIn(0f, 1f)
+                                            val nt = (minOf(fixY, fixY + dirY * h) / imgH).coerceIn(0f, 1f)
+                                            val nr = (maxOf(fixX, fixX + dirX * w) / imgW).coerceIn(0f, 1f)
+                                            val nb2 = (maxOf(fixY, fixY + dirY * h) / imgH).coerceIn(0f, 1f)
+                                            normBox = RectF(nl, nt, nr, nb2)
                                         }
                                     }
                                 )
@@ -451,24 +471,28 @@ private fun CropDialog(
                     ) {
                         val cw = size.width
                         val ch = size.height
-                        val s = cw / src.width
+                        // 使用取整后的画布尺寸，与交互缩放因子一致
+                        val cwR = cw.roundToInt().toFloat()
+                        val chR = ch.roundToInt().toFloat()
+                        val s = cwR / imgW
                         // 图片铺满画布（画布比例 = 图片比例，不变形）
                         drawImage(
                             image = src.asImageBitmap(),
                             srcOffset = androidx.compose.ui.unit.IntOffset.Zero,
                             srcSize = androidx.compose.ui.unit.IntSize(src.width, src.height),
                             dstOffset = androidx.compose.ui.unit.IntOffset.Zero,
-                            dstSize = androidx.compose.ui.unit.IntSize(cw.toInt(), ch.toInt()),
+                            dstSize = androidx.compose.ui.unit.IntSize(cwR.toInt(), chR.toInt()),
                         )
-                        val b = box!!
-                        val bl = b.left * s; val bt = b.top * s
-                        val br = b.right * s; val bb = b.bottom * s
-                        // 框外调暗（四块）
+                        // 归一化 → 画布像素坐标
+                        val nb = normBox!!
+                        val bl = nb.left * imgW * s; val bt = nb.top * imgH * s
+                        val br = nb.right * imgW * s; val bb = nb.bottom * imgH * s
+                        // 框外压暗（四块）
                         val dim = Color.Black.copy(alpha = 0.55f)
-                        drawRect(dim, size = androidx.compose.ui.geometry.Size(cw, bt))
-                        drawRect(dim, topLeft = Offset(0f, bb), size = androidx.compose.ui.geometry.Size(cw, ch - bb))
+                        drawRect(dim, size = androidx.compose.ui.geometry.Size(cwR, bt))
+                        drawRect(dim, topLeft = Offset(0f, bb), size = androidx.compose.ui.geometry.Size(cwR, chR - bb))
                         drawRect(dim, topLeft = Offset(0f, bt), size = androidx.compose.ui.geometry.Size(bl, bb - bt))
-                        drawRect(dim, topLeft = Offset(br, bt), size = androidx.compose.ui.geometry.Size(cw - br, bb - bt))
+                        drawRect(dim, topLeft = Offset(br, bt), size = androidx.compose.ui.geometry.Size(cwR - br, bb - bt))
                         // 虚线裁剪框
                         drawRect(
                             color = Color.White,
@@ -512,15 +536,14 @@ private fun CropDialog(
                         )
                         TextButton(
                             text = stringResource(R.string.confirm),
-                            enabled = !saving && box != null,
+                            enabled = !saving && normBox != null,
                             onClick = {
-                                val b = box ?: return@TextButton
-                                val preview = src ?: return@TextButton
+                                val nb = normBox ?: return@TextButton
                                 scope.launch {
                                     saving = true
                                     var published = false
                                     val newUri = withContext(Dispatchers.IO) {
-                                        performCrop(image.uri, preview, b) { f ->
+                                        performCrop(image.uri, nb, cropRatio) { f ->
                                             published = FileManagerUtils.publishCropFile(f)
                                         }
                                     }
@@ -864,43 +887,53 @@ private fun startReplace(
 // ---------- 图片处理 ----------
 
 /**
- * 默认裁剪框：图片内能放下的最大等比框（比例 = 本机分辨率横屏），居中。
+ * 默认归一化裁剪框：图片内能放下的最大等比框（比例 = 本机分辨率横屏），居中。
+ * 返回归一化坐标（0-1）。
  */
-private fun defaultCropBox(imgW: Float, imgH: Float, ratio: Float): RectF {
+private fun defaultNormBox(imgW: Float, imgH: Float, ratio: Float): RectF {
     val w = minOf(imgW, imgH / ratio)
     val h = w * ratio
     val l = (imgW - w) / 2f
     val t = (imgH - h) / 2f
-    return RectF(l, t, l + w, t + h)
+    return RectF(l / imgW, t / imgH, (l + w) / imgW, (t + h) / imgH)
 }
 
 /**
  * 执行裁剪：
- * 以更高分辨率（≤4096）重新解码原图，把预览坐标系的裁剪框映射回原坐标并裁剪，
+ * 使用归一化坐标直接计算裁剪区域，消除 inSampleSize 取整导致的 fx/fy 不一致。
+ * 以高分辨率（≤4096）重新解码原图，按归一化框裁剪，
  * 结果存为中转目录 JPEG 文件，并通过 onPublish 复制到 luoxi/裁剪/。
+ * @param normBox 归一化裁剪框（0-1）
+ * @param cropRatio 裁剪框比例（短边/长边）
  * @return 裁剪结果文件 uri；失败返回 null
  */
 private suspend fun performCrop(
     uri: Uri,
-    preview: Bitmap,
-    box: RectF,
+    normBox: RectF,
+    cropRatio: Float,
     onPublish: suspend (java.io.File) -> Unit
 ): Uri? {
     return try {
-        val full = decodeSampledBitmap(uri, 4096) ?: preview
-        val fx = full.width.toFloat() / preview.width
-        val fy = full.height.toFloat() / preview.height
-        val l = (box.left * fx).toInt().coerceIn(0, full.width - 1)
-        val t = (box.top * fy).toInt().coerceIn(0, full.height - 1)
-        val r = (box.right * fx).toInt().coerceIn(l + 1, full.width)
-        val b = (box.bottom * fy).toInt().coerceIn(t + 1, full.height)
+        val full = decodeSampledBitmap(uri, 4096) ?: return null
+        val fw = full.width.toFloat()
+        val fh = full.height.toFloat()
+        // 从归一化坐标计算裁剪区域：宽度用归一化宽度，高度用精确比例 cropRatio
+        val normW = normBox.right - normBox.left
+        val boxW = normW * fw
+        val boxH = boxW * cropRatio
+        val cx = (normBox.left + normBox.right) / 2f * fw
+        val cy = (normBox.top + normBox.bottom) / 2f * fh
+        val l = (cx - boxW / 2f).roundToInt().coerceIn(0, full.width - 1)
+        val t = (cy - boxH / 2f).roundToInt().coerceIn(0, full.height - 1)
+        val r = (cx + boxW / 2f).roundToInt().coerceIn(l + 1, full.width)
+        val b = (cy + boxH / 2f).roundToInt().coerceIn(t + 1, full.height)
         val cropped = Bitmap.createBitmap(full, l, t, r - l, b - t)
         val stamp = java.text.SimpleDateFormat("yyyyMMdd_HHmmss_SSS", java.util.Locale.getDefault())
             .format(java.util.Date())
         val f = java.io.File(FileManagerUtils.workDir(), "crop_$stamp.jpg")
         java.io.FileOutputStream(f).use { cropped.compress(Bitmap.CompressFormat.JPEG, 95, it) }
         if (cropped !== full) cropped.recycle()
-        if (full !== preview) full.recycle()
+        full.recycle()
         onPublish(f)
         Uri.fromFile(f)
     } catch (e: Exception) {
