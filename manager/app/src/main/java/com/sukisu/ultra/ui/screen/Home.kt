@@ -87,21 +87,6 @@ fun HomeScreen(navigator: DestinationsNavigator) {
             delay(100)
             viewModel.loadExtendedData(context)
         }
-
-        // 启动数据变化监听
-        coroutineScope.launch {
-            while (true) {
-                delay(5000) // 每5秒检查一次
-                viewModel.autoRefreshIfNeeded(context)
-            }
-        }
-    }
-
-    // 监听数据刷新状态流
-    LaunchedEffect(viewModel.dataRefreshTrigger) {
-        viewModel.dataRefreshTrigger.collect { _ ->
-            // 数据刷新时的额外处理可以在这里添加
-        }
     }
 
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior(rememberTopAppBarState())
