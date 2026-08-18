@@ -397,9 +397,9 @@ private fun CropDialog(
                                 detectDragGestures(
                                     onDragStart = { p ->
                                         val nb = normBox ?: return@detectDragGestures
-                                        // 画布实际像素尺寸（取整）
-                                        val cwR = size.width.roundToInt().toFloat()
-                                        val chR = size.height.roundToInt().toFloat()
+                                        // PointerInputScope.size 是 IntSize，width/height 已是 Int
+                                        val cwR = size.width.toFloat()
+                                        val chR = size.height.toFloat()
                                         val s = cwR / imgW
                                         // 裁剪框四角在画布上的像素位置
                                         val bl = nb.left * imgW * s
@@ -423,9 +423,9 @@ private fun CropDialog(
                                     onDrag = { change, drag ->
                                         change.consume()
                                         val nb = normBox ?: return@detectDragGestures
-                                        // 使用取整后的画布尺寸计算缩放因子，保证与绘制一致
-                                        val cwR = size.width.roundToInt().toFloat()
-                                        val chR = size.height.roundToInt().toFloat()
+                                        // PointerInputScope.size 是 IntSize，width/height 已是 Int
+                                        val cwR = size.width.toFloat()
+                                        val chR = size.height.toFloat()
                                         val s = cwR / imgW
                                         // 当前裁剪框像素尺寸
                                         val bw = (nb.right - nb.left) * imgW
