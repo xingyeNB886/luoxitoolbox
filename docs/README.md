@@ -1,57 +1,46 @@
-**English** | [Español](README_ES.md) | [简体中文](README_CN.md) | [繁體中文](README_TW.md) | [日本語](README_JP.md) | [한국어](README_KR.md) | [Polski](README_PL.md) | [Português (Brasil)](README_PT-BR.md) | [Türkçe](README_TR.md) | [Русский](README_RU.md) | [Tiếng Việt](README_VI.md) | [Indonesia](README_ID.md) | [עברית](README_IW.md) | [हिंदी](README_IN.md) | [Italiano](README_IT.md)
+# 洛茜工具箱
 
-# KernelSU
+一个 Android 上的游戏文件管理工具，通过 Root 或 Shizuku 权限操作游戏私有目录。
 
-<img src="https://kernelsu.org/logo.png" style="width: 96px;" alt="logo">
-
-A kernel-based root solution for Android devices.
-
-[![Latest release](https://img.shields.io/github/v/release/tiann/KernelSU?label=Release&logo=github)](https://github.com/tiann/KernelSU/releases/latest)
-[![Weblate](https://img.shields.io/badge/Localization-Weblate-teal?logo=weblate)](https://hosted.weblate.org/engage/kernelsu)
-[![Channel](https://img.shields.io/badge/Follow-Telegram-blue.svg?logo=telegram)](https://t.me/KernelSU)
+[![Latest release](https://img.shields.io/github/v/release/xingyeNB886/luoxitoolbox?label=Release&logo=github)](https://github.com/xingyeNB886/luoxitoolbox/releases/latest)
 [![License: GPL v2](https://img.shields.io/badge/License-GPL%20v2-orange.svg?logo=gnu)](https://www.gnu.org/licenses/old-licenses/gpl-2.0.en.html)
-[![GitHub License](https://img.shields.io/github/license/tiann/KernelSU?logo=gnu)](/LICENSE)
+[![GitHub License](https://img.shields.io/github/license/xingyeNB886/luoxitoolbox?logo=gnu)](/LICENSE)
 
-## Features
+## 功能
 
-1. Kernel-based `su` and root access management.
-2. Module system based on [metamodules](https://kernelsu.org/guide/metamodule.html): Pluggable infrastructure for systemless modifications.
-3. [App Profile](https://kernelsu.org/guide/app-profile.html): Lock up the root power in a cage.
+- 图片多选与裁剪：按设备分辨率比例裁剪，裁剪框限制在图片内部，不超出边界。
+- 批量制作文件：按记录的游戏文件名自动复制并命名，均分到每张图片，保留原始画质。
+- 游戏文件替换：一键替换游戏加载图目录，支持提前备份，失败自动回滚。
+- 双权限通道：同时支持 Root（KernelSU）和 Shizuku（ADB），自动检测可用权限。
 
-## Compatibility state
+## 兼容状态
 
-KernelSU officially supports Android GKI 2.0 devices (kernel 5.10+). Older kernels (4.14+) are also supported, but the kernel will need to be built manually.
+运行环境：Android 11+，需要 Root 或 Shizuku 权限。
 
-With this, WSA, ChromeOS, and container-based Android are all supported.
+支持架构：`arm64-v8a` 和 `x86_64`。
 
-Currently, only the `arm64-v8a` and `x86_64` architectures are supported.
+## 使用方法
 
-## Usage
+- [Release 下载](https://github.com/xingyeNB886/luoxitoolbox/releases)
+- [开发指南](https://github.com/xingyeNB886/luoxitoolbox/blob/main/luoxi-dev-guide.md)
 
-- [Installation](https://kernelsu.org/guide/installation.html)
-- [How to build](https://kernelsu.org/guide/how-to-build.html)
-- [Official website](https://kernelsu.org/)
+## 讨论
 
-## Translation
+- QQ群: [群1](https://qm.qq.com/q/TEuQTWTu48) / [群2](https://qm.qq.com/q/9XnN0A6PbW)
 
-To help translate KernelSU or improve existing translations, please use [Weblate](https://hosted.weblate.org/engage/kernelsu/). PR of Manager's translation is no longer accepted, because it will conflict with Weblate.
+## 安全性
 
-## Discussion
+有关报告安全漏洞的信息，请参阅 [SECURITY.md](/SECURITY.md)。
 
-- Telegram: [@KernelSU](https://t.me/KernelSU)
+## 许可证
 
-## Security
+- 目录 `kernel` 下所有文件为 [GPL-2.0-only](https://www.gnu.org/licenses/old-licenses/gpl-2.0.en.html)。
+- 除 `kernel` 目录的其他部分均为 [GPL-3.0-or-later](https://www.gnu.org/licenses/gpl-3.0.html)。
 
-For information on reporting security vulnerabilities in KernelSU, see [SECURITY.md](/SECURITY.md).
+## 鸣谢
 
-## License
-
-- Files under the `kernel` directory are [GPL-2.0-only](https://www.gnu.org/licenses/old-licenses/gpl-2.0.en.html).
-- All other parts except the `kernel` directory are [GPL-3.0-or-later](https://www.gnu.org/licenses/gpl-3.0.html).
-
-## Credits
-
-- [Kernel-Assisted Superuser](https://git.zx2c4.com/kernel-assisted-superuser/about/): The KernelSU idea.
-- [Magisk](https://github.com/topjohnwu/Magisk): The powerful root tool.
-- [genuine](https://github.com/brevent/genuine/): APK v2 signature validation.
-- [Diamorphine](https://github.com/m0nad/Diamorphine): Some rootkit skills.
+- [KernelSU](https://github.com/tiann/KernelSU)：本工具基于 KernelSU 管理器二开。
+- [Magisk](https://github.com/topjohnwu/Magisk)：强大的 root 工具箱。
+- [Shizuku](https://github.com/RikkaApps/Shizuku)：提供 ADB 权限通道。
+- [genuine](https://github.com/brevent/genuine/)：apk v2 签名验证。
+- [Diamorphine](https://github.com/m0nad/Diamorphine)：一些 rootkit 技巧。

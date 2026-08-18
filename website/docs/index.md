@@ -1,28 +1,28 @@
 ---
 layout: home
-title: Home
+title: Luoxi Toolbox
 
 hero:
-  name: KernelSU
-  text: A kernel-based root solution for Android
-  tagline: ""
+  name: Luoxi Toolbox
+  text: Game file management tool
+  tagline: "Operate on private game directories via Root or Shizuku"
   image:
     src: /logo.png
-    alt: KernelSU
+    alt: Luoxi Toolbox
   actions:
     - theme: brand
       text: Get started
-      link: /guide/what-is-kernelsu
+      link: https://github.com/xingyeNB886/luoxitoolbox/releases
     - theme: alt
       text: View on GitHub
-      link: https://github.com/tiann/KernelSU
+      link: https://github.com/xingyeNB886/luoxitoolbox
 
 features:
-  - title: Kernel-based
-    details: As the name suggests, KernelSU runs inside the Linux kernel, giving it more control over userspace apps.
-  - title: Root access control
-    details: Only permitted apps can access or see su; all other apps remain unaware of it.
-  - title: Customizable root privileges
-    details: KernelSU allows customization of su's uid, gid, groups, capabilities, and SELinux rules, hardening root privileges.
-  - title: Metamodule system
-    details: Pluggable module infrastructure allows systemless /system modifications. Install a metamodule like meta-overlayfs to enable module mounting.
+  - title: Image cropping
+    details: Select multiple images and crop at device aspect ratio. The crop box stays within the image, never outside.
+  - title: Batch production
+    details: Auto-replicate and rename images to match recorded game filenames, evenly distributed with no quality loss.
+  - title: Safe replacement
+    details: Optional backup before replacing, automatic rollback on failure. No mess left behind.
+  - title: Dual permission
+    details: Supports both Root (KernelSU) and Shizuku (ADB). Auto-detect and use whatever is available.
