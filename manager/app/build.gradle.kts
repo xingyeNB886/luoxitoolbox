@@ -110,6 +110,12 @@ ksp {
     arg("compose-destinations.defaultTransitions", "none")
 }
 
+kotlin {
+    compilerOptions {
+        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21)
+    }
+}
+
 dependencies {
     implementation(libs.gson)
     implementation(libs.androidx.activity.compose)

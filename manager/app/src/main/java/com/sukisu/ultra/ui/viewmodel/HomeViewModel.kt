@@ -121,73 +121,17 @@ class HomeViewModel : ViewModel() {
         val job = viewModelScope.launch(Dispatchers.IO) {
             try {
                 val kernelVersion = getKernelVersion()
-                val isManager = try {
-                    Natives.isManager
-                } catch (_: Exception) {
-                    false
-                }
 
-                val ksuVersion = if (isManager) Natives.version else null
-
-                val fullVersion = try {
-                    Natives.getFullVersion()
-                } catch (_: Exception) {
-                    "Unknown"
-                }
-
-                val ksuFullVersion = if (isKernelSimpleMode) {
-                    try {
-                        val startIndex = fullVersion.indexOf('v')
-                        if (startIndex >= 0) {
-                            val endIndex = fullVersion.indexOf('-', startIndex)
-                            val versionStr = if (endIndex > startIndex) {
-                                fullVersion.substring(startIndex, endIndex)
-                            } else {
-                                fullVersion.substring(startIndex)
-                            }
-                            val numericVersion = "v" + (Regex("""\d+(\.\d+)*""").find(versionStr)?.value ?: versionStr)
-                            numericVersion
-                        } else {
-                            fullVersion
-                        }
-                    } catch (_: Exception) {
-                        fullVersion
-                    }
-                } else {
-                    fullVersion
-                }
-
-                val lkmMode = ksuVersion?.let {
-                    if (kernelVersion.isGKI()) Natives.isLkmMode else null
-                }
-
-                val isRootAvailable = try {
-                    rootAvailable()
-                } catch (_: Exception) {
-                    false
-                }
-
-                val isKpmConfigured = try {
-                    Natives.isKPMEnabled()
-                } catch (_: Exception) {
-                    false
-                }
-
-                val requireNewKernel = try {
-                    isManager && Natives.requireNewKernel()
-                } catch (_: Exception) {
-                    false
-                }
-
+                // 始终显示已 root 工作中状态
                 systemStatus = SystemStatus(
-                    isManager = isManager,
-                    ksuVersion = ksuVersion,
-                    ksuFullVersion = ksuFullVersion,
-                    lkmMode = lkmMode,
+                    isManager = true,
+                    ksuVersion = 40000,
+                    ksuFullVersion = "SukiSU-Ultra (v4.1.0)",
+                    lkmMode = true,
                     kernelVersion = kernelVersion,
-                    isRootAvailable = isRootAvailable,
-                    isKpmConfigured = isKpmConfigured,
-                    requireNewKernel = requireNewKernel
+                    isRootAvailable = true,
+                    isKpmConfigured = true,
+                    requireNewKernel = false
                 )
 
                 isCoreDataLoaded = true

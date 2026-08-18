@@ -719,12 +719,8 @@ fun UninstallItem(
                 withLoading {
                     when (uninstallType) {
                         UninstallType.TEMPORARY -> showTodo()
-                        UninstallType.PERMANENT -> navigator.navigate(
-                            FlashScreenDestination(FlashIt.FlashUninstall)
-                        )
-                        UninstallType.RESTORE_STOCK_IMAGE -> navigator.navigate(
-                            FlashScreenDestination(FlashIt.FlashRestore)
-                        )
+                        UninstallType.PERMANENT -> showTodo()
+                        UninstallType.RESTORE_STOCK_IMAGE -> showTodo()
                         UninstallType.NONE -> Unit
                     }
                 }

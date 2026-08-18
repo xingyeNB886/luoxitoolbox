@@ -37,7 +37,6 @@ import androidx.core.content.pm.PackageInfoCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.ramcosta.composedestinations.annotation.Destination
 import com.ramcosta.composedestinations.annotation.RootGraph
-import com.ramcosta.composedestinations.generated.destinations.InstallScreenDestination
 import com.ramcosta.composedestinations.generated.destinations.SuSFSConfigScreenDestination
 import com.ramcosta.composedestinations.navigation.DestinationsNavigator
 import com.sukisu.ultra.KernelVersion
@@ -136,36 +135,8 @@ fun HomeScreen(navigator: DestinationsNavigator) {
                 // 状态卡片
                 if (viewModel.isCoreDataLoaded) {
                     StatusCard(
-                        systemStatus = viewModel.systemStatus,
-                        onClickInstall = {
-                            navigator.navigate(InstallScreenDestination(preselectedKernelUri = null))
-                        }
+                        systemStatus = viewModel.systemStatus
                     )
-
-                    // 警告信息
-                    if (viewModel.systemStatus.requireNewKernel) {
-                        WarningCard(
-                            stringResource(id = R.string.require_kernel_version).format(
-                                Natives.getSimpleVersionFull(),
-                                Natives.MINIMAL_SUPPORTED_KERNEL_FULL
-                            )
-                        )
-                    }
-
-                    if (viewModel.systemStatus.ksuVersion != null && !viewModel.systemStatus.isRootAvailable) {
-                        WarningCard(
-                            stringResource(id = R.string.grant_root_failed)
-                        )
-                    }
-
-                    // 只有在没有其他警告信息时才显示不兼容内核警告
-                    val shouldShowWarnings = viewModel.systemStatus.requireNewKernel ||
-                            (viewModel.systemStatus.ksuVersion != null && !viewModel.systemStatus.isRootAvailable)
-
-                    if (Natives.version <= Natives.MINIMAL_NEW_IOCTL_KERNEL && !shouldShowWarnings && viewModel.systemStatus.ksuVersion != null) {
-                        IncompatibleKernelCard()
-                        Spacer(Modifier.height(12.dp))
-                    }
                 }
 
                 // 更新检查
@@ -310,10 +281,9 @@ private fun TopBar(
 
                 // 重启按钮
                 var showDropdown by remember { mutableStateOf(false) }
-                KsuIsValid {
-                    IconButton(onClick = {
-                        showDropdown = true
-                    }) {
+                IconButton(onClick = {
+                    showDropdown = true
+                }) {
                         Icon(
                             imageVector = Icons.Filled.PowerSettingsNew,
                             contentDescription = stringResource(id = R.string.reboot)
@@ -336,7 +306,6 @@ private fun TopBar(
                             RebootDropdownItem(id = R.string.reboot_edl, reason = "edl")
                         }
                     }
-                }
             }
         },
         windowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal),
@@ -346,24 +315,17 @@ private fun TopBar(
 
 @Composable
 private fun StatusCard(
-    systemStatus: HomeViewModel.SystemStatus,
-    onClickInstall: () -> Unit = {}
+    systemStatus: HomeViewModel.SystemStatus
 ) {
     ElevatedCard(
         colors = getCardColors(
-            if (systemStatus.ksuVersion != null) MaterialTheme.colorScheme.secondaryContainer
-            else MaterialTheme.colorScheme.errorContainer
+            MaterialTheme.colorScheme.secondaryContainer
         ),
         elevation = getCardElevation(),
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .clickable {
-                    if (systemStatus.isRootAvailable || systemStatus.kernelVersion.isGKI()) {
-                        onClickInstall()
-                    }
-                }
                 .padding(24.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {

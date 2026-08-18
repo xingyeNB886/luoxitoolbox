@@ -51,7 +51,6 @@ import com.sukisu.ultra.ui.component.ZipFileInfo
 import com.sukisu.ultra.ui.screen.BottomBarDestination
 import com.sukisu.ultra.ui.theme.KernelSUTheme
 import com.sukisu.ultra.ui.util.LocalSnackbarHost
-import com.sukisu.ultra.ui.util.install
 import com.sukisu.ultra.ui.viewmodel.HomeViewModel
 import com.sukisu.ultra.ui.viewmodel.SuperUserViewModel
 import com.sukisu.ultra.ui.webui.initPlatform
@@ -92,11 +91,6 @@ class MainActivity : ComponentActivity() {
             }
 
             super.onCreate(savedInstanceState)
-
-            val isManager = Natives.isManager
-            if (isManager && !Natives.requireNewKernel()) {
-                install()
-            }
 
             // 使用标记控制初始化流程
             if (!isInitialized) {
