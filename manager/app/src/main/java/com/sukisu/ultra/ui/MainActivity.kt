@@ -142,12 +142,6 @@ class MainActivity : ComponentActivity() {
             contentResolver.unregisterContentObserver(contentObserver)
         }
 
-        val isManager = Natives.becomeManager(ksuApp.packageName)
-        if (isManager) {
-            install()
-            UltraToolInstall.tryToInstall()
-        }
-
         setContent {
             KernelSUTheme {
                 val navController = rememberNavController()
@@ -236,15 +230,8 @@ class MainActivity : ComponentActivity() {
 @Composable
 private fun BottomBar(navController: NavHostController) {
     val navigator = navController.rememberDestinationsNavigator()
-    val isManager = Natives.becomeManager(ksuApp.packageName)
-    val fullFeatured = isManager && !Natives.requireNewKernel() && rootAvailable()
-    val kpmVersion = getKpmVersion()
     val containerColor = MaterialTheme.colorScheme.surfaceVariant
     val cardColor = MaterialTheme.colorScheme.surfaceVariant
-
-    // 检查是否显示KPM
-    val showKpmInfo = LocalContext.current.getSharedPreferences("settings", Context.MODE_PRIVATE)
-        .getBoolean("show_kpm_info", true)
 
     NavigationBar(
         modifier = Modifier.windowInsetsPadding(
@@ -257,77 +244,38 @@ private fun BottomBar(navController: NavHostController) {
         tonalElevation = cardElevation
     ) {
         BottomBarDestination.entries.forEach { destination ->
-            if (destination == BottomBarDestination.Kpm) {
-                if (kpmVersion.isNotEmpty() && !kpmVersion.startsWith("Error") && showKpmInfo) {
-                    if (!fullFeatured && destination.rootRequired) return@forEach
-                    val isCurrentDestOnBackStack by navController.isRouteOnBackStackAsState(destination.direction)
-                    NavigationBarItem(
-                        selected = isCurrentDestOnBackStack,
-                        onClick = {
-                            if (!isCurrentDestOnBackStack) {
-                                navigator.navigate(destination.direction) {
-                                    popUpTo(NavGraphs.root as RouteOrDirection) {
-                                        saveState = true
-                                    }
-                                    launchSingleTop = true
-                                    restoreState = true
-                                }
+            val isCurrentDestOnBackStack by navController.isRouteOnBackStackAsState(destination.direction)
+            NavigationBarItem(
+                selected = isCurrentDestOnBackStack,
+                onClick = {
+                    if (!isCurrentDestOnBackStack) {
+                        navigator.navigate(destination.direction) {
+                            popUpTo(NavGraphs.root as RouteOrDirection) {
+                                saveState = true
                             }
-                        },
-                        icon = {
-                            Icon(
-                                imageVector = if (isCurrentDestOnBackStack) {
-                                    destination.iconSelected
-                                } else {
-                                    destination.iconNotSelected
-                                },
-                                contentDescription = stringResource(destination.label),
-                                tint = if (isCurrentDestOnBackStack) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        },
-                        label = {
-                            Text(
-                                text = stringResource(destination.label),
-                                style = MaterialTheme.typography.labelMedium
-                            )
+                            launchSingleTop = true
+                            restoreState = true
                         }
+                    }
+                },
+                icon = {
+                    Icon(
+                        imageVector = if (isCurrentDestOnBackStack) {
+                            destination.iconSelected
+                        } else {
+                            destination.iconNotSelected
+                        },
+                        contentDescription = stringResource(destination.label),
+                        tint = if (isCurrentDestOnBackStack) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                },
+                label = {
+                    Text(
+                        text = stringResource(destination.label),
+                        style = MaterialTheme.typography.labelMedium
                     )
                 }
-            } else {
-                if (!fullFeatured && destination.rootRequired) return@forEach
-                val isCurrentDestOnBackStack by navController.isRouteOnBackStackAsState(destination.direction)
-                NavigationBarItem(
-                    selected = isCurrentDestOnBackStack,
-                    onClick = {
-                        if (!isCurrentDestOnBackStack) {
-                            navigator.navigate(destination.direction) {
-                                popUpTo(NavGraphs.root as RouteOrDirection) {
-                                    saveState = true
-                                }
-                                launchSingleTop = true
-                                restoreState = true
-                            }
-                        }
-                    },
-                    icon = {
-                        Icon(
-                            imageVector = if (isCurrentDestOnBackStack) {
-                                destination.iconSelected
-                            } else {
-                                destination.iconNotSelected
-                            },
-                            contentDescription = stringResource(destination.label),
-                            tint = if (isCurrentDestOnBackStack) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    },
-                    label = {
-                        Text(
-                            text = stringResource(destination.label),
-                            style = MaterialTheme.typography.labelMedium
-                        )
-                    }
-                )
-            }
+            )
         }
     }
 }

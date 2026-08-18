@@ -19,6 +19,21 @@ lateinit var ksuApp: KernelSUApplication
 class KernelSUApplication : Application() {
 
     override fun attachBaseContext(base: Context) {
+        // 【第一优先】Hidden API 豁免（在系统创建 ContentProvider 之前！）
+        // ShizukuProvider.onCreate 会反射调用 @hide 系统 API，若未豁免，
+        // Android 9+ 会触发 hidden-api 黑名单 → native SIGABRT（try-catch 接不住）
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            runCatching {
+                org.lsposed.hiddenapibypass.HiddenApiBypass.addHiddenApiExemptions(
+                    "Lrikka/shizuku/",
+                    "Landroid/os/",
+                    "Landroid/content/pm/",
+                    "Landroid/os/UserHandle;",
+                    "L"
+                )
+            }
+        }
+
         val prefs = base.getSharedPreferences("settings", MODE_PRIVATE)
         val languageCode = prefs.getString("app_language", "") ?: ""
 
@@ -63,6 +78,12 @@ class KernelSUApplication : Application() {
         ksuApp = this
 
         Platform.setHiddenApiExemptions()
+
+        // 洛茜工具箱：安装 Shizuku Binder 监听（授权弹窗结果 / Binder 变化 → 推 Flow）
+        // ShizukuProvider 已通过 Manifest 声明，SDK 内部自动初始化，无需手动 initialize
+        runCatching {
+            com.sukisu.ultra.ui.util.PermissionManager.installListenersIfNeeded()
+        }
 
         val context = this
         val iconSize = resources.getDimensionPixelSize(android.R.dimen.app_icon_size)

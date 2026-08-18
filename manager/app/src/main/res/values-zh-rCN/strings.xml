@@ -357,4 +357,41 @@
     <string name="selected">已选择</string>
     <string name="select">选择</string>
     <string name="profile_umount_modules_disable">禁用自定义卸载模块</string>
+
+    <!-- 洛茜工具箱：权限授权页 -->
+    <string name="permission_working">工作中</string>
+    <string name="permission_working_summary">工具箱正在运行</string>
+    <string name="permission_not_working">未工作</string>
+    <string name="permission_tap_to_grant">点击授权</string>
+    <string name="permission_screen_title">权限获取</string>
+    <string name="permission_screen_subtitle">请授予以下任一权限以启用全部功能</string>
+    <string name="permission_shizuku_title">Shizuku</string>
+    <string name="permission_shizuku_summary">通过 Shizuku 服务获取 Shell 级别权限（需安装 Shizuku 应用并激活 ADB）</string>
+    <string name="permission_shizuku_not_granted">未授权</string>
+    <string name="permission_shizuku_granted">已授权</string>
+    <string name="permission_shizuku_request_button">授权 Shizuku</string>
+    <string name="permission_shizuku_not_installed">未检测到 Shizuku 服务，请先安装并激活 Shizuku</string>
+    <string name="permission_root_title">Root</string>
+    <string name="permission_root_summary">通过 su 获取设备 Root 权限（KernelSU / Magisk）</string>
+    <string name="permission_root_not_granted">未授权</string>
+    <string name="permission_root_granted">已授权</string>
+    <string name="permission_root_request_button">请求 Root</string>
+    <string name="permission_refresh_button">刷新状态</string>
+    <string name="permission_grant_type_both">双重授权</string>
+    <string name="permission_shizuku_install_title">没有安装 Shizuku？</string>
+    <string name="permission_shizuku_install_summary">Shizuku 可提供 ADB 级权限，无需 Root 即可使用本工具全部功能。首次安装可能需要授予\"安装未知应用\"权限。</string>
+    <string name="install_shizuku">安装 Shizuku</string>
+    <string name="preparing">准备中…</string>
+    <string name="shizuku_permission_tip">打开 Shizuku → 找到\"洛茜工具箱\" → 开启授权；授权后本页会自动检测（最长 2 分钟）</string>
+    <string name="apk_read_error">读取 APK 失败：%s</string>
+    <string name="init_title">初始化</string>
+    <string name="init_summary_prefix">先授予权限，再进行初始化。仅需一次。</string>
+    <string name="init_status_done">已初始化，无需重复</string>
+    <string name="init_status_no_grant">尚未授权，请先授予上方任一权限</string>
+    <string name="init_status_ready">点按钮开始初始化</string>
+    <string name="init_button_initializing">初始化中…</string>
+    <string name="init_button_done">已完成</string>
+    <string name="init_button">初始化</string>
+    <string name="init_success">初始化完成</string>
+    <string name="init_failed">初始化失败，请检查权限</string>
 </resources>

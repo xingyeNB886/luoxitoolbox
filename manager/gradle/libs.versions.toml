@@ -23,6 +23,8 @@ compose-ui = "1.8.0"
 compose-foundation = "1.7.8"
 documentfile = "1.0.1"
 mmrl = "v33560"
+shizuku = "13.1.5"
+hiddenapibypass = "6.1"
 
 [plugins]
 agp-app = { id = "com.android.application", version.ref = "agp" }
@@ -89,3 +91,7 @@ mmrl-webui = { group = "com.github.MMRLApp.MMRL", name = "webui", version.ref = 
 mmrl-platform = { group = "com.github.MMRLApp.MMRL", name = "platform", version.ref = "mmrl" }
 mmrl-ui = { group = "com.github.MMRLApp.MMRL", name = "ui", version.ref = "mmrl" }
 mmrl-hidden-api = { group = "com.github.MMRLApp.MMRL", name = "hidden-api", version.ref = "mmrl" }
+
+rikka-shizuku-api = { module = "dev.rikka.shizuku:api", version.ref = "shizuku" }
+rikka-shizuku-provider = { module = "dev.rikka.shizuku:provider", version.ref = "shizuku" }
+hiddenapibypass = { module = "org.lsposed.hiddenapibypass:hiddenapibypass", version.ref = "hiddenapibypass" }

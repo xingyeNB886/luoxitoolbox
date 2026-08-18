@@ -274,71 +274,6 @@ fun MoreSettingsScreen(navigator: DestinationsNavigator) {
         )
     }
 
-    // 简洁模式开关状态
-    var isSimpleMode by remember {
-        mutableStateOf(prefs.getBoolean("is_simple_mode", false))
-    }
-
-    // 更新简洁模式开关状态
-    val onSimpleModeChange = { newValue: Boolean ->
-        prefs.edit { putBoolean("is_simple_mode", newValue) }
-        isSimpleMode = newValue
-    }
-
-    // 隐藏内核版本号开关状态
-    var isHideVersion by remember {
-        mutableStateOf(prefs.getBoolean("is_hide_version", false))
-    }
-
-    // 隐藏内核版本号开关状态
-    val onHideVersionChange = { newValue: Boolean ->
-        prefs.edit { putBoolean("is_hide_version", newValue) }
-        isHideVersion = newValue
-    }
-
-    // 隐藏模块数量等信息开关状态
-    var isHideOtherInfo by remember {
-        mutableStateOf(prefs.getBoolean("is_hide_other_info", false))
-    }
-
-    // 隐藏模块数量等信息开关状态
-    val onHideOtherInfoChange = { newValue: Boolean ->
-        prefs.edit { putBoolean("is_hide_other_info", newValue) }
-        isHideOtherInfo = newValue
-    }
-
-    // 显示KPM开关状态
-    var isShowKpmInfo by remember {
-        mutableStateOf(prefs.getBoolean("show_kpm_info", true))
-    }
-
-    // 更新显示KPM开关状态
-    val onShowKpmInfoChange = { newValue: Boolean ->
-        prefs.edit { putBoolean("show_kpm_info", newValue) }
-        isShowKpmInfo = newValue
-    }
-
-    // 隐藏SuSFS状态开关状态
-    var isHideSusfsStatus by remember {
-        mutableStateOf(prefs.getBoolean("is_hide_susfs_status", false))
-    }
-
-    // 隐藏SuSFS状态开关状态
-    val onHideSusfsStatusChange = { newValue: Boolean ->
-        prefs.edit { putBoolean("is_hide_susfs_status", newValue) }
-        isHideSusfsStatus = newValue
-    }
-
-    // 隐藏链接状态开关状态
-    var isHideLinkCard by remember {
-        mutableStateOf(prefs.getBoolean("is_hide_link_card", false))
-    }
-
-    val onHideLinkCardChange = { newValue: Boolean ->
-        prefs.edit { putBoolean("is_hide_link_card", newValue) }
-        isHideLinkCard = newValue
-    }
-
     // SELinux状态
     var selinuxEnabled by remember {
         mutableStateOf(Shell.cmd("getenforce").exec().out.firstOrNull() == "Enforcing")
@@ -356,7 +291,6 @@ fun MoreSettingsScreen(navigator: DestinationsNavigator) {
     var selectedImageUri by remember { mutableStateOf<Uri?>(null) }
 
     // 展开/折叠状态
-    var isCustomizeExpanded by remember { mutableStateOf(false) }
     var isAppearanceExpanded by remember { mutableStateOf(true) }
     var isAdvancedExpanded by remember { mutableStateOf(false) }
     var isDpiExpanded by remember { mutableStateOf(false) }
@@ -953,112 +887,6 @@ fun MoreSettingsScreen(navigator: DestinationsNavigator) {
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.padding(top = 4.dp)
                             )
-                        }
-                    }
-                }
-            }
-
-            // 自定义设置部分
-            SectionHeader(
-                title = stringResource(R.string.custom_settings),
-                expanded = isCustomizeExpanded,
-                onToggle = { isCustomizeExpanded = !isCustomizeExpanded }
-            )
-
-            AnimatedVisibility(
-                visible = isCustomizeExpanded,
-                enter = fadeIn() + expandVertically(),
-                exit = fadeOut() + shrinkVertically()
-            ) {
-                Surface(
-                    shape = RoundedCornerShape(16.dp),
-                    tonalElevation = 1.dp,
-                    modifier = Modifier.padding(bottom = 16.dp)
-                ) {
-                    Column {
-                        // 添加简洁模式开关
-                        SwitchItem(
-                            icon = Icons.Filled.Brush,
-                            title = stringResource(R.string.simple_mode),
-                            summary = stringResource(R.string.simple_mode_summary),
-                            checked = isSimpleMode
-                        ) {
-                            onSimpleModeChange(it)
-                        }
-
-                        HorizontalDivider(
-                            modifier = Modifier.padding(horizontal = 16.dp),
-                            color = MaterialTheme.colorScheme.outlineVariant
-                        )
-
-                        // 隐藏内核部分版本号
-                        SwitchItem(
-                            icon = Icons.Filled.VisibilityOff,
-                            title = stringResource(R.string.hide_kernel_kernelsu_version),
-                            summary = stringResource(R.string.hide_kernel_kernelsu_version_summary),
-                            checked = isHideVersion
-                        ) {
-                            onHideVersionChange(it)
-                        }
-
-                        HorizontalDivider(
-                            modifier = Modifier.padding(horizontal = 16.dp),
-                            color = MaterialTheme.colorScheme.outlineVariant
-                        )
-
-                        // 模块数量等信息
-                        SwitchItem(
-                            icon = Icons.Filled.VisibilityOff,
-                            title = stringResource(R.string.hide_other_info),
-                            summary = stringResource(R.string.hide_other_info_summary),
-                            checked = isHideOtherInfo
-                        ) {
-                            onHideOtherInfoChange(it)
-                        }
-
-                        HorizontalDivider(
-                            modifier = Modifier.padding(horizontal = 16.dp),
-                            color = MaterialTheme.colorScheme.outlineVariant
-                        )
-
-                        // SuSFS 状态信息
-                        SwitchItem(
-                            icon = Icons.Filled.VisibilityOff,
-                            title = stringResource(R.string.hide_susfs_status),
-                            summary = stringResource(R.string.hide_susfs_status_summary),
-                            checked = isHideSusfsStatus
-                        ) {
-                            onHideSusfsStatusChange(it)
-                        }
-
-                        HorizontalDivider(
-                            modifier = Modifier.padding(horizontal = 16.dp),
-                            color = MaterialTheme.colorScheme.outlineVariant
-                        )
-
-                        // 显示KPM开关
-                        SwitchItem(
-                            icon = Icons.Filled.VisibilityOff,
-                            title = stringResource(R.string.show_kpm_info),
-                            summary = stringResource(R.string.show_kpm_info_summary),
-                            checked = isShowKpmInfo
-                        ) {
-                            onShowKpmInfoChange(it)
-                        }
-
-                        HorizontalDivider(
-                            modifier = Modifier.padding(horizontal = 16.dp),
-                            color = MaterialTheme.colorScheme.outlineVariant
-                        )
-
-                        // 隐藏链接信息
-                        SwitchItem(
-                            icon = Icons.Filled.VisibilityOff,
-                            title = stringResource(R.string.hide_link_card),
-                            summary = stringResource(R.string.hide_link_card_summary),
-                            checked = isHideLinkCard
-                        ) {
-                            onHideLinkCardChange(it)
                         }
                     }
                 }

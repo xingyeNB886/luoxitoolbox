@@ -32,20 +32,8 @@ val androidCompileSdkVersion = 36
 val androidCompileNdkVersion = "28.0.13004108"
 val androidSourceCompatibility = JavaVersion.VERSION_21
 val androidTargetCompatibility = JavaVersion.VERSION_21
-val managerVersionCode by extra(1 * 10000 + getGitCommitCount() + 606)
-val managerVersionName by extra(getGitDescribe())
-
-fun getGitCommitCount(): Int {
-    return providers.exec {
-        commandLine("git", "rev-list", "--count", "HEAD")
-    }.standardOutput.asText.get().trim().toInt()
-}
-
-fun getGitDescribe(): String {
-    return providers.exec {
-        commandLine("git", "describe", "--tags", "--always", "--abbrev=0")
-    }.standardOutput.asText.get().trim()
-}
+val managerVersionCode by extra(12900)
+val managerVersionName by extra("v3.1.2")
 
 subprojects {
     plugins.withType(AndroidBasePlugin::class.java) {

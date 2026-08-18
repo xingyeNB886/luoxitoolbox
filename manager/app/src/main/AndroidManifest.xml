@@ -7,6 +7,11 @@
         tools:ignore="ScopedStorage" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
         tools:ignore="ScopedStorage" />
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+
+    <!-- 洛茜工具箱：Shizuku 相关声明 -->
+    <uses-permission android:name="moe.shizuku.api.access.permission.BIND" />
+    <uses-permission android:name="moe.shizuku.manager.permission.API_V23" />
 
 
     <application
@@ -55,6 +60,19 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/filepaths" />
         </provider>
+
+        <!--
+            洛茜工具箱：Shizuku ContentProvider（按 Shizuku 官方接入文档配置）。
+            - exported="true" → 允许 Shizuku App 跨进程调用
+            - permission="android.permission.INTERACT_ACROSS_USERS_FULL" → 系统级跨用户权限
+        -->
+        <provider
+            android:name="rikka.shizuku.ShizukuProvider"
+            android:authorities="${applicationId}.shizuku"
+            android:enabled="true"
+            android:exported="true"
+            android:multiprocess="false"
+            android:permission="android.permission.INTERACT_ACROSS_USERS_FULL" />
     </application>
 
 </manifest>

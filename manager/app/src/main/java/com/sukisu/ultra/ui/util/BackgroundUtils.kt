@@ -19,6 +19,16 @@ data class BackgroundTransformation(
     val offsetY: Float = 0f
 )
 
+/**
+ * 裁剪信息：归一化坐标 (0~1)
+ */
+data class CropInfo(
+    val normX: Float,      // 裁剪框左上角 X (0~1)
+    val normY: Float,      // 裁剪框左上角 Y (0~1)
+    val normWidth: Float,  // 裁剪框宽度 (0~1)
+    val normHeight: Float  // 裁剪框高度 (0~1)
+)
+
 fun Context.getImageBitmap(uri: Uri): Bitmap? {
     return try {
         val contentResolver: ContentResolver = contentResolver
@@ -36,13 +46,11 @@ fun Context.applyTransformationToBitmap(bitmap: Bitmap, transformation: Backgrou
     val width = bitmap.width
     val height = bitmap.height
 
-    // 创建与屏幕比例相同的目标位图
     val displayMetrics = resources.displayMetrics
     val screenWidth = displayMetrics.widthPixels
     val screenHeight = displayMetrics.heightPixels
     val screenRatio = screenHeight.toFloat() / screenWidth.toFloat()
 
-    // 计算目标宽高
     val targetWidth: Int
     val targetHeight: Int
     if (width.toFloat() / height.toFloat() > screenRatio) {
@@ -53,37 +61,30 @@ fun Context.applyTransformationToBitmap(bitmap: Bitmap, transformation: Backgrou
         targetHeight = (width * screenRatio).toInt()
     }
 
-    // 创建与目标相同大小的位图
     val scaledBitmap = createBitmap(targetWidth, targetHeight)
     val canvas = Canvas(scaledBitmap)
 
     val matrix = Matrix()
 
-    // 确保缩放值有效
     val safeScale = maxOf(0.1f, transformation.scale)
     matrix.postScale(safeScale, safeScale)
 
-    // 计算偏移量，确保不会出现负最大值的问题
     val widthDiff = (bitmap.width * safeScale - targetWidth)
     val heightDiff = (bitmap.height * safeScale - targetHeight)
 
-    // 安全计算偏移量边界
     val maxOffsetX = maxOf(0f, widthDiff / 2)
     val maxOffsetY = maxOf(0f, heightDiff / 2)
 
-    // 限制偏移范围
     val safeOffsetX = if (maxOffsetX > 0)
         transformation.offsetX.coerceIn(-maxOffsetX, maxOffsetX) else 0f
     val safeOffsetY = if (maxOffsetY > 0)
         transformation.offsetY.coerceIn(-maxOffsetY, maxOffsetY) else 0f
 
-    // 应用偏移量到矩阵
     val translationX = -widthDiff / 2 + safeOffsetX
     val translationY = -heightDiff / 2 + safeOffsetY
 
     matrix.postTranslate(translationX, translationY)
 
-    // 将原始位图绘制到新位图上
     canvas.drawBitmap(bitmap, matrix, null)
 
     return scaledBitmap
@@ -105,6 +106,40 @@ fun Context.saveTransformedBackground(uri: Uri, transformation: BackgroundTransf
         return Uri.fromFile(file)
     } catch (e: Exception) {
         Log.e("BackgroundUtils", "Failed to save transformed image: ${e.message}", e)
+        return null
+    }
+}
+
+/**
+ * 根据裁剪信息从原图中精确裁剪
+ * 所见即所得：裁剪框内的内容就是最终输出
+ */
+fun Context.cropBackground(uri: Uri, cropInfo: CropInfo): Uri? {
+    try {
+        val bitmap = getImageBitmap(uri) ?: return null
+        val origWidth = bitmap.width
+        val origHeight = bitmap.height
+
+        // 将归一化坐标转换为像素坐标
+        val cropX = (cropInfo.normX * origWidth).toInt().coerceIn(0, origWidth - 1)
+        val cropY = (cropInfo.normY * origHeight).toInt().coerceIn(0, origHeight - 1)
+        val cropW = (cropInfo.normWidth * origWidth).toInt().coerceIn(1, origWidth - cropX)
+        val cropH = (cropInfo.normHeight * origHeight).toInt().coerceIn(1, origHeight - cropY)
+
+        // 精确裁剪
+        val croppedBitmap = Bitmap.createBitmap(bitmap, cropX, cropY, cropW, cropH)
+
+        val fileName = "custom_background_cropped.jpg"
+        val file = File(filesDir, fileName)
+        val outputStream = FileOutputStream(file)
+
+        croppedBitmap.compress(Bitmap.CompressFormat.JPEG, 95, outputStream)
+        outputStream.flush()
+        outputStream.close()
+
+        return Uri.fromFile(file)
+    } catch (e: Exception) {
+        Log.e("BackgroundUtils", "Failed to crop image: ${e.message}", e)
         return null
     }
 }

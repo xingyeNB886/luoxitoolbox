@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name" translatable="false">SukiSU Ultra</string>
+    <string name="app_name" translatable="false">洛茜工具箱</string>
     <string name="home">Home</string>
     <string name="home_not_installed">Not installed</string>
     <string name="home_click_to_install">Click to install</string>
@@ -361,4 +361,41 @@
     <string name="selected">Selected</string>
     <string name="select">option</string>
     <string name="profile_umount_modules_disable">Disable custom uninstallation module</string>
+
+    <!-- 洛茜工具箱：权限授权页 -->
+    <string name="permission_working">Working</string>
+    <string name="permission_working_summary">Toolbox is running</string>
+    <string name="permission_not_working">Not working</string>
+    <string name="permission_tap_to_grant">Tap to grant permission</string>
+    <string name="permission_screen_title">Permission</string>
+    <string name="permission_screen_subtitle">Please grant one of the following privileges to enable full features.</string>
+    <string name="permission_shizuku_title">Shizuku</string>
+    <string name="permission_shizuku_summary">Get shell level access through Shizuku service (device needs Shizuku app installed and ADB activated).</string>
+    <string name="permission_shizuku_not_granted">Not authorized</string>
+    <string name="permission_shizuku_granted">Authorized</string>
+    <string name="permission_shizuku_request_button">Authorize Shizuku</string>
+    <string name="permission_shizuku_not_installed">Shizuku service not detected, please install and activate Shizuku first.</string>
+    <string name="permission_root_title">Root</string>
+    <string name="permission_root_summary">Acquire device root privileges via su (KernelSU / Magisk).</string>
+    <string name="permission_root_not_granted">Not authorized</string>
+    <string name="permission_root_granted">Authorized</string>
+    <string name="permission_root_request_button">Request Root</string>
+    <string name="permission_refresh_button">Refresh status</string>
+    <string name="permission_grant_type_both">Both authorized</string>
+    <string name="permission_shizuku_install_title">Shizuku not installed?</string>
+    <string name="permission_shizuku_install_summary">Get shell-level access via Shizuku to use all features without Root. First install may require \"Install unknown apps\" permission.</string>
+    <string name="install_shizuku">Install Shizuku</string>
+    <string name="preparing">Preparing…</string>
+    <string name="shizuku_permission_tip">Open Shizuku → find \"洛茜工具箱\" → enable authorization; this page will auto-detect after authorization (up to 2 minutes)</string>
+    <string name="apk_read_error">Failed to read APK: %s</string>
+    <string name="init_title">Initialize</string>
+    <string name="init_summary_prefix">Grant permission first, then initialize. Only needs to be done once.</string>
+    <string name="init_status_done">Already initialized, no need to repeat</string>
+    <string name="init_status_no_grant">No permission granted yet, please grant one of the permissions above</string>
+    <string name="init_status_ready">Tap the button to start initialization</string>
+    <string name="init_button_initializing">Initializing…</string>
+    <string name="init_button_done">Done</string>
+    <string name="init_button">Initialize</string>
+    <string name="init_success">Initialization complete</string>
+    <string name="init_failed">Initialization failed, check permissions</string>
 </resources>

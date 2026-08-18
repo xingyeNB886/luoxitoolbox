@@ -61,6 +61,7 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -89,6 +90,7 @@ import androidx.core.content.pm.PackageInfoCompat
 import com.ramcosta.composedestinations.annotation.Destination
 import com.ramcosta.composedestinations.annotation.RootGraph
 import com.ramcosta.composedestinations.generated.destinations.InstallScreenDestination
+import com.ramcosta.composedestinations.generated.destinations.PermissionScreenDestination
 import com.ramcosta.composedestinations.navigation.DestinationsNavigator
 import com.sukisu.ultra.KernelVersion
 import com.sukisu.ultra.Natives
@@ -100,20 +102,10 @@ import com.sukisu.ultra.ui.component.rememberConfirmDialog
 import com.sukisu.ultra.ui.theme.CardConfig
 import com.sukisu.ultra.ui.theme.CardConfig.cardElevation
 import com.sukisu.ultra.ui.theme.getCardColors
+import com.sukisu.ultra.ui.util.PermissionManager
 import com.sukisu.ultra.ui.util.checkNewVersion
-import com.sukisu.ultra.ui.util.getKpmModuleCount
-import com.sukisu.ultra.ui.util.getKpmVersion
-import com.sukisu.ultra.ui.util.getModuleCount
-import com.sukisu.ultra.ui.util.getSELinuxStatus
-import com.sukisu.ultra.ui.util.getSuSFS
-import com.sukisu.ultra.ui.util.getSuSFSFeatures
-import com.sukisu.ultra.ui.util.getSuSFSVariant
-import com.sukisu.ultra.ui.util.getSuSFSVersion
-import com.sukisu.ultra.ui.util.getSuperuserCount
 import com.sukisu.ultra.ui.util.module.LatestVersionInfo
 import com.sukisu.ultra.ui.util.reboot
-import com.sukisu.ultra.ui.util.rootAvailable
-import com.sukisu.ultra.ui.util.susfsSUS_SU_Mode
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.debounce
@@ -128,30 +120,10 @@ import kotlin.random.Random
 @Composable
 fun HomeScreen(navigator: DestinationsNavigator) {
     val context = LocalContext.current
-    var isSimpleMode by rememberSaveable { mutableStateOf(false) }
-    var isHideVersion by rememberSaveable { mutableStateOf(false) }
-    var isHideOtherInfo by rememberSaveable { mutableStateOf(false) }
-    var isHideSusfsStatus by rememberSaveable { mutableStateOf(false) }
-    var isHideLinkCard by rememberSaveable { mutableStateOf(false) }
     var showKpmInfo by rememberSaveable { mutableStateOf(true) }
 
-    // 从 SharedPreferences 加载简洁模式状态
+    // 从 SharedPreferences 加载设置
     LaunchedEffect(Unit) {
-        isSimpleMode = context.getSharedPreferences("settings", Context.MODE_PRIVATE)
-            .getBoolean("is_simple_mode", false)
-
-        isHideVersion = context.getSharedPreferences("settings", Context.MODE_PRIVATE)
-            .getBoolean("is_hide_version", false)
-
-        isHideOtherInfo = context.getSharedPreferences("settings", Context.MODE_PRIVATE)
-            .getBoolean("is_hide_other_info", false)
-
-        isHideSusfsStatus = context.getSharedPreferences("settings", Context.MODE_PRIVATE)
-            .getBoolean("is_hide_susfs_status", false)
-
-        isHideLinkCard = context.getSharedPreferences("settings", Context.MODE_PRIVATE)
-            .getBoolean("is_hide_link_card", false)
-
         showKpmInfo = context.getSharedPreferences("settings", Context.MODE_PRIVATE)
             .getBoolean("show_kpm_info", true)
     }
@@ -159,12 +131,12 @@ fun HomeScreen(navigator: DestinationsNavigator) {
     val kernelVersion = getKernelVersion()
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior(rememberTopAppBarState())
 
-    val isManager = Natives.becomeManager(ksuApp.packageName)
+    val isManager = true
     val deviceModel = getDeviceModel()
-    val ksuVersion = if (isManager) Natives.version else null
-    val zako = "一.*加.*A.*c.*e.*5.*P.*r.*o".toRegex().matches(deviceModel)
-    val isVersion = ksuVersion == 12777
-    val shouldTriggerRestart = zako && kernelVersion.isGKI() && (isVersion)
+    val ksuVersion: Int? = 12900
+    val zako = false
+    val isVersion = false
+    val shouldTriggerRestart = false
 
     LaunchedEffect(shouldTriggerRestart) {
         if (shouldTriggerRestart) {
@@ -207,28 +179,9 @@ fun HomeScreen(navigator: DestinationsNavigator) {
                 WarningCard(message = "zakozako")
                 return@Column
             }
-            val isManager = Natives.becomeManager(ksuApp.packageName)
-            val ksuVersion = if (isManager) Natives.version else null
-            val lkmMode = ksuVersion?.let {
-                if (it >= Natives.MINIMAL_SUPPORTED_KERNEL_LKM && kernelVersion.isGKI()) Natives.isLkmMode else null
-            }
 
-            StatusCard(kernelVersion, ksuVersion, lkmMode) {
-                navigator.navigate(InstallScreenDestination)
-            }
-
-            if (isManager && Natives.requireNewKernel()) {
-                WarningCard(
-                    stringResource(id = R.string.require_kernel_version).format(
-                        ksuVersion, Natives.MINIMAL_SUPPORTED_KERNEL
-                    )
-                )
-            }
-
-            if (ksuVersion != null && !rootAvailable()) {
-                WarningCard(
-                    stringResource(id = R.string.grant_root_failed)
-                )
+            StatusCard {
+                navigator.navigate(PermissionScreenDestination)
             }
 
             val checkUpdate =
@@ -239,59 +192,9 @@ fun HomeScreen(navigator: DestinationsNavigator) {
             }
 
             val prefs = remember { context.getSharedPreferences("app_prefs", Context.MODE_PRIVATE) }
-            var clickCount by rememberSaveable { mutableIntStateOf(prefs.getInt("click_count", 0)) }
-
-            if (!isSimpleMode && clickCount < 3) {
-                AnimatedVisibility(
-                    visible = clickCount < 3,
-                    enter = fadeIn() + expandVertically(),
-                    exit = shrinkVertically() + fadeOut()
-                ) {
-                    ElevatedCard(
-                        colors = getCardColors(MaterialTheme.colorScheme.secondaryContainer),
-                        elevation = CardDefaults.cardElevation(defaultElevation = cardElevation),
-                        modifier = Modifier
-                            .clip(MaterialTheme.shapes.medium)
-                            .shadow(
-                                elevation = cardElevation,
-                                shape = MaterialTheme.shapes.medium,
-                                spotColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
-                            )
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable {
-                                    clickCount++
-                                    prefs.edit { putInt("click_count", clickCount) }
-                                }
-                                .padding(16.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                imageVector = Icons.Outlined.Info,
-                                contentDescription = null,
-                                modifier = Modifier.padding(end = 12.dp)
-                            )
-                            Text(
-                                text = stringResource(R.string.using_mksu_manager),
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                        }
-                    }
-                }
-            }
 
             InfoCard()
 
-            if (!isSimpleMode) {
-                if (!isHideLinkCard) {
-                    ContributionCard()
-                    DonateCard()
-                    LearnMoreCard()
-                }
-            }
             Spacer(Modifier.height(16.dp))
         }
     }
@@ -395,13 +298,11 @@ private fun TopBar(
             scrolledContainerColor = cardColor.copy(alpha = cardAlpha)
         ),
         actions = {
-            if (rootAvailable() || kernelVersion.isGKI()) {
-                IconButton(onClick = onInstallClick) {
-                    Icon(
-                        Icons.Filled.Archive,
-                        contentDescription = stringResource(R.string.install),
-                    )
-                }
+            IconButton(onClick = onInstallClick) {
+                Icon(
+                    Icons.Filled.Archive,
+                    contentDescription = stringResource(R.string.install),
+                )
             }
 
             var showDropdown by remember { mutableStateOf(false) }
@@ -439,11 +340,40 @@ private fun TopBar(
 
 @Composable
 private fun StatusCard(
-    kernelVersion: KernelVersion,
-    ksuVersion: Int?,
-    lkmMode: Boolean?,
-    onClickInstall: () -> Unit = {}
+    onClickGrant: () -> Unit = {}
 ) {
+    var isWorking by remember { mutableStateOf(false) }
+    var grantLabel by remember { mutableStateOf("") }
+
+    // 首次进入检测授权状态（Root / Shizuku）
+    LaunchedEffect(Unit) {
+        withContext(Dispatchers.IO) {
+            isWorking = PermissionManager.isAnyGranted()
+            grantLabel = PermissionManager.getGrantLabel()
+        }
+    }
+
+    // 授权状态变化时自动刷新（Shizuku 授权弹窗回调 / Binder 变化）
+    DisposableEffect(Unit) {
+        val listener: () -> Unit = {
+            isWorking = PermissionManager.isAnyGranted()
+            grantLabel = PermissionManager.getGrantLabel()
+        }
+        PermissionManager.addOnChangeListener(listener)
+        onDispose { PermissionManager.removeOnChangeListener(listener) }
+    }
+
+    val workingText = if (isWorking) {
+        "${stringResource(id = R.string.permission_working)}$grantLabel"
+    } else {
+        stringResource(id = R.string.permission_not_working)
+    }
+    val summaryText = if (isWorking) {
+        stringResource(id = R.string.permission_working_summary)
+    } else {
+        stringResource(id = R.string.permission_tap_to_grant)
+    }
+
     ElevatedCard(
         colors = getCardColors(MaterialTheme.colorScheme.surfaceVariant),
         elevation = CardDefaults.cardElevation(defaultElevation = cardElevation),
@@ -459,157 +389,53 @@ private fun StatusCard(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .clickable {
-                    if (rootAvailable() || kernelVersion.isGKI()) {
-                        onClickInstall()
-                    }
-                }
+                .clickable { onClickGrant() }
                 .padding(24.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            when {
-                ksuVersion != null -> {
-                    val safeMode = when {
-                        Natives.isSafeMode -> " [${stringResource(id = R.string.safe_mode)}]"
-                        else -> ""
-                    }
+            if (isWorking) {
+                Icon(
+                    Icons.Outlined.CheckCircle,
+                    contentDescription = stringResource(R.string.permission_working),
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(24.dp)
+                )
 
-                    val workingMode = when (lkmMode) {
-                        null -> " <Non-GKI>"
-                        true -> " <LKM>"
-                        else -> " <GKI>"
-                    }
-
-                    val workingText = "${stringResource(id = R.string.home_working)}$workingMode$safeMode"
-
-                    val isHideVersion = LocalContext.current.getSharedPreferences("settings", Context.MODE_PRIVATE)
-                        .getBoolean("is_hide_version", false)
-
-                    val isHideOtherInfo = LocalContext.current.getSharedPreferences("settings", Context.MODE_PRIVATE)
-                        .getBoolean("is_hide_other_info", false)
-
-                    val isHideSusfsStatus = LocalContext.current.getSharedPreferences("settings", Context.MODE_PRIVATE)
-                        .getBoolean("is_hide_susfs_status", false)
-
-                    val showKpmInfo = LocalContext.current.getSharedPreferences("settings", Context.MODE_PRIVATE)
-                        .getBoolean("show_kpm_info", true)
-
-                    Icon(
-                        Icons.Outlined.CheckCircle,
-                        contentDescription = stringResource(R.string.home_working),
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(24.dp)
+                Column(Modifier.padding(start = 20.dp)) {
+                    Text(
+                        text = workingText,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurface
                     )
 
-                    Column(Modifier.padding(start = 20.dp)) {
-                        Text(
-                            text = workingText,
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-
-                        if (!isHideVersion) {
-                            Spacer(Modifier.height(4.dp))
-                            Text(
-                                text = stringResource(R.string.home_working_version, ksuVersion),
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-
-                        if (!isHideOtherInfo) {
-                            Spacer(Modifier.height(4.dp))
-                            Text(
-                                text = stringResource(R.string.home_superuser_count, getSuperuserCount()),
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-
-                            Spacer(Modifier.height(4.dp))
-                            Text(
-                                text = stringResource(R.string.home_module_count, getModuleCount()),
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-
-                            val kpmVersion = getKpmVersion()
-                            if (kpmVersion.isNotEmpty() && !kpmVersion.startsWith("Error") && showKpmInfo) {
-                                Spacer(Modifier.height(4.dp))
-                                Text(
-                                    text = stringResource(R.string.home_kpm_module, getKpmModuleCount()),
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                        }
-
-                        if (!isHideSusfsStatus) {
-                            Spacer(modifier = Modifier.height(4.dp))
-
-                            val suSFS = getSuSFS()
-                            if (lkmMode != true) {
-                                val translatedStatus = when (suSFS) {
-                                    "Supported" -> stringResource(R.string.status_supported)
-                                    "Not Supported" -> stringResource(R.string.status_not_supported)
-                                    else -> stringResource(R.string.status_unknown)
-                                }
-
-                                Text(
-                                    text = stringResource(R.string.home_susfs, translatedStatus),
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                        }
-                    }
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        text = summaryText,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
+            } else {
+                Icon(
+                    Icons.Outlined.Warning,
+                    contentDescription = stringResource(R.string.permission_not_working),
+                    tint = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.size(24.dp)
+                )
 
-                kernelVersion.isGKI() -> {
-                    Icon(
-                        Icons.Outlined.Warning,
-                        contentDescription = stringResource(R.string.home_not_installed),
-                        tint = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.size(24.dp)
+                Column(Modifier.padding(start = 20.dp)) {
+                    Text(
+                        text = workingText,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.error
                     )
 
-                    Column(Modifier.padding(start = 20.dp)) {
-                        Text(
-                            text = stringResource(R.string.home_not_installed),
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.error
-                        )
-
-                        Spacer(Modifier.height(4.dp))
-                        Text(
-                            text = stringResource(R.string.home_click_to_install),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-
-                else -> {
-                    Icon(
-                        Icons.Outlined.Block,
-                        contentDescription = stringResource(R.string.home_unsupported),
-                        tint = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.size(24.dp)
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        text = summaryText,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-
-                    Column(Modifier.padding(start = 20.dp)) {
-                        Text(
-                            text = stringResource(R.string.home_unsupported),
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.error
-                        )
-
-                        Spacer(Modifier.height(4.dp))
-                        Text(
-                            text = stringResource(R.string.home_unsupported_reason),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
                 }
             }
         }
@@ -793,12 +619,7 @@ fun DonateCard() {
 
 @Composable
 private fun InfoCard() {
-    val lkmMode = Natives.isLkmMode
     val context = LocalContext.current
-    val isSimpleMode = LocalContext.current.getSharedPreferences("settings", Context.MODE_PRIVATE)
-        .getBoolean("is_simple_mode", false)
-    val showKpmInfo = LocalContext.current.getSharedPreferences("settings", Context.MODE_PRIVATE)
-        .getBoolean("show_kpm_info", true)
 
     ElevatedCard(
         colors = getCardColors(MaterialTheme.colorScheme.surfaceContainerHighest),
@@ -816,17 +637,14 @@ private fun InfoCard() {
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(start = 24.dp, top = 24.dp, end = 24.dp, bottom = 16.dp),
-        ) withContext@{
-            val contents = StringBuilder()
-            val uname = Os.uname()
-
+        ) {
             @Composable
             fun InfoCardItem(
                 label: String,
                 content: String,
-                icon: ImageVector = Icons.Default.Info
+                icon: ImageVector = Icons.Default.Info,
+                iconTint: Color = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f)
             ) {
-                contents.appendLine(label).appendLine(content).appendLine()
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
@@ -837,7 +655,7 @@ private fun InfoCard() {
                         imageVector = icon,
                         contentDescription = label,
                         modifier = Modifier.size(24.dp),
-                        tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f),
+                        tint = iconTint,
                     )
                     Spacer(modifier = Modifier.width(16.dp))
                     Column(
@@ -860,96 +678,44 @@ private fun InfoCard() {
                 }
             }
 
+            // 安卓版本（原内核版本，图标换色：绿色）
+            val androidVersion = Build.VERSION.RELEASE
             InfoCardItem(
-                stringResource(R.string.home_kernel),
-                "${uname.release} (${uname.machine})",
-                icon = Icons.Default.Memory,
+                "安卓版本",
+                androidVersion,
+                icon = Icons.Default.Android,
+                iconTint = Color(0xFF3DDC84)
             )
 
-            if (!isSimpleMode) {
-                val androidVersion = Build.VERSION.RELEASE
-                InfoCardItem(
-                    stringResource(R.string.home_android_version),
-                    androidVersion,
-                    icon = Icons.Default.Android,
-                )
-            }
+            // 设备分辨率（原 Linux，图标换色：蓝色）
+            val displayMetrics = context.resources.displayMetrics
+            val screenWidth = displayMetrics.widthPixels
+            val screenHeight = displayMetrics.heightPixels
+            val densityDpi = displayMetrics.densityDpi
+            InfoCardItem(
+                "设备分辨率",
+                "${screenWidth} × ${screenHeight} (${densityDpi}dpi)",
+                icon = Icons.Default.PhoneAndroid,
+                iconTint = Color(0xFF4285F4)
+            )
 
+            // 设备型号（图标换色：橙色）
             val deviceModel = getDeviceModel()
             InfoCardItem(
                 stringResource(R.string.home_device_model),
                 deviceModel,
                 icon = Icons.Default.PhoneAndroid,
+                iconTint = Color(0xFFFFA726)
             )
 
+            // 工具箱版本（原管理器版本，图标换色：紫色）
             val managerVersion = getManagerVersion(context)
             InfoCardItem(
-                stringResource(R.string.home_manager_version),
+                "工具箱版本",
                 "${managerVersion.first} (${managerVersion.second})",
                 icon = Icons.Default.Settings,
+                iconTint = Color(0xFFAB47BC)
             )
-
-            InfoCardItem(
-                stringResource(R.string.home_selinux_status),
-                getSELinuxStatus(),
-                icon = Icons.Default.Security,
-            )
-
-            if (!isSimpleMode) {
-                if (lkmMode != true) {
-                    val kpmVersion = getKpmVersion()
-                    val isKpmConfigured = checkKpmConfigured()
-
-                    // 根据showKpmInfo决定是否显示KPM信息
-                    if (showKpmInfo) {
-                        val displayVersion = if (kpmVersion.isEmpty() || kpmVersion.startsWith("Error")) {
-                            val statusText = if (isKpmConfigured) {
-                                stringResource(R.string.kernel_patched)
-                            } else {
-                                stringResource(R.string.kernel_not_enabled)
-                            }
-                            "${stringResource(R.string.not_supported)} ($statusText)"
-                        } else {
-                            "${stringResource(R.string.supported)} ($kpmVersion)"
-                        }
-
-                        InfoCardItem(
-                            stringResource(R.string.home_kpm_version),
-                            displayVersion,
-                            icon = Icons.Default.Code
-                        )
-                    }
-                }
-            }
-
-            val isHideSusfsStatus = LocalContext.current.getSharedPreferences("settings", Context.MODE_PRIVATE)
-                .getBoolean("is_hide_susfs_status", false)
-
-            if ((!isSimpleMode) && (!isHideSusfsStatus)) {
-                val suSFS = getSuSFS()
-                if (suSFS == "Supported") {
-                    val suSFSVersion = getSuSFSVersion()
-                    if (suSFSVersion.isNotEmpty()) {
-                        val isSUS_SU = getSuSFSFeatures() == "CONFIG_KSU_SUSFS_SUS_SU"
-                        val infoText = buildString {
-                            append(suSFSVersion)
-                            append(if (isSUS_SU) " (${getSuSFSVariant()})" else " (${stringResource(R.string.manual_hook)})")
-                            if (isSUS_SU) {
-                                val susSUMode = try { susfsSUS_SU_Mode().toString() } catch (_: Exception) { "" }
-                                if (susSUMode.isNotEmpty()) {
-                                    append(" ${stringResource(R.string.sus_su_mode)} $susSUMode")
-                                }
-                            }
-                        }
-
-                        InfoCardItem(
-                            stringResource(R.string.home_susfs_version),
-                            infoText,
-                            icon = Icons.Default.Storage
-                        )
-                    }
-                }
-            }
         }
     }
 }
@@ -964,10 +730,7 @@ fun getManagerVersion(context: Context): Pair<String, Long> {
 @Composable
 private fun StatusCardPreview() {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        StatusCard(KernelVersion(5, 10, 101), 1, null)
-        StatusCard(KernelVersion(5, 10, 101), 20000, true)
-        StatusCard(KernelVersion(5, 10, 101), null, true)
-        StatusCard(KernelVersion(4, 10, 101), null, false)
+        StatusCard {}
     }
 }
 

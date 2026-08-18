@@ -8,10 +8,6 @@ import com.sukisu.ultra.ksuApp
 fun KsuIsValid(
     content: @Composable () -> Unit
 ) {
-    val isManager = Natives.becomeManager(ksuApp.packageName)
-    val ksuVersion = if (isManager) Natives.version else null
-
-    if (ksuVersion != null) {
-        content()
-    }
+    // 始终显示内容，不检查 root 状态
+    content()
 }

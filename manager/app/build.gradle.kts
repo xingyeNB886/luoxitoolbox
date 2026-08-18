@@ -42,6 +42,9 @@ android {
         release {
             isMinifyEnabled = true
             isShrinkResources = true
+            ndk {
+                abiFilters += listOf("arm64-v8a")
+            }
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
         /**debug {
@@ -158,5 +161,9 @@ dependencies {
     compileOnly(libs.mmrl.hidden.api)
     implementation(libs.mmrl.webui)
     implementation(libs.mmrl.ui)
+
+    implementation(libs.rikka.shizuku.api)
+    implementation(libs.rikka.shizuku.provider)
+    implementation(libs.hiddenapibypass)
 
 }
