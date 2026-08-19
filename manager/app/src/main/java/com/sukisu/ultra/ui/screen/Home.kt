@@ -104,7 +104,6 @@ import com.sukisu.ultra.ui.theme.CardConfig
 import com.sukisu.ultra.ui.theme.CardConfig.cardElevation
 import com.sukisu.ultra.ui.theme.getCardColors
 import com.sukisu.ultra.ui.util.getKpmModuleCount
-import com.sukisu.ultra.ui.util.getKpmVersion
 import com.sukisu.ultra.ui.util.getModuleCount
 import com.sukisu.ultra.ui.util.getSuSFS
 import com.sukisu.ultra.ui.util.getSuperuserCount
@@ -373,17 +372,18 @@ private fun StatusCard(
             superuserCount = runCatching { getSuperuserCount() }.getOrDefault(0)
             moduleCount = runCatching { getModuleCount() }.getOrDefault(0)
 
-            // KPM 模块数（KPM 版本可读时才展示；尊重用户"显示 KPM 功能"开关）
-            val kpmVersion = runCatching { getKpmVersion() }.getOrDefault("")
+            // KPM 模块数（始终显示；无 KPM 驱动时如实显示 0）
+            kpmModuleCount = runCatching { getKpmModuleCount() }.getOrDefault(0)
+            // 尊重用户"显示 KPM 功能"开关
             val showKpmPref = context.getSharedPreferences("settings", Context.MODE_PRIVATE)
                 .getBoolean("show_kpm_info", true)
-            showKpmInfo = kpmVersion.isNotEmpty() && !kpmVersion.startsWith("Error") && showKpmPref
-            if (showKpmInfo) {
-                kpmModuleCount = runCatching { getKpmModuleCount() }.getOrDefault(0)
-            }
+            showKpmInfo = showKpmPref
 
-            // SUSFS 支持状态
+            // SusFS 支持状态（始终显示；空时显示"未知"）
             susfsSupport = runCatching { getSuSFS() }.getOrDefault("")
+            if (susfsSupport.isBlank()) {
+                susfsSupport = "Unknown"
+            }
         }
     }
 
@@ -469,17 +469,15 @@ private fun StatusCard(
                             value = kpmModuleCount.toString()
                         )
                     }
-                    if (susfsSupport.isNotEmpty()) {
-                        val translated = when (susfsSupport) {
-                            "Supported" -> stringResource(R.string.status_supported)
-                            "Not Supported" -> stringResource(R.string.status_not_supported)
-                            else -> stringResource(R.string.status_unknown)
-                        }
-                        StatusInfoRow(
-                            label = stringResource(R.string.home_susfs_label),
-                            value = translated
-                        )
+                    val susfsTranslated = when (susfsSupport) {
+                        "Supported" -> stringResource(R.string.status_supported)
+                        "Not Supported" -> stringResource(R.string.status_not_supported)
+                        else -> stringResource(R.string.status_unknown)
                     }
+                    StatusInfoRow(
+                        label = stringResource(R.string.home_susfs_label),
+                        value = susfsTranslated
+                    )
                 }
             } else {
                 Icon(
