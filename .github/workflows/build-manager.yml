@@ -125,8 +125,8 @@ jobs:
     with:
       target: ${{ matrix.target }}
       os: ${{ matrix.os }}
-      pack_lkm: true
-      pull_lkm: ${{ needs.check-build-lkm.outputs.build_lkm != 'true' }}
+      pack_lkm: false
+      pull_lkm: false
 
   build-manager:
     if: ${{ always() }}
