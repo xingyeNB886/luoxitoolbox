@@ -98,9 +98,6 @@ class AdbClient(
             tlsSocket = sslContext.socketFactory.createSocket(
                 socket, host, port, true
             ) as SSLSocket
-            tlsSocket.sslParameters = tlsSocket.sslParameters.apply {
-                applicationProtocols = emptyList()
-            }
             tlsSocket.startHandshake()
             Log.d(TAG, "TLS 握手成功")
 
@@ -242,19 +239,7 @@ class AdbClient(
             override fun getServerAliases(
                 keyType: String,
                 issuers: Array<out java.security.Principal>?
-            ) = null
-
-            override fun chooseServerAlias(
-                keyType: String,
-                issuers: Array<out java.security.Principal>?,
-                engine: javax.net.ssl.SSLEngine?
-            ) = null
-
-            override fun chooseServerAlias(
-                keyType: String,
-                issuers: Array<out java.security.Principal>?,
-                socket: Socket?
-            ) = null
+            ): Array<String>? = null
         }
 
         val trustManager = object : X509ExtendedTrustManager() {
