@@ -3,6 +3,8 @@
 import com.android.build.api.dsl.ApkSigningConfig
 import com.android.build.gradle.internal.api.BaseVariantOutputImpl
 import com.android.build.gradle.tasks.PackageAndroidArtifact
+import java.security.KeyStore
+import java.security.MessageDigest
 
 plugins {
     alias(libs.plugins.agp.app)
@@ -49,13 +51,13 @@ android {
             if (!ksFile.isNullOrEmpty() && file(ksFile).exists()
                 && !ksPass.isNullOrEmpty() && !ksAlias.isNullOrEmpty()
             ) {
-                val ks = java.security.KeyStore.getInstance("JKS")
+                val ks = KeyStore.getInstance("JKS")
                 file(ksFile).inputStream().use { fis ->
                     ks.load(fis, ksPass.toCharArray())
                 }
                 val cert = ks.getCertificate(ksAlias)
                 if (cert != null) {
-                    java.security.MessageDigest.getInstance("SHA-256")
+                    MessageDigest.getInstance("SHA-256")
                         .digest(cert.encoded)
                         .joinToString("") { "%02x".format(it) }
                 } else ""
