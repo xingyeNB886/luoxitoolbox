@@ -225,6 +225,34 @@ jobs:
           mkdir -p app/src/main/jniLibs/arm64-v8a
           cp -f ../arm64-v8a/zakozakozako ../manager/app/src/main/jniLibs/arm64-v8a/libzakozakozako.so
 
+      - name: Pre-download Gradle distribution
+        working-directory: ./manager
+        run: |
+          GRADLE_VERSION=8.12.1
+          GRADLE_ZIP=gradle-${GRADLE_VERSION}-bin.zip
+          GRADLE_DIST_DIR=${HOME}/.gradle/wrapper/dists/gradle-${GRADLE_VERSION}-bin
+          mkdir -p "${GRADLE_DIST_DIR}"
+          # Try multiple mirrors
+          for URL in \
+            "https://services.gradle.org/distributions/${GRADLE_ZIP}" \
+            "https://downloads.gradle-dn.com/distributions/${GRADLE_ZIP}" \
+            "https://mirror.tsinghua.edu.cn/gradle/${GRADLE_ZIP}" \
+          ; do
+            echo "Trying: $URL"
+            if wget -q --tries=3 --timeout=30 -O "${GRADLE_DIST_DIR}/${GRADLE_ZIP}" "$URL"; then
+              echo "Downloaded from: $URL"
+              break
+            fi
+          done
+          # Compute hash dir like the wrapper does
+          HASH=$(sha1sum "${GRADLE_DIST_DIR}/${GRADLE_ZIP}" | awk '{print $1}')
+          HASH_DIR="${GRADLE_DIST_DIR}/${HASH}"
+          mkdir -p "${HASH_DIR}"
+          cd "${HASH_DIR}"
+          unzip -q "../${GRADLE_ZIP}"
+          touch "${GRADLE_ZIP}.ok"
+          echo "Gradle pre-installed at: ${HASH_DIR}"
+
       - name: Build with Gradle
         run: |
           {
