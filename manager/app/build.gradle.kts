@@ -165,5 +165,6 @@ dependencies {
     implementation(libs.rikka.shizuku.api)
     implementation(libs.rikka.shizuku.provider)
     implementation(libs.hiddenapibypass)
+    implementation(libs.bouncycastle)
 
 }

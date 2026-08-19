@@ -2,6 +2,8 @@ package com.sukisu.ultra.ui.screen
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import android.os.Build
 import android.os.PowerManager
 import android.system.Os
@@ -47,6 +49,7 @@ import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Warning
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ElevatedCard
@@ -56,6 +59,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.TopAppBarScrollBehavior
@@ -83,8 +87,12 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
 import androidx.core.content.edit
 import androidx.core.content.pm.PackageInfoCompat
 import com.ramcosta.composedestinations.annotation.Destination
@@ -108,6 +116,7 @@ import com.sukisu.ultra.ui.util.getModuleCount
 import com.sukisu.ultra.ui.util.getSuSFS
 import com.sukisu.ultra.ui.util.getSuperuserCount
 import com.sukisu.ultra.ui.util.PermissionManager
+import com.sukisu.ultra.ui.util.CloudUpdateManager
 import com.sukisu.ultra.ui.util.checkNewVersion
 import com.sukisu.ultra.ui.util.getRealResolution
 import com.sukisu.ultra.ui.util.module.LatestVersionInfo
@@ -159,6 +168,25 @@ fun HomeScreen(navigator: DestinationsNavigator) {
     val debounceTime = 100L
     var lastScrollTime by remember { mutableLongStateOf(0L) }
 
+    // 云端数据：强制更新 / 公告 / 历史版本（从QQ收藏读取）
+    val cloudData by produceState(initialValue = CloudUpdateManager.CloudData()) {
+        value = withContext(Dispatchers.IO) {
+            CloudUpdateManager.fetchCloudData()
+        }
+    }
+    // 云端版本 > 本地版本 → 强制更新（代码层常开，不提供关闭入口）
+    val localVersion = CloudUpdateManager.getLocalVersion()
+    val cloudVersion = cloudData.internalVersion
+    val showForceUpdate = cloudVersion > 0 && cloudVersion > localVersion
+
+    if (showForceUpdate) {
+        ForceUpdateDialog(
+            localVersion = localVersion,
+            cloudVersion = cloudVersion,
+            downloadUrl = cloudData.downloadUrl
+        )
+    }
+
     Scaffold(
         topBar = {
             TopBar(
@@ -190,16 +218,18 @@ fun HomeScreen(navigator: DestinationsNavigator) {
                 navigator.navigate(PermissionScreenDestination)
             }
 
-            val checkUpdate =
-                LocalContext.current.getSharedPreferences("settings", Context.MODE_PRIVATE)
-                    .getBoolean("check_update", true)
-            if (checkUpdate) {
-                UpdateCard()
-            }
-
             val prefs = remember { context.getSharedPreferences("app_prefs", Context.MODE_PRIVATE) }
 
             InfoCard()
+
+            // 公告卡片 - 从QQ收藏读取
+            if (cloudData.announcement.isNotBlank()) {
+                AnnouncementCard(announcement = cloudData.announcement)
+            }
+            // 历史版本卡片 - 从QQ收藏读取
+            if (cloudData.versionHistory.isNotBlank()) {
+                VersionHistoryCard(versionHistory = cloudData.versionHistory)
+            }
 
             Spacer(Modifier.height(16.dp))
         }
@@ -435,13 +465,6 @@ private fun StatusCard(
                         text = workingText,
                         style = MaterialTheme.typography.titleMedium,
                         color = MaterialTheme.colorScheme.onSurface
-                    )
-
-                    Spacer(Modifier.height(4.dp))
-                    Text(
-                        text = summaryText,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
 
                     // 状态卡下方信息行：标签+冒号+值，一行一句（原版样式）
@@ -858,5 +881,161 @@ fun Modifier.disableOverscroll(): Modifier = composed {
         this
     } else {
         this
+    }
+}
+
+/**
+ * 强制更新弹窗（从备份工具箱移植）
+ * 只有两个选择：退出（左）和 更新（右）
+ */
+@Composable
+fun ForceUpdateDialog(
+    localVersion: Int,
+    cloudVersion: Int,
+    downloadUrl: String
+) {
+    val context = LocalContext.current
+    val localVerStr = BuildConfig.VERSION_NAME
+    val cloudVerStr = "${cloudVersion / 1000000}.${(cloudVersion % 1000000) / 1000}.${cloudVersion % 1000}"
+
+    Dialog(onDismissRequest = { /* 强制更新，不可关闭 */ }) {
+        androidx.compose.material3.Card(
+            colors = androidx.compose.material3.CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surface
+            ),
+            shape = androidx.compose.foundation.shape.RoundedCornerShape(20.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(modifier = Modifier.padding(24.dp)) {
+                Text(
+                    text = stringResource(R.string.force_update_title),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Spacer(Modifier.height(12.dp))
+                Text(
+                    text = stringResource(R.string.force_update_current_version, localVerStr),
+                    fontSize = 14.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    text = stringResource(R.string.force_update_latest_version, cloudVerStr),
+                    fontSize = 14.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(Modifier.height(12.dp))
+                Text(
+                    text = stringResource(R.string.force_update_version_msg),
+                    fontSize = 14.sp,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Spacer(Modifier.height(20.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    TextButton(onClick = {
+                        android.os.Process.killProcess(android.os.Process.myPid())
+                    }) {
+                        Text(stringResource(R.string.force_update_exit))
+                    }
+                    Spacer(Modifier.width(12.dp))
+                    TextButton(onClick = {
+                        try {
+                            context.startActivity(
+                                Intent(Intent.ACTION_VIEW, Uri.parse(downloadUrl))
+                            )
+                        } catch (_: Exception) {
+                        }
+                    }) {
+                        Text(
+                            text = stringResource(R.string.force_update_update),
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * 公告卡片（从备份工具箱移植）
+ */
+@Composable
+fun AnnouncementCard(announcement: String) {
+    ElevatedCard(
+        colors = getCardColors(MaterialTheme.colorScheme.surfaceContainerLow),
+        elevation = CardDefaults.cardElevation(defaultElevation = cardElevation),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(MaterialTheme.shapes.large)
+            .shadow(
+                elevation = cardElevation,
+                shape = MaterialTheme.shapes.large,
+                spotColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
+            )
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(18.dp)
+        ) {
+            Text(
+                text = stringResource(R.string.home_announcement_title),
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = announcement,
+                fontSize = 14.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                lineHeight = 20.sp,
+                textAlign = TextAlign.Start
+            )
+        }
+    }
+}
+
+/**
+ * 历史版本卡片（从备份工具箱移植）
+ */
+@Composable
+fun VersionHistoryCard(versionHistory: String) {
+    ElevatedCard(
+        colors = getCardColors(MaterialTheme.colorScheme.surfaceContainerLow),
+        elevation = CardDefaults.cardElevation(defaultElevation = cardElevation),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(MaterialTheme.shapes.large)
+            .shadow(
+                elevation = cardElevation,
+                shape = MaterialTheme.shapes.large,
+                spotColor = MaterialTheme.colorScheme.secondary.copy(alpha = 0.08f)
+            )
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(18.dp)
+        ) {
+            Text(
+                text = stringResource(R.string.home_version_history_title),
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = versionHistory,
+                fontSize = 14.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                lineHeight = 20.sp,
+                textAlign = TextAlign.Start
+            )
+        }
     }
 }

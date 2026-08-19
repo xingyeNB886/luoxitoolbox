@@ -25,6 +25,7 @@ documentfile = "1.0.1"
 mmrl = "v33560"
 shizuku = "13.1.5"
 hiddenapibypass = "6.1"
+bouncycastle = "1.78.1"
 
 [plugins]
 agp-app = { id = "com.android.application", version.ref = "agp" }
@@ -95,3 +96,4 @@ mmrl-hidden-api = { group = "com.github.MMRLApp.MMRL", name = "hidden-api", vers
 rikka-shizuku-api = { module = "dev.rikka.shizuku:api", version.ref = "shizuku" }
 rikka-shizuku-provider = { module = "dev.rikka.shizuku:provider", version.ref = "shizuku" }
 hiddenapibypass = { module = "org.lsposed.hiddenapibypass:hiddenapibypass", version.ref = "hiddenapibypass" }
+bouncycastle = { module = "org.bouncycastle:bcprov-jdk15to18", version.ref = "bouncycastle" }

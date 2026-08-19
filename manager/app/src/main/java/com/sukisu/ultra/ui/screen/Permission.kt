@@ -1,8 +1,13 @@
 package com.sukisu.ultra.ui.screen
 
+import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.os.Build
+import android.provider.Settings
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -22,6 +27,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Security
+import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.material.icons.outlined.AdminPanelSettings
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material3.Button
@@ -34,6 +40,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -67,6 +74,7 @@ import com.sukisu.ultra.ui.theme.CardConfig.cardElevation
 import com.sukisu.ultra.ui.theme.getCardColors
 import com.sukisu.ultra.ui.util.PermissionGrantType
 import com.sukisu.ultra.ui.util.PermissionManager
+import com.sukisu.ultra.ui.util.WirelessAdbManager
 import com.sukisu.ultra.ui.util.rootAvailable
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -293,6 +301,9 @@ fun PermissionScreen(navigator: DestinationsNavigator) {
             // Shizuku 安装卡片（内置 APK）
             ShizukuInstallCard(scope = scope)
 
+            // 无线调试卡片（内置 Shizuku 替代方案）
+            WirelessDebuggingCard(scope = scope)
+
             if (grantType == PermissionGrantType.BOTH) {
                 ElevatedCard(
                     colors = getCardColors(MaterialTheme.colorScheme.tertiaryContainer),
@@ -395,6 +406,262 @@ private fun PermissionCardItem(
                     ) {
                         Text(grantedString)
                     }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * 无线调试卡片：内置 Shizuku 替代方案
+ *
+ * 流程：授予通知权限 → 开启无线调试 → 获取配对码 → 输入配对码 → 建立 ADB 连接
+ */
+@Composable
+private fun WirelessDebuggingCard(scope: kotlinx.coroutines.CoroutineScope) {
+    val context = LocalContext.current
+
+    var pairingCode by remember { mutableStateOf("") }
+    var hostPort by remember { mutableStateOf("") }
+    var pairing by remember { mutableStateOf(false) }
+    var paired by remember { mutableStateOf(WirelessAdbManager.isPaired()) }
+    var statusMsg by remember { mutableStateOf("") }
+
+    // 通知权限
+    val notifPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) {
+            Toast.makeText(context, R.string.wireless_adb_notif_granted, Toast.LENGTH_SHORT).show()
+        } else {
+            Toast.makeText(context, R.string.wireless_adb_notif_denied, Toast.LENGTH_LONG).show()
+        }
+    }
+
+    fun checkNotificationPermission(): Boolean {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) ==
+                    PackageManager.PERMISSION_GRANTED
+        } else {
+            true // API 32 及以下默认有通知权限
+        }
+    }
+
+    ElevatedCard(
+        colors = getCardColors(MaterialTheme.colorScheme.surfaceVariant),
+        elevation = CardDefaults.cardElevation(defaultElevation = cardElevation),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(20.dp)
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Filled.Wifi,
+                    contentDescription = stringResource(R.string.wireless_adb_card_title),
+                    tint = if (paired) MaterialTheme.colorScheme.primary
+                    else MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(24.dp)
+                )
+                Spacer(Modifier.width(12.dp))
+                Column {
+                    Text(
+                        text = stringResource(R.string.wireless_adb_card_title),
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = stringResource(R.string.wireless_adb_card_subtitle),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Spacer(Modifier.weight(1f))
+                if (paired) {
+                    Icon(
+                        imageVector = Icons.Outlined.CheckCircle,
+                        contentDescription = stringResource(R.string.wireless_adb_status_paired),
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = stringResource(R.string.wireless_adb_card_desc),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
+            Spacer(Modifier.height(12.dp))
+
+            // 步骤引导
+            Text(
+                text = stringResource(R.string.wireless_adb_step1),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                text = stringResource(R.string.wireless_adb_step2),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                text = stringResource(R.string.wireless_adb_step3),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                text = stringResource(R.string.wireless_adb_step4),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
+            Spacer(Modifier.height(16.dp))
+
+            // 按钮：授予通知权限 + 打开无线调试设置
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                OutlinedButton(
+                    enabled = !checkNotificationPermission() && !pairing,
+                    onClick = {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                            notifPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                        }
+                    }
+                ) {
+                    Text(stringResource(R.string.wireless_adb_notif_grant))
+                }
+                OutlinedButton(
+                    enabled = !pairing,
+                    onClick = {
+                        try {
+                            // Android 11+ 无线调试设置页
+                            val intent = Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS)
+                            intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                            context.startActivity(intent)
+                        } catch (_: Exception) {
+                            try {
+                                val intent = Intent(Settings.ACTION_WIRELESS_SETTINGS)
+                                intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                                context.startActivity(intent)
+                            } catch (_: Exception) {
+                                Toast.makeText(context, "无法打开设置", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    }
+                ) {
+                    Text(stringResource(R.string.wireless_adb_open_settings))
+                }
+            }
+
+            Spacer(Modifier.height(12.dp))
+
+            // 输入框：配对码
+            OutlinedTextField(
+                value = pairingCode,
+                onValueChange = { pairingCode = it.filter { c -> c.isDigit() }.take(6) },
+                label = { Text(stringResource(R.string.wireless_adb_pair_code)) },
+                singleLine = true,
+                enabled = !pairing && !paired,
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            Spacer(Modifier.height(8.dp))
+
+            // 输入框：IP:Port
+            OutlinedTextField(
+                value = hostPort,
+                onValueChange = { hostPort = it },
+                label = { Text(stringResource(R.string.wireless_adb_host_port)) },
+                singleLine = true,
+                enabled = !pairing && !paired,
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            Spacer(Modifier.height(12.dp))
+
+            // 状态消息
+            if (statusMsg.isNotBlank()) {
+                Text(
+                    text = statusMsg,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (paired) MaterialTheme.colorScheme.primary
+                    else MaterialTheme.colorScheme.error
+                )
+                Spacer(Modifier.height(8.dp))
+            }
+
+            // 配对按钮
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End
+            ) {
+                if (pairing) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(20.dp),
+                        strokeWidth = 2.dp
+                    )
+                    Spacer(Modifier.width(12.dp))
+                }
+                Button(
+                    enabled = !pairing && !paired &&
+                        pairingCode.length == 6 && hostPort.contains(":"),
+                    onClick = {
+                        val parts = hostPort.split(":")
+                        if (parts.size != 2 || pairingCode.length != 6) {
+                            statusMsg = context.getString(R.string.wireless_adb_invalid_input)
+                            return@Button
+                        }
+                        val host = parts[0].trim()
+                        val port = parts[1].trim().toIntOrNull()
+                        if (host.isEmpty() || port == null || port <= 0 || port > 65535) {
+                            statusMsg = context.getString(R.string.wireless_adb_invalid_input)
+                            return@Button
+                        }
+
+                        scope.launch(Dispatchers.IO) {
+                            withContext(Dispatchers.Main) {
+                                pairing = true
+                                statusMsg = context.getString(R.string.wireless_adb_pairing)
+                            }
+
+                            val result = WirelessAdbManager.pair(host, port, pairingCode)
+
+                            withContext(Dispatchers.Main) {
+                                pairing = false
+                                when (result) {
+                                    is WirelessAdbManager.PairResult.Success -> {
+                                        paired = true
+                                        statusMsg = context.getString(R.string.wireless_adb_pair_success)
+                                        Toast.makeText(
+                                            context,
+                                            R.string.wireless_adb_pair_success,
+                                            Toast.LENGTH_LONG
+                                        ).show()
+                                    }
+                                    is WirelessAdbManager.PairResult.Failure -> {
+                                        statusMsg = context.getString(
+                                            R.string.wireless_adb_pair_failed, result.message
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                ) {
+                    Text(
+                        text = if (paired) stringResource(R.string.wireless_adb_status_paired)
+                        else stringResource(R.string.wireless_adb_start_pairing)
+                    )
                 }
             }
         }
