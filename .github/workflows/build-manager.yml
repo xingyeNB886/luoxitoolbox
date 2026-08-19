@@ -152,7 +152,7 @@ jobs:
           fi
 
       - name: Write key
-        if: ${{ ( github.event_name != 'pull_request' && github.ref == 'refs/heads/main' ) || github.ref == 'refs/heads/susfs' || github.ref_type == 'tag' }}
+        if: ${{ ( github.event_name != 'pull_request' && ( github.ref == 'refs/heads/main' || github.ref == 'refs/heads/ci' ) ) || github.ref == 'refs/heads/susfs' || github.ref_type == 'tag' }}
         run: |
           if [ ! -z "${{ secrets.KEYSTORE }}" ]; then
             {
@@ -173,12 +173,12 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
-          cache-disabled: true
+          cache-disabled: false
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
         with:
-          packages: 'tools platforms;android-35 build-tools;35.0.0'
+          packages: 'tools platforms;android-36 build-tools;36.0.0 ndk;28.0.13004108 cmake;3.22.1'
 
       - name: Download arm64 susfs
         uses: actions/download-artifact@v4
@@ -257,29 +257,29 @@ jobs:
             echo 'org.gradle.vfs.watch=true'
             echo 'org.gradle.jvmargs=-Xmx2048m'
             echo 'android.native.buildOutput=verbose'
-            echo 'org.gradle.internal.http.connectionTimeout=120000'
-            echo 'org.gradle.internal.http.socketTimeout=120000'
+            echo 'org.gradle.internal.http.connectionTimeout=180000'
+            echo 'org.gradle.internal.http.socketTimeout=180000'
             echo 'org.gradle.internal.repository.max.retries=5'
             echo 'org.gradle.internal.publish.checksums.insecure=true'
           } >> gradle.properties
           sed -i 's/org.gradle.configuration-cache=true//g' gradle.properties
           for i in 1 2 3; do
             echo "=== Gradle attempt $i ==="
-            gradle --refresh-dependencies clean assembleRelease && break
+            gradle clean assembleRelease && break
             echo "Attempt $i failed, retrying..."
             [ $i -eq 3 ] && exit 1
             sleep 10
           done
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
-        if: ${{ ( github.event_name != 'pull_request' && github.ref == 'refs/heads/main' ) || github.ref_type == 'tag' }}
+        if: ${{ ( github.event_name != 'pull_request' && ( github.ref == 'refs/heads/main' || github.ref == 'refs/heads/ci' ) ) || github.ref_type == 'tag' }}
         with:
           name: manager
           path: manager/app/build/outputs/apk/release/*.apk
 
       - name: Upload mappings
         uses: actions/upload-artifact@v4
-        if: ${{ ( github.event_name != 'pull_request' && github.ref == 'refs/heads/main' ) || github.ref_type == 'tag' }}
+        if: ${{ ( github.event_name != 'pull_request' && ( github.ref == 'refs/heads/main' || github.ref == 'refs/heads/ci' ) ) || github.ref_type == 'tag' }}
         with:
           name: "mappings"
           path: "manager/app/build/outputs/mapping/release/"
