@@ -433,14 +433,12 @@
     <string name="wireless_adb_notif_granted">通知权限已授予</string>
     <string name="wireless_adb_open_settings">打开无线调试</string>
     <string name="wireless_adb_pair_code">配对码（6 位数字）</string>
-    <string name="wireless_adb_host_port">IP:端口（可选，自动获取失败时才需填写）</string>
     <string name="wireless_adb_start_pairing">开始配对</string>
     <string name="wireless_adb_pairing">正在配对…</string>
     <string name="wireless_adb_pair_success">配对成功！ADB 连接已建立。</string>
     <string name="wireless_adb_pair_failed">配对失败：%s</string>
     <string name="wireless_adb_tls_error">TLS 连接失败</string>
     <string name="wireless_adb_spake_error">密钥交换失败</string>
-    <string name="wireless_adb_invalid_input">请输入有效的配对码和 IP:端口</string>
     <string name="wireless_adb_notif_denied">通知权限被拒绝。需要通知权限来保持服务运行。</string>
     <string name="wireless_adb_status_idle">未配对</string>
     <string name="wireless_adb_status_paired">ADB 连接已激活</string>
@@ -454,7 +452,7 @@
     <string name="wireless_adb_notif_pairing">正在配对…</string>
     <string name="wireless_adb_notif_paired">ADB 连接已激活</string>
     <string name="wireless_adb_notif_failed">配对失败：%1$s</string>
-    <string name="wireless_adb_notif_input_label">"输入 6 位配对码（自动获取 IP 和端口）"</string>
+    <string name="wireless_adb_notif_input_label">"输入 6 位配对码"</string>
     <string name="wireless_adb_notif_pair_action">输入配对码</string>
     <string name="wireless_adb_notif_open_settings">打开无线调试</string>
     <string name="wireless_adb_notif_stop">停止</string>

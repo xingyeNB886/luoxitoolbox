@@ -424,7 +424,6 @@ private fun WirelessDebuggingCard(scope: kotlinx.coroutines.CoroutineScope) {
     val context = LocalContext.current
 
     var pairingCode by remember { mutableStateOf("") }
-    var hostPort by remember { mutableStateOf("") }
     var pairing by remember { mutableStateOf(false) }
     var paired by remember { mutableStateOf(WirelessAdbManager.isPaired()) }
     var statusMsg by remember { mutableStateOf("") }
@@ -630,18 +629,6 @@ private fun WirelessDebuggingCard(scope: kotlinx.coroutines.CoroutineScope) {
 
             Spacer(Modifier.height(8.dp))
 
-            // 输入框：IP:Port
-            OutlinedTextField(
-                value = hostPort,
-                onValueChange = { hostPort = it },
-                label = { Text(stringResource(R.string.wireless_adb_host_port)) },
-                singleLine = true,
-                enabled = !pairing && !paired,
-                modifier = Modifier.fillMaxWidth()
-            )
-
-            Spacer(Modifier.height(12.dp))
-
             // 状态消息
             if (statusMsg.isNotBlank()) {
                 Text(
@@ -669,21 +656,7 @@ private fun WirelessDebuggingCard(scope: kotlinx.coroutines.CoroutineScope) {
                     enabled = !pairing && !paired && pairingCode.length == 6,
                     onClick = {
                         val code = pairingCode
-                        // 如果填写了 IP:端口 则手动配对，否则自动发现端口
-                        val manualHostPort = hostPort.trim()
-                        if (manualHostPort.contains(":")) {
-                            val parts = manualHostPort.split(":")
-                            val host = parts[0].trim()
-                            val port = parts[1].trim().toIntOrNull()
-                            if (parts.size != 2 || host.isEmpty() || port == null || port <= 0 || port > 65535) {
-                                statusMsg = context.getString(R.string.wireless_adb_invalid_input)
-                                return@Button
-                            }
-                            doPair(code, host, port)
-                            return@Button
-                        }
-
-                        // 自动发现（和 Shizuku 一样：只输配对码，自动拿 IP 和端口）
+                        // 只输配对码，IP 和端口全部自动获取（和 Shizuku 一样）
                         pairing = true
                         statusMsg = context.getString(R.string.wireless_adb_pairing)
                         scope.launch {

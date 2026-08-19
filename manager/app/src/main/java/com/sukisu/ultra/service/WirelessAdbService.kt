@@ -291,34 +291,14 @@ class WirelessAdbService : Service() {
     /**
      * 解析通知栏输入并执行配对。
      *
-     * 支持两种格式：
-     *   1. 纯 6 位配对码（推荐）：自动通过 mDNS 发现配对端口，
-     *      主机固定为 127.0.0.1，用户不用管 IP 和端口，和 Shizuku 一样。
-     *   2. "配对码 IP:端口"（手动后备）：如 "123456 192.168.1.5:43211"
+     * 和 Shizuku 一样：只需要输入 6 位配对码，
+     * 配对端口通过 mDNS 自动发现，主机固定为本机 127.0.0.1。
      */
     private fun handlePairInput(input: String) {
-        val trimmed = input.trim()
+        val code = input.trim()
 
-        // 尝试解析手动格式 "码 IP:端口"
-        val parts = trimmed.split("\\s+".toRegex())
-        if (parts.size >= 2) {
-            val code = parts[0].trim()
-            val hostPort = parts[1].trim()
-            if (code.matches(Regex("\\d{6}"))) {
-                val colonIdx = hostPort.lastIndexOf(':')
-                if (colonIdx > 0 && colonIdx < hostPort.length - 1) {
-                    val host = hostPort.substring(0, colonIdx).trim()
-                    val port = hostPort.substring(colonIdx + 1).trim().toIntOrNull()
-                    if (host.isNotEmpty() && port != null && port in 1..65535) {
-                        startPairing(host, port, code)
-                        return
-                    }
-                }
-            }
-        }
-
-        // 纯 6 位配对码：自动发现配对端口（和 Shizuku 一致）
-        if (!trimmed.matches(Regex("\\d{6}"))) {
+        // 只要 6 位数字配对码
+        if (!code.matches(Regex("\\d{6}"))) {
             showNotificationFailed(getString(R.string.wireless_adb_notif_format_error))
             return
         }
@@ -332,7 +312,7 @@ class WirelessAdbService : Service() {
                 return@launch
             }
             // 配对隧道在本机，固定用 127.0.0.1
-            startPairing("127.0.0.1", port, trimmed)
+            startPairing("127.0.0.1", port, code)
         }
     }
 
