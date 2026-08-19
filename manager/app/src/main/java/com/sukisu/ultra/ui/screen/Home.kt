@@ -356,7 +356,6 @@ private fun StatusCard(
     var superuserCount by remember { mutableStateOf(0) }
     var moduleCount by remember { mutableStateOf(0) }
     var kpmModuleCount by remember { mutableStateOf(0) }
-    var showKpmInfo by remember { mutableStateOf(false) }
     var susfsSupport by remember { mutableStateOf("") }
 
     // 首次进入检测授权状态（Root / Shizuku）并读取可核对的真实数据
@@ -374,10 +373,6 @@ private fun StatusCard(
 
             // KPM 模块数（始终显示；无 KPM 驱动时如实显示 0）
             kpmModuleCount = runCatching { getKpmModuleCount() }.getOrDefault(0)
-            // 尊重用户"显示 KPM 功能"开关
-            val showKpmPref = context.getSharedPreferences("settings", Context.MODE_PRIVATE)
-                .getBoolean("show_kpm_info", true)
-            showKpmInfo = showKpmPref
 
             // SusFS 支持状态（始终显示；空时显示"未知"）
             susfsSupport = runCatching { getSuSFS() }.getOrDefault("")
@@ -449,34 +444,30 @@ private fun StatusCard(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
 
-                    // 状态卡下方信息行（一排下来，真实数据）
+                    // 状态卡下方信息行：标签+冒号+值，一行一句（原版样式）
                     Spacer(Modifier.height(8.dp))
-                    StatusInfoRow(
-                        label = stringResource(R.string.home_working_version_label),
-                        value = infoVersion
+                    InfoLine(
+                        text = stringResource(R.string.home_working_version_full, infoVersion)
                     )
-                    StatusInfoRow(
-                        label = stringResource(R.string.home_superuser_count_label),
-                        value = superuserCount.toString()
-                    )
-                    StatusInfoRow(
-                        label = stringResource(R.string.home_module_count_label),
-                        value = moduleCount.toString()
-                    )
-                    if (showKpmInfo) {
-                        StatusInfoRow(
-                            label = stringResource(R.string.home_kpm_module_label),
-                            value = kpmModuleCount.toString()
+                    InfoLine(
+                        text = stringResource(
+                            R.string.home_superuser_count_full,
+                            superuserCount
                         )
-                    }
+                    )
+                    InfoLine(
+                        text = stringResource(R.string.home_module_count_full, moduleCount)
+                    )
+                    InfoLine(
+                        text = stringResource(R.string.home_kpm_module_full, kpmModuleCount)
+                    )
                     val susfsTranslated = when (susfsSupport) {
                         "Supported" -> stringResource(R.string.status_supported)
                         "Not Supported" -> stringResource(R.string.status_not_supported)
                         else -> stringResource(R.string.status_unknown)
                     }
-                    StatusInfoRow(
-                        label = stringResource(R.string.home_susfs_label),
-                        value = susfsTranslated
+                    InfoLine(
+                        text = stringResource(R.string.home_susfs_full, susfsTranslated)
                     )
                 }
             } else {
@@ -797,23 +788,13 @@ private fun StatusCardPreview() {
 }
 
 @Composable
-private fun StatusInfoRow(label: String, value: String) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.weight(1f)
-        )
-        Text(
-            text = value,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurface
-        )
-    }
+private fun InfoLine(text: String) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(vertical = 2.dp)
+    )
 }
 
 @Preview
