@@ -90,6 +90,12 @@ class WirelessAdbService : Service() {
             }
         }
 
+        if (intent?.action.isNullOrEmpty()) {
+            // 兜底：任何路径进入都必须先贴上前台通知，避免 5 秒超时崩溃
+            showNotificationWaiting()
+            return START_STICKY
+        }
+
         when (intent?.action) {
             ACTION_START -> {
                 showNotificationWaiting()
@@ -131,7 +137,7 @@ class WirelessAdbService : Service() {
             val channel = NotificationChannel(
                 CHANNEL_ID,
                 getString(R.string.wireless_adb_notif_channel_name),
-                NotificationManager.IMPORTANCE_LOW
+                NotificationManager.IMPORTANCE_DEFAULT
             ).apply {
                 description = getString(R.string.wireless_adb_notif_channel_desc)
                 setShowBadge(false)
@@ -169,13 +175,13 @@ class WirelessAdbService : Service() {
         )
 
         val pairAction = NotificationCompat.Action.Builder(
-            android.R.drawable.ic_menu_send,
+            R.drawable.ic_notification_adb,
             getString(R.string.wireless_adb_notif_pair_action),
             pairPI
         ).addRemoteInput(remoteInput).build()
 
         val openSettingsAction = NotificationCompat.Action.Builder(
-            android.R.drawable.ic_menu_preferences,
+            R.drawable.ic_notification_adb,
             getString(R.string.wireless_adb_notif_open_settings),
             openSettingsPI
         ).build()
@@ -190,7 +196,7 @@ class WirelessAdbService : Service() {
         } else null
 
         val notification = NotificationCompat.Builder(this, CHANNEL_ID)
-            .setSmallIcon(android.R.drawable.stat_sys_data_bluetooth)
+            .setSmallIcon(R.drawable.ic_notification_adb)
             .setContentTitle(getString(R.string.wireless_adb_notif_title))
             .setContentText(getString(R.string.wireless_adb_notif_waiting))
             .setOngoing(true)
@@ -209,7 +215,7 @@ class WirelessAdbService : Service() {
      */
     private fun showNotificationPairing() {
         val notification = NotificationCompat.Builder(this, CHANNEL_ID)
-            .setSmallIcon(android.R.drawable.stat_sys_download)
+            .setSmallIcon(R.drawable.ic_notification_adb)
             .setContentTitle(getString(R.string.wireless_adb_notif_title))
             .setContentText(getString(R.string.wireless_adb_notif_pairing))
             .setOngoing(true)
@@ -226,7 +232,7 @@ class WirelessAdbService : Service() {
      */
     private fun showNotificationSuccess() {
         val notification = NotificationCompat.Builder(this, CHANNEL_ID)
-            .setSmallIcon(android.R.drawable.stat_sys_data_bluetooth)
+            .setSmallIcon(R.drawable.ic_notification_adb)
             .setContentTitle(getString(R.string.wireless_adb_notif_title))
             .setContentText(getString(R.string.wireless_adb_notif_paired))
             .setOngoing(true)
@@ -253,13 +259,13 @@ class WirelessAdbService : Service() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
         val pairAction = NotificationCompat.Action.Builder(
-            android.R.drawable.ic_menu_send,
+            R.drawable.ic_notification_adb,
             getString(R.string.wireless_adb_notif_retry),
             pairPI
         ).addRemoteInput(remoteInput).build()
 
         val notification = NotificationCompat.Builder(this, CHANNEL_ID)
-            .setSmallIcon(android.R.drawable.stat_notify_error)
+            .setSmallIcon(R.drawable.ic_notification_adb)
             .setContentTitle(getString(R.string.wireless_adb_notif_title))
             .setContentText(getString(R.string.wireless_adb_notif_failed, errorMsg))
             .setOngoing(true)
@@ -280,7 +286,7 @@ class WirelessAdbService : Service() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
         return NotificationCompat.Action.Builder(
-            android.R.drawable.ic_menu_close_clear_cancel,
+            R.drawable.ic_notification_adb,
             getString(R.string.wireless_adb_notif_stop),
             stopPI
         ).build()
@@ -343,7 +349,7 @@ class WirelessAdbService : Service() {
      */
     private fun showNotificationSearching() {
         val notification = NotificationCompat.Builder(this, CHANNEL_ID)
-            .setSmallIcon(android.R.drawable.stat_sys_download)
+            .setSmallIcon(R.drawable.ic_notification_adb)
             .setContentTitle(getString(R.string.wireless_adb_notif_title))
             .setContentText(getString(R.string.wireless_adb_notif_searching))
             .setOngoing(true)
