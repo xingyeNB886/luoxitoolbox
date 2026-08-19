@@ -79,6 +79,16 @@ class WirelessAdbService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        // Android 13+ 检查通知权限，没有权限直接不启动
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            val notifPerm = checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)
+            if (notifPerm != PackageManager.PERMISSION_GRANTED) {
+                Log.w(TAG, "没有通知权限，停止服务")
+                stopSelf()
+                return START_NOT_STICKY
+            }
+        }
+
         when (intent?.action) {
             ACTION_START -> {
                 showNotificationWaiting()

@@ -444,4 +444,20 @@
     <string name="wireless_adb_notif_denied">通知权限被拒绝。需要通知权限来保持服务运行。</string>
     <string name="wireless_adb_status_idle">未配对</string>
     <string name="wireless_adb_status_paired">ADB 连接已激活</string>
+
+    <!-- 无线调试通知栏 -->
+    <string name="wireless_adb_notif_channel_name">无线调试</string>
+    <string name="wireless_adb_notif_channel_desc">无线调试配对服务通知</string>
+    <string name="wireless_adb_notif_title">洛茜工具箱 · 无线调试</string>
+    <string name="wireless_adb_notif_waiting">等待配对中…</string>
+    <string name="wireless_adb_notif_pairing">正在配对…</string>
+    <string name="wireless_adb_notif_paired">ADB 连接已激活</string>
+    <string name="wireless_adb_notif_failed">配对失败：%1$s</string>
+    <string name="wireless_adb_notif_input_label">"配对码 IP:端口（如 123456 192.168.1.5:43211）"</string>
+    <string name="wireless_adb_notif_pair_action">输入配对码</string>
+    <string name="wireless_adb_notif_open_settings">打开无线调试</string>
+    <string name="wireless_adb_notif_stop">停止</string>
+    <string name="wireless_adb_notif_retry">重新配对</string>
+    <string name="wireless_adb_notif_format_error">格式错误。请输入：123456 192.168.1.5:43211</string>
+    <string name="wireless_adb_start_notif">从通知栏启动</string>
 </resources>
