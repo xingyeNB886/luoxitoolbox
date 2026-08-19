@@ -38,6 +38,35 @@ android {
     }**/
     namespace = "com.sukisu.ultra"
 
+    defaultConfig {
+        // 构建时从 keystore 动态计算签名证书 SHA-256，注入 BuildConfig
+        // 这样无论用什么 keystore 签名，EXPECTED_SHA256 都会自动匹配
+        val expectedSha256 = try {
+            val ksFile = project.findProperty("KEYSTORE_FILE") as? String
+            val ksPass = project.findProperty("KEYSTORE_PASSWORD") as? String
+            val ksAlias = project.findProperty("KEY_ALIAS") as? String
+
+            if (!ksFile.isNullOrEmpty() && file(ksFile).exists()
+                && !ksPass.isNullOrEmpty() && !ksAlias.isNullOrEmpty()
+            ) {
+                val ks = java.security.KeyStore.getInstance("JKS")
+                file(ksFile).inputStream().use { fis ->
+                    ks.load(fis, ksPass.toCharArray())
+                }
+                val cert = ks.getCertificate(ksAlias)
+                if (cert != null) {
+                    java.security.MessageDigest.getInstance("SHA-256")
+                        .digest(cert.encoded)
+                        .joinToString("") { "%02x".format(it) }
+                } else ""
+            } else ""
+        } catch (e: Exception) {
+            ""
+        }
+
+        buildConfigField("String", "EXPECTED_SHA256", "\"$expectedSha256\"")
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = true

@@ -45,3 +45,9 @@
 -keep class com.sukisu.ultra.ui.webui.WebViewInterface { *; }
 
 -keep,allowobfuscation class * extends com.dergoogler.mmrl.platform.content.IService { *; }
+
+# 保留 BuildConfig（签名校验依赖 EXPECTED_SHA256 字段）
+-keep class com.sukisu.ultra.BuildConfig { *; }
+
+# 保留签名校验工具类
+-keep class com.sukisu.ultra.ui.util.SignatureVerifier { *; }

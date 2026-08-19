@@ -32,7 +32,7 @@ val androidCompileSdkVersion = 36
 val androidCompileNdkVersion = "28.0.13004108"
 val androidSourceCompatibility = JavaVersion.VERSION_21
 val androidTargetCompatibility = JavaVersion.VERSION_21
-val managerVersionCode by extra(12900)
+val managerVersionCode by extra(3000012)
 val managerVersionName by extra("v3.1.2")
 
 subprojects {

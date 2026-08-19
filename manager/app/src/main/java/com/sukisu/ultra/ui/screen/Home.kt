@@ -117,6 +117,7 @@ import com.sukisu.ultra.ui.util.getSuSFS
 import com.sukisu.ultra.ui.util.getSuperuserCount
 import com.sukisu.ultra.ui.util.PermissionManager
 import com.sukisu.ultra.ui.util.CloudUpdateManager
+import com.sukisu.ultra.ui.util.SignatureVerifier
 import com.sukisu.ultra.ui.util.checkNewVersion
 import com.sukisu.ultra.ui.util.getRealResolution
 import com.sukisu.ultra.ui.util.module.LatestVersionInfo
@@ -178,6 +179,18 @@ fun HomeScreen(navigator: DestinationsNavigator) {
     val localVersion = CloudUpdateManager.getLocalVersion()
     val cloudVersion = cloudData.internalVersion
     val showForceUpdate = cloudVersion > 0 && cloudVersion > localVersion
+
+    // APK 签名校验
+    val sigResult by produceState(initialValue = SignatureVerifier.VerifyResult(true, "", "")) {
+        value = withContext(Dispatchers.IO) {
+            SignatureVerifier.verify(context)
+        }
+    }
+
+    if (!sigResult.isValid) {
+        SignatureInvalidDialog()
+        return
+    }
 
     if (showForceUpdate) {
         ForceUpdateDialog(
@@ -881,6 +894,60 @@ fun Modifier.disableOverscroll(): Modifier = composed {
         this
     } else {
         this
+    }
+}
+
+/**
+ * 签名校验失败弹窗 — APK 被篡改/重签名
+ */
+@Composable
+fun SignatureInvalidDialog() {
+    val context = LocalContext.current
+    Dialog(onDismissRequest = { /* 不可关闭 */ }) {
+        androidx.compose.material3.Card(
+            colors = androidx.compose.material3.CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.errorContainer
+            ),
+            shape = androidx.compose.foundation.shape.RoundedCornerShape(20.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(modifier = Modifier.padding(24.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Filled.Warning,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.error
+                    )
+                    Spacer(Modifier.width(12.dp))
+                    Text(
+                        text = "签名校验失败",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onErrorContainer
+                    )
+                }
+                Spacer(Modifier.height(12.dp))
+                Text(
+                    text = "检测到 APK 签名与官方不一致，可能已被二次打包或篡改。为保障安全，请从官方渠道重新下载安装。",
+                    fontSize = 14.sp,
+                    color = MaterialTheme.colorScheme.onErrorContainer
+                )
+                Spacer(Modifier.height(20.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    TextButton(onClick = {
+                        android.os.Process.killProcess(android.os.Process.myPid())
+                    }) {
+                        Text(
+                            stringResource(R.string.force_update_exit),
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    }
+                }
+            }
+        }
     }
 }
 
