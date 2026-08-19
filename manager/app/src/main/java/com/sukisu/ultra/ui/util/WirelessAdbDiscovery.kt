@@ -39,16 +39,20 @@ object WirelessAdbDiscovery {
                         }
                 var finished = false
 
+                // 提前声明，避免局部函数引用后定义变量的作用域问题
+                var resolveListener: NsdManager.ResolveListener? = null
+                var discoveryListener: NsdManager.DiscoveryListener? = null
+
                 fun finish(port: Int?) {
                     if (finished) return
                     finished = true
-                    try { nsdManager.stopServiceDiscovery(discoveryListener) } catch (_: Exception) {}
+                    try { discoveryListener?.let { nsdManager.stopServiceDiscovery(it) } } catch (_: Exception) {}
                     if (cont.isActive) {
                         cont.resume(port)
                     }
                 }
 
-                val resolveListener = object : NsdManager.ResolveListener {
+                resolveListener = object : NsdManager.ResolveListener {
                     override fun onResolveFailed(info: NsdServiceInfo?, errorCode: Int) {
                         Log.w(TAG, "解析 mDNS 服务失败: $errorCode")
                     }
@@ -60,7 +64,7 @@ object WirelessAdbDiscovery {
                     }
                 }
 
-                val discoveryListener = object : NsdManager.DiscoveryListener {
+                discoveryListener = object : NsdManager.DiscoveryListener {
                     override fun onDiscoveryStarted(sType: String) {
                         Log.d(TAG, "开始搜索 $sType")
                     }
@@ -69,7 +73,7 @@ object WirelessAdbDiscovery {
                         // 匹配 ADB 配对服务
                         if (si.serviceType.contains("adb-tls-pairing", ignoreCase = true)) {
                             Log.d(TAG, "找到配对服务: ${si.serviceName}")
-                            nsdManager.resolveService(si, resolveListener)
+                            resolveListener?.let { nsdManager.resolveService(si, it) }
                         }
                     }
 
@@ -91,7 +95,7 @@ object WirelessAdbDiscovery {
                     nsdManager.discoverServices(
                         SERVICE_TYPE,
                         NsdManager.PROTOCOL_DNS_SD,
-                        discoveryListener
+                        discoveryListener!!
                     )
                 } catch (e: Exception) {
                     Log.e(TAG, "discoverServices 异常", e)
@@ -100,7 +104,7 @@ object WirelessAdbDiscovery {
                 }
 
                 cont.invokeOnCancellation {
-                    try { nsdManager.stopServiceDiscovery(discoveryListener) } catch (_: Exception) {}
+                    try { discoveryListener?.let { nsdManager.stopServiceDiscovery(it) } } catch (_: Exception) {}
                 }
             }
         } catch (e: Exception) {
