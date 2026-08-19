@@ -3,8 +3,6 @@ package com.sukisu.ultra.ui.util
 import android.content.Context
 import android.net.nsd.NsdManager
 import android.net.nsd.NsdServiceInfo
-import android.os.Handler
-import android.os.Looper
 import android.util.Log
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlin.coroutines.resume
@@ -33,15 +31,18 @@ object WirelessAdbDiscovery {
     suspend fun discoverPairingPort(context: Context): Int? {
         return try {
             suspendCancellableCoroutine { cont ->
-                val mainLooper = Looper.getMainLooper()
-                val nsdManager = NsdManager(context, mainLooper)
+                val nsdManager: NsdManager =
+                    context.getSystemService(Context.NSD_SERVICE) as? NsdManager
+                        ?: run {
+                            cont.resume(null)
+                            return@suspendCancellableCoroutine
+                        }
                 var finished = false
 
                 fun finish(port: Int?) {
                     if (finished) return
                     finished = true
                     try { nsdManager.stopServiceDiscovery(discoveryListener) } catch (_: Exception) {}
-                    try { nsdManager.unregisterService(null) } catch (_: Exception) {}
                     if (cont.isActive) {
                         cont.resume(port)
                     }

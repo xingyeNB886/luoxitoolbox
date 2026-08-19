@@ -450,9 +450,9 @@ private fun WirelessDebuggingCard(scope: kotlinx.coroutines.CoroutineScope) {
     }
 
     /** 执行配对并更新配对输入框状态 */
-    fun doPair(ctx: Context, code: String, host: String, port: Int) {
+    fun doPair(code: String, host: String, port: Int) {
         pairing = true
-        statusMsg = ctx.getString(R.string.wireless_adb_pairing)
+        statusMsg = context.getString(R.string.wireless_adb_pairing)
         scope.launch(Dispatchers.IO) {
             val result = WirelessAdbManager.pair(host, port, code)
             withContext(Dispatchers.Main) {
@@ -460,15 +460,15 @@ private fun WirelessDebuggingCard(scope: kotlinx.coroutines.CoroutineScope) {
                 when (result) {
                     is WirelessAdbManager.PairResult.Success -> {
                         paired = true
-                        statusMsg = ctx.getString(R.string.wireless_adb_pair_success)
+                        statusMsg = context.getString(R.string.wireless_adb_pair_success)
                         Toast.makeText(
-                            ctx,
+                            context,
                             R.string.wireless_adb_pair_success,
                             Toast.LENGTH_LONG
                         ).show()
                     }
                     is WirelessAdbManager.PairResult.Failure -> {
-                        statusMsg = ctx.getString(
+                        statusMsg = context.getString(
                             R.string.wireless_adb_pair_failed, result.message
                         )
                     }
@@ -679,7 +679,7 @@ private fun WirelessDebuggingCard(scope: kotlinx.coroutines.CoroutineScope) {
                                 statusMsg = context.getString(R.string.wireless_adb_invalid_input)
                                 return@Button
                             }
-                            doPair(context, code, host, port)
+                            doPair(code, host, port)
                             return@Button
                         }
 
@@ -696,7 +696,7 @@ private fun WirelessDebuggingCard(scope: kotlinx.coroutines.CoroutineScope) {
                             } else {
                                 pairing = false
                                 statusMsg = ""
-                                doPair(context, code, "127.0.0.1", port)
+                                doPair(code, "127.0.0.1", port)
                             }
                         }
                     }
