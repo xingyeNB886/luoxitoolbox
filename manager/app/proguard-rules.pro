@@ -55,3 +55,13 @@
 # 保留无线调试前台服务
 -keep class com.sukisu.ultra.service.WirelessAdbService { *; }
 -keep class com.sukisu.ultra.service.WirelessAdbService$* { *; }
+
+# 保留无线调试配对（SPAKE25519 / Edwards25519）相关类
+-keep class com.flyfish233.crypto.spake2.** { *; }
+-keep class cafe.cryptography.** { *; }
+-dontwarn cafe.cryptography.**
+-keep class com.sukisu.ultra.ui.util.WirelessAdbManager { *; }
+
+# 保留 BouncyCastle 证书生成 API
+-keep class org.bouncycastle.** { *; }
+-dontwarn org.bouncycastle.**

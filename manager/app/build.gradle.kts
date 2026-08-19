@@ -197,5 +197,13 @@ dependencies {
     implementation(libs.rikka.shizuku.provider)
     implementation(libs.hiddenapibypass)
     implementation(libs.bouncycastle)
+    implementation(libs.bctls)
 
+    // ADB 无线调试配对（SPAKE25519 / Edwards25519 / bcpkix）本地依赖
+    // 注：bcpkix 走 Google 仓库在部分网络环境拉不下来，改为本地 jar
+    implementation(files(
+        "libs/bcpkix-jdk15to18-1.78.1.jar",
+        "libs/curve25519-elisabeth-0.1.0.jar",
+        "libs/ed25519-elisabeth-0.1.0.jar"
+    ))
 }
