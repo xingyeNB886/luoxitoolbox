@@ -252,6 +252,8 @@ jobs:
 
       - name: Build with Gradle
         run: |
+          # 移除本地代理设置（CI 环境不需要）
+          sed -i '/systemProp.http.proxy/d; /systemProp.https.proxy/d' gradle.properties
           {
             echo 'org.gradle.parallel=true'
             echo 'org.gradle.vfs.watch=true'
