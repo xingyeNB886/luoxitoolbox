@@ -240,6 +240,11 @@ class AdbClient(
                 keyType: String,
                 issuers: Array<out java.security.Principal>?
             ): Array<String>? = null
+
+            override fun chooseServerAlias(
+                keyType: String,
+                issuers: Array<out java.security.Principal>?
+            ): String? = null
         }
 
         val trustManager = object : X509ExtendedTrustManager() {
