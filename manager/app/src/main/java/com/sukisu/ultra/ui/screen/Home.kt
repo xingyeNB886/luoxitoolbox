@@ -95,6 +95,7 @@ import com.ramcosta.composedestinations.navigation.DestinationsNavigator
 import com.sukisu.ultra.KernelVersion
 import com.sukisu.ultra.Natives
 import com.sukisu.ultra.R
+import com.sukisu.ultra.BuildConfig
 import com.sukisu.ultra.getKernelVersion
 import com.sukisu.ultra.ksuApp
 import com.sukisu.ultra.ui.component.KsuIsValid
@@ -102,6 +103,8 @@ import com.sukisu.ultra.ui.component.rememberConfirmDialog
 import com.sukisu.ultra.ui.theme.CardConfig
 import com.sukisu.ultra.ui.theme.CardConfig.cardElevation
 import com.sukisu.ultra.ui.theme.getCardColors
+import com.sukisu.ultra.ui.util.getModuleCount
+import com.sukisu.ultra.ui.util.getSuperuserCount
 import com.sukisu.ultra.ui.util.PermissionManager
 import com.sukisu.ultra.ui.util.checkNewVersion
 import com.sukisu.ultra.ui.util.getRealResolution
@@ -343,14 +346,26 @@ private fun TopBar(
 private fun StatusCard(
     onClickGrant: () -> Unit = {}
 ) {
+    val context = LocalContext.current
     var isWorking by remember { mutableStateOf(false) }
     var grantLabel by remember { mutableStateOf("") }
+    // 状态卡下方真实信息行（工具版本 / 超级用户数 / 模块数）
+    var infoVersion by remember { mutableStateOf("") }
+    var superuserCount by remember { mutableStateOf(0) }
+    var moduleCount by remember { mutableStateOf(0) }
 
-    // 首次进入检测授权状态（Root / Shizuku）
-    LaunchedEffect(Unit) {
+    // 首次进入检测授权状态（Root / Shizuku）并读取可核对的真实数据
+    LaunchedEffect(context) {
         withContext(Dispatchers.IO) {
             isWorking = PermissionManager.isAnyGranted()
             grantLabel = PermissionManager.getGrantLabel()
+
+            val (vName, vCode) = getManagerVersion(context)
+            infoVersion = if (vName.isNotBlank()) "$vName ($vCode)" else BuildConfig.VERSION_NAME
+
+            // 真实查询：KSU 驱动在线时返回真实计数，离线时如实返回 0
+            superuserCount = runCatching { getSuperuserCount() }.getOrDefault(0)
+            moduleCount = runCatching { getModuleCount() }.getOrDefault(0)
         }
     }
 
@@ -414,6 +429,21 @@ private fun StatusCard(
                         text = summaryText,
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    // 状态卡下方信息行（一排下来，真实数据）
+                    Spacer(Modifier.height(8.dp))
+                    StatusInfoRow(
+                        label = stringResource(R.string.home_working_version_label),
+                        value = infoVersion
+                    )
+                    StatusInfoRow(
+                        label = stringResource(R.string.home_superuser_count_label),
+                        value = superuserCount.toString()
+                    )
+                    StatusInfoRow(
+                        label = stringResource(R.string.home_module_count_label),
+                        value = moduleCount.toString()
                     )
                 }
             } else {
@@ -730,6 +760,26 @@ fun getManagerVersion(context: Context): Pair<String, Long> {
 private fun StatusCardPreview() {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         StatusCard {}
+    }
+}
+
+@Composable
+private fun StatusInfoRow(label: String, value: String) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.weight(1f)
+        )
+        Text(
+            text = value,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurface
+        )
     }
 }
 

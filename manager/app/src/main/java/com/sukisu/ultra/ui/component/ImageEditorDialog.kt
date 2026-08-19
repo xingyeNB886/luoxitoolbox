@@ -71,7 +71,7 @@ import java.io.FileOutputStream
  *
  * 从备份工具箱（加载图替换）的 CropDialog 原样照搬，仅把比例改为竖屏真实分辨率：
  * - 图片按原始比例完整显示（画布比例 = 图片比例）
- * - 裁剪框比例固定为本机竖屏真实分辨率比例（宽/高），不可更改
+ * - 裁剪框比例固定为本机竖屏真实分辨率比例（屏幕高/宽），框为竖屏（高>宽），不可更改
  * - 裁剪框内部原色不变，外部压暗
  * - 按住框内拖动 = 移动；按住四角任意一角拖动 = 等比例缩放（对角固定）
  * - 裁剪框始终被图片边界限制，不会超出图片
@@ -87,9 +87,9 @@ fun ImageEditorDialog(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
-    // 竖屏真实分辨率（宽/高），裁剪框比例 = 宽/高
+    // 竖屏真实分辨率，裁剪框比例 = 屏幕高/宽（大于 1，框即为竖屏「高>宽」）
     val (screenW, screenH) = remember { context.getRealResolution() }
-    val cropRatio = screenW.toFloat() / screenH.toFloat()
+    val cropRatio = screenH.toFloat() / screenW.toFloat()
 
     val src = remember(imageUri) { decodeSampledBitmap(imageUri, 2048) }
     // 归一化裁剪框（0-1），默认 = 图片内能放下的最大等比框，居中
