@@ -11,6 +11,8 @@
     <string name="home_working_version_label">Tool version</string>
     <string name="home_superuser_count_label">Superusers</string>
     <string name="home_module_count_label">Modules</string>
+    <string name="home_kpm_module_label">KPM modules</string>
+    <string name="home_susfs_label">SuSFS</string>
     <string name="home_unsupported">Unsupported</string>
     <string name="home_unsupported_reason">No KernelSU driver detected on your kernel, wrong kernel?.</string>
     <string name="home_kernel">Kernel version</string>

@@ -103,7 +103,10 @@ import com.sukisu.ultra.ui.component.rememberConfirmDialog
 import com.sukisu.ultra.ui.theme.CardConfig
 import com.sukisu.ultra.ui.theme.CardConfig.cardElevation
 import com.sukisu.ultra.ui.theme.getCardColors
+import com.sukisu.ultra.ui.util.getKpmModuleCount
+import com.sukisu.ultra.ui.util.getKpmVersion
 import com.sukisu.ultra.ui.util.getModuleCount
+import com.sukisu.ultra.ui.util.getSuSFS
 import com.sukisu.ultra.ui.util.getSuperuserCount
 import com.sukisu.ultra.ui.util.PermissionManager
 import com.sukisu.ultra.ui.util.checkNewVersion
@@ -349,10 +352,13 @@ private fun StatusCard(
     val context = LocalContext.current
     var isWorking by remember { mutableStateOf(false) }
     var grantLabel by remember { mutableStateOf("") }
-    // 状态卡下方真实信息行（工具版本 / 超级用户数 / 模块数）
+    // 状态卡下方真实信息行（工具版本 / 超级用户数 / 模块数 / KPM模块数 / SUSFS支持）
     var infoVersion by remember { mutableStateOf("") }
     var superuserCount by remember { mutableStateOf(0) }
     var moduleCount by remember { mutableStateOf(0) }
+    var kpmModuleCount by remember { mutableStateOf(0) }
+    var showKpmInfo by remember { mutableStateOf(false) }
+    var susfsSupport by remember { mutableStateOf("") }
 
     // 首次进入检测授权状态（Root / Shizuku）并读取可核对的真实数据
     LaunchedEffect(context) {
@@ -363,9 +369,21 @@ private fun StatusCard(
             val (vName, vCode) = getManagerVersion(context)
             infoVersion = if (vName.isNotBlank()) "$vName ($vCode)" else BuildConfig.VERSION_NAME
 
-            // 真实查询：KSU 驱动在线时返回真实计数，离线时如实返回 0
+            // 真实查询：KSU 驱动在线时返回真实计数，离线时如实返回空/0
             superuserCount = runCatching { getSuperuserCount() }.getOrDefault(0)
             moduleCount = runCatching { getModuleCount() }.getOrDefault(0)
+
+            // KPM 模块数（KPM 版本可读时才展示；尊重用户"显示 KPM 功能"开关）
+            val kpmVersion = runCatching { getKpmVersion() }.getOrDefault("")
+            val showKpmPref = context.getSharedPreferences("settings", Context.MODE_PRIVATE)
+                .getBoolean("show_kpm_info", true)
+            showKpmInfo = kpmVersion.isNotEmpty() && !kpmVersion.startsWith("Error") && showKpmPref
+            if (showKpmInfo) {
+                kpmModuleCount = runCatching { getKpmModuleCount() }.getOrDefault(0)
+            }
+
+            // SUSFS 支持状态
+            susfsSupport = runCatching { getSuSFS() }.getOrDefault("")
         }
     }
 
@@ -445,6 +463,23 @@ private fun StatusCard(
                         label = stringResource(R.string.home_module_count_label),
                         value = moduleCount.toString()
                     )
+                    if (showKpmInfo) {
+                        StatusInfoRow(
+                            label = stringResource(R.string.home_kpm_module_label),
+                            value = kpmModuleCount.toString()
+                        )
+                    }
+                    if (susfsSupport.isNotEmpty()) {
+                        val translated = when (susfsSupport) {
+                            "Supported" -> stringResource(R.string.status_supported)
+                            "Not Supported" -> stringResource(R.string.status_not_supported)
+                            else -> stringResource(R.string.status_unknown)
+                        }
+                        StatusInfoRow(
+                            label = stringResource(R.string.home_susfs_label),
+                            value = translated
+                        )
+                    }
                 }
             } else {
                 Icon(
