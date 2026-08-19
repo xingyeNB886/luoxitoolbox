@@ -11,16 +11,14 @@ import java.security.PrivateKey
 import java.security.cert.X509Certificate
 import java.security.interfaces.RSAPrivateKey
 import java.security.interfaces.RSAPublicKey
-import javax.net.ssl.SSLContext
-import javax.net.ssl.SSLSocket
-import javax.net.ssl.X509ExtendedKeyManager
-import javax.net.ssl.X509ExtendedTrustManager
 
 /**
  * 洛茜工具箱 · ADB 协议客户端
  *
- * 连接 adbd（无线调试端口 5555），完成 ADB 认证（TLS 或 RSA Token），
+ * 连接 adbd（无线调试端口），完成 ADB 认证（TLS 或 RSA Token），
  * 然后通过 ADB 协议执行 shell 命令。
+ *
+ * TLS 握手复用 WirelessAdbTls（BouncyCastle 实现，不依赖系统隐藏 API）。
  *
  * 流程（与 AOSP adb 客户端一致）：
  *   1. 建立 TCP 连接，发送 CNXN 包
@@ -28,8 +26,6 @@ import javax.net.ssl.X509ExtendedTrustManager
  *   3. 如果收到 AUTH(TOKEN) → 用 RSA 私钥签名，回 AUTH(SIGNATURE)
  *   4. 认证通过后收到 CNXN → 可以执行命令
  *   5. 发送 OPEN("shell:xxx") 执行命令，通过 WRTE 读取输出
- *
- * 参考：moe.shizuku.manager.adb.AdbClient
  */
 class AdbClient(
     private val host: String,
@@ -43,7 +39,7 @@ class AdbClient(
     companion object {
         private const val TAG = "AdbClient"
 
-        // ADB 协议命令常量（与 AOSP 一致）
+        // ADB 协议命令常量（与 AOSP 一致，小端序 4 字节魔数）
         private const val A_CNXN = 0x4e584e43
         private const val A_AUTH = 0x48545541
         private const val A_OPEN = 0x4e45504f
@@ -66,13 +62,12 @@ class AdbClient(
     private lateinit var plainOutputStream: DataOutputStream
 
     private var useTls = false
+    private var tlsSession: WirelessAdbTls.Session? = null
 
-    private lateinit var tlsSocket: SSLSocket
-    private lateinit var tlsInputStream: DataInputStream
-    private lateinit var tlsOutputStream: DataOutputStream
-
-    private val inputStream get() = if (useTls) tlsInputStream else plainInputStream
-    private val outputStream get() = if (useTls) tlsOutputStream else plainOutputStream
+    private val inputStream: DataInputStream
+        get() = if (useTls) DataInputStream(tlsSession!!.input) else plainInputStream
+    private val outputStream: DataOutputStream
+        get() = if (useTls) DataOutputStream(tlsSession!!.output) else plainOutputStream
 
     /**
      * 连接 adbd 并完成认证。
@@ -92,18 +87,13 @@ class AdbClient(
         // 2. 检查是否需要 TLS 升级
         if (message.command == A_STLS) {
             Log.d(TAG, "服务端要求 TLS 升级")
+            // 回复 STLS，同意升级
             write(A_STLS, A_STLS_VERSION, 0)
 
-            val sslContext = createSslContext()
-            tlsSocket = sslContext.socketFactory.createSocket(
-                socket, host, port, true
-            ) as SSLSocket
-            tlsSocket.startHandshake()
-            Log.d(TAG, "TLS 握手成功")
-
-            tlsInputStream = DataInputStream(tlsSocket.inputStream)
-            tlsOutputStream = DataOutputStream(tlsSocket.outputStream)
+            // 用 BouncyCastle 做 TLS 1.3 握手（复用配对用的 TLS 实现）
+            tlsSession = WirelessAdbTls.connect(socket, certificate, privateKey)
             useTls = true
+            Log.d(TAG, "TLS 握手成功")
 
             message = read()
         }
@@ -131,7 +121,7 @@ class AdbClient(
         }
 
         if (message.command != A_CNXN) {
-            throw IllegalStateException("ADB 认证失败，最终消息 command=${message.command}")
+            throw IllegalStateException("ADB 认证失败，最终消息 command=${message.command.toString(16)}")
         }
         Log.i(TAG, "ADB 连接 & 认证成功")
     }
@@ -158,7 +148,7 @@ class AdbClient(
                         write(A_CLSE, localId, remoteId)
                         break
                     } else {
-                        throw IllegalStateException("期望 WRTE 或 CLSE，实际 command=${message.command}")
+                        throw IllegalStateException("期望 WRTE 或 CLSE，实际 command=${message.command.toString(16)}")
                     }
                 }
             }
@@ -167,7 +157,7 @@ class AdbClient(
                 write(A_CLSE, localId, remoteId)
             }
             else -> {
-                throw IllegalStateException("期望 OKAY 或 CLSE，实际 command=${message.command}")
+                throw IllegalStateException("期望 OKAY 或 CLSE，实际 command=${message.command.toString(16)}")
             }
         }
     }
@@ -208,104 +198,34 @@ class AdbClient(
         return message
     }
 
-    // ---- TLS ----
-
-    private fun createSslContext(): SSLContext {
-        val keyManager = object : javax.net.ssl.X509KeyManager {
-            private val alias = "adb_key"
-
-            override fun chooseClientAlias(
-                keyTypes: Array<out String>,
-                issuers: Array<out java.security.Principal>?
-            ): String? {
-                for (kt in keyTypes) {
-                    if (kt.equals("RSA", ignoreCase = true)) return alias
-                }
-                return null
-            }
-
-            override fun chooseServerAlias(
-                keyType: String,
-                issuers: Array<out java.security.Principal>?
-            ): String? = null
-
-            override fun getCertificateChain(alias: String?): Array<X509Certificate>? {
-                return if (alias == this.alias) arrayOf(certificate) else null
-            }
-
-            override fun getPrivateKey(alias: String?): PrivateKey? {
-                return if (alias == this.alias) privateKey else null
-            }
-
-            override fun getClientAliases(keyType: String?, issuers: Array<out java.security.Principal>?): Array<String>? = null
-
-            override fun getServerAliases(keyType: String, issuers: Array<out java.security.Principal>?): Array<String>? = null
-        }
-
-        val trustManager = object : X509ExtendedTrustManager() {
-            override fun checkClientTrusted(chain: Array<out X509Certificate>?, authType: String?) {}
-            override fun checkClientTrusted(chain: Array<out X509Certificate>?, authType: String?, socket: Socket?) {}
-            override fun checkClientTrusted(chain: Array<out X509Certificate>?, authType: String?, engine: javax.net.ssl.SSLEngine?) {}
-            override fun checkServerTrusted(chain: Array<out X509Certificate>?, authType: String?) {}
-            override fun checkServerTrusted(chain: Array<out X509Certificate>?, authType: String?, socket: Socket?) {}
-            override fun checkServerTrusted(chain: Array<out X509Certificate>?, authType: String?, engine: javax.net.ssl.SSLEngine?) {}
-            override fun getAcceptedIssuers(): Array<X509Certificate> = emptyArray()
-        }
-
-        val sslContext = SSLContext.getInstance("TLSv1.3")
-        sslContext.init(arrayOf(keyManager), arrayOf(trustManager), java.security.SecureRandom())
-        return sslContext
-    }
-
     // ---- RSA 签名 ----
 
     /**
-     * ADB TOKEN 签名：PKCS#1 v1.5 + SHA1（与 AOSP adb 一致）
-     * 实际是：对 token 做"RSA with padding"的签名，padding 用 PKCS#1 v1.5 风格
+     * ADB TOKEN 签名：用 RSA 私钥做 PKCS#1 v1.5 签名。
+     * adbd 端用 RSA_verify(PKCS1_PADDING) 验证。
+     *
+     * 注意：ADB 的 token 签名不是标准的 "SHA1withRSA"，
+     * 而是直接对 token 做 RSA_private_encrypt（PKCS#1 padding）。
      */
     private fun adbSign(token: ByteArray): ByteArray {
-        // ADB 用的是老式 RSA 签名：先做 SHA-1 hash，再 PKCS#1 v1.5 padding，再私钥加密
-        // 我们用 Cipher "RSA/ECB/PKCS1Padding" 手动做 padding
         val cipher = javax.crypto.Cipher.getInstance("RSA/ECB/PKCS1Padding")
         cipher.init(javax.crypto.Cipher.ENCRYPT_MODE, privateKey)
-        // ADB 签名的 padding 是 DigestInfo (SHA-1) + token
-        // 实际上 adbd 会调用 RSA_verify 验证 signature == token（在 RSA padding 解包后）
-        // 更准确的做法：直接对 token 做"RSA decrypt with private key"，不做 hash
-        // 但 Java Cipher 只能做加密/解密，要做签名用 Signature。
-        // 最简单正确的做法：用 "NONEwithRSA" + 手动加 PKCS#1 v1.5 padding
-        return try {
-            val sig = java.security.Signature.getInstance("NONEwithRSA")
-            sig.initSign(privateKey)
-            // ADB 实际上做的是：signature = RSA_private_encrypt(token_len, token, sig, key, RSA_PKCS1_PADDING)
-            // 即直接对 token 做 PKCS#1 padding + 私钥加密，不做 hash
-            // NONEwithRSA 需要数据长度等于 modulus 字节数 - 11（PKCS1 padding）
-            // 但 token 通常是 20 字节（SHA-1），所以我们直接传
-            sig.update(token)
-            sig.sign()
-        } catch (e: Exception) {
-            // 回退：用 Cipher 做 RSA/ECB/PKCS1Padding
-            cipher.doFinal(token)
-        }
+        return cipher.doFinal(token)
     }
 
     // ---- ADB 公钥编码 ----
 
     private fun encodeAdbPublicKey(publicKey: RSAPublicKey, name: String): ByteArray {
-        // 复用 WirelessAdbManager 里的 AndroidPubkey 编码逻辑
         val androidKey = AndroidPubkeyAdb.encode(publicKey)
         val suffix = " $name\u0000"
         return androidKey.toByteArray(Charsets.US_ASCII) + suffix.toByteArray(Charsets.US_ASCII)
     }
 
     override fun close() {
+        try { tlsSession?.close() } catch (_: Exception) {}
         try { plainInputStream.close() } catch (_: Exception) {}
         try { plainOutputStream.close() } catch (_: Exception) {}
         try { socket.close() } catch (_: Exception) {}
-        if (useTls) {
-            try { tlsInputStream.close() } catch (_: Exception) {}
-            try { tlsOutputStream.close() } catch (_: Exception) {}
-            try { tlsSocket.close() } catch (_: Exception) {}
-        }
     }
 
     // ---- ADB 消息 ----
@@ -348,9 +268,10 @@ class AdbClient(
         fun validateOrThrow() {
             val expectedMagic = command xor -0x1
             if (magic != expectedMagic) {
-                throw IllegalStateException("ADB 消息 magic 不匹配: expected=${expectedMagic.toString(16)} actual=${magic.toString(16)}")
+                throw IllegalStateException(
+                    "ADB 消息 magic 不匹配: expected=${expectedMagic.toString(16)} actual=${magic.toString(16)}"
+                )
             }
-            // checksum 可选验证
         }
 
         fun toStringShort(): String {
