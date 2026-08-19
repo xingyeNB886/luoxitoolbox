@@ -1,5 +1,7 @@
 package com.sukisu.ultra.service
 
+import android.annotation.SuppressLint
+import android.app.ForegroundServiceStartNotAllowedException
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -7,10 +9,9 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
-import android.content.pm.PackageManager
+import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
-import android.provider.Settings
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.RemoteInput
@@ -27,10 +28,12 @@ import kotlinx.coroutines.withContext
 /**
  * 洛茜工具箱 · 无线调试前台服务
  *
- * 类似 Shizuku 的通知栏启动方式：
- *   1. 显示常驻通知，带"打开无线调试"按钮
- *   2. 通知栏 RemoteInput 直接输入配对码 + IP:Port
- *   3. 后台完成 ADB 配对，通知更新状态
+ * 通知栏启动流程完全对齐 Shizuku 官方 AdbPairingService：
+ *   1. startForegroundService + PendingIntent.getForegroundService 启动服务
+ *   2. startForeground 带 FOREGROUND_SERVICE_TYPE_MANIFEST
+ *   3. 捕获 ForegroundServiceStartNotAllowedException，降级用 NotificationManager.notify
+ *   4. 渠道 IMPORTANCE_HIGH，确保通知一定显示
+ *   5. mDNS 搜索到配对端口后，再显示"输入配对码"按钮
  */
 class WirelessAdbService : Service() {
 
@@ -39,17 +42,21 @@ class WirelessAdbService : Service() {
         private const val CHANNEL_ID = "wireless_adb_channel"
         private const val NOTIF_ID = 10086
 
-        // 通知栏 Action
-        const val ACTION_START = "com.sukisu.ultra.action.START_WIRELESS_ADB"
-        const val ACTION_STOP = "com.sukisu.ultra.action.STOP_WIRELESS_ADB"
-        const val ACTION_OPEN_SETTINGS = "com.sukisu.ultra.action.OPEN_WIRELESS_SETTINGS"
-        const val ACTION_INPUT_PAIR = "com.sukisu.ultra.action.INPUT_PAIR_CODE"
+        // 通知 Action
+        private const val ACTION_START = "com.sukisu.ultra.action.START_WIRELESS_ADB"
+        private const val ACTION_STOP = "com.sukisu.ultra.action.STOP_WIRELESS_ADB"
+        private const val ACTION_REPLY = "com.sukisu.ultra.action.REPLY_PAIR_CODE"
+        private const val ACTION_OPEN_SETTINGS = "com.sukisu.ultra.action.OPEN_WIRELESS_SETTINGS"
 
         // RemoteInput Key
-        const val KEY_PAIR_INPUT = "pair_input"
+        private const val KEY_PAIR_INPUT = "pair_input"
+        private const val KEY_PAIR_PORT = "pair_port"
 
-        // 通知栏点击 → 打开应用
-        const val ACTION_OPEN_APP = "com.sukisu.ultra.action.OPEN_APP"
+        // request codes
+        private const val REQ_START = 1
+        private const val REQ_STOP = 2
+        private const val REQ_REPLY = 3
+        private const val REQ_OPEN_SETTINGS = 4
 
         fun start(context: Context) {
             val intent = Intent(context, WirelessAdbService::class.java).apply {
@@ -72,6 +79,10 @@ class WirelessAdbService : Service() {
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
+    // mDNS 搜索状态
+    private var discoveryStarted = false
+    private var currentPort: Int = -1
+
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onCreate() {
@@ -80,209 +91,295 @@ class WirelessAdbService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        // Android 13+ 检查通知权限，没有权限直接不启动
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            val notifPerm = checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)
-            if (notifPerm != PackageManager.PERMISSION_GRANTED) {
-                Log.w(TAG, "没有通知权限，停止服务")
-                stopSelf()
-                return START_NOT_STICKY
-            }
-        }
-
-        if (intent?.action.isNullOrEmpty()) {
-            // 兜底：任何路径进入都必须先贴上前台通知，避免 5 秒超时崩溃
-            showNotificationWaiting()
-            return START_STICKY
-        }
-
-        when (intent?.action) {
+        val notification = when (intent?.action) {
             ACTION_START -> {
-                showNotificationWaiting()
+                onStart()
+            }
+            ACTION_REPLY -> {
+                val code = RemoteInput.getResultsFromIntent(intent)
+                    ?.getCharSequence(KEY_PAIR_INPUT)?.toString() ?: ""
+                val port = intent.getIntExtra(KEY_PAIR_PORT, -1)
+                if (port != -1) {
+                    onInput(code, port)
+                } else {
+                    onStart()
+                }
             }
             ACTION_STOP -> {
-                stopForeground(Service.STOP_FOREGROUND_REMOVE)
+                stopSearch()
+                stopForeground(STOP_FOREGROUND_REMOVE)
                 stopSelf()
-                return START_NOT_STICKY
+                null
             }
             ACTION_OPEN_SETTINGS -> {
                 openWirelessDebugSettings()
-                // 保持通知
-                showNotificationWaiting()
+                searchingNotification()
             }
-            ACTION_INPUT_PAIR -> {
-                val input = RemoteInput.getResultsFromIntent(intent)
-                if (input != null) {
-                    val pairInput = input.getCharSequence(KEY_PAIR_INPUT)?.toString()?.trim() ?: ""
-                    handlePairInput(pairInput)
-                }
-            }
-            ACTION_OPEN_APP -> {
-                openApp()
+            else -> {
+                // 兜底：任何入口都先显示搜索通知
+                onStart()
             }
         }
 
-        return START_STICKY
+        if (notification != null) {
+            try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    startForeground(
+                        NOTIF_ID,
+                        notification,
+                        ServiceInfo.FOREGROUND_SERVICE_TYPE_MANIFEST
+                    )
+                } else {
+                    startForeground(NOTIF_ID, notification)
+                }
+            } catch (e: Throwable) {
+                Log.e(TAG, "startForeground failed", e)
+                // 降级：用 NotificationManager.notify 显示通知（部分 ROM 上 startForeground 被限制时）
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+                    && e is ForegroundServiceStartNotAllowedException
+                ) {
+                    try {
+                        getSystemService(NotificationManager::class.java)
+                            .notify(NOTIF_ID, notification)
+                    } catch (_: Exception) {
+                    }
+                }
+            }
+        }
+
+        return START_REDELIVER_INTENT
     }
 
     override fun onDestroy() {
         super.onDestroy()
+        stopSearch()
         serviceScope.cancel()
     }
 
-    // ---- 通知 ----
+    // ---- 通知渠道 ----
 
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 CHANNEL_ID,
                 getString(R.string.wireless_adb_notif_channel_name),
-                NotificationManager.IMPORTANCE_DEFAULT
+                NotificationManager.IMPORTANCE_HIGH
             ).apply {
                 description = getString(R.string.wireless_adb_notif_channel_desc)
                 setShowBadge(false)
+                setSound(null, null)
+                enableVibration(false)
             }
             val manager = getSystemService(NotificationManager::class.java)
             manager.createNotificationChannel(channel)
         }
     }
 
-    /**
-     * 等待配对状态通知
-     * - 点击 → 打开无线调试设置
-     * - RemoteInput → 输入配对码 + IP:Port
-     */
-    private fun showNotificationWaiting() {
-        val openSettingsIntent = Intent(this, WirelessAdbService::class.java).apply {
-            action = ACTION_OPEN_SETTINGS
-        }
-        val openSettingsPI = PendingIntent.getService(
-            this, 1, openSettingsIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
+    // ---- mDNS 搜索 ----
 
-        // RemoteInput: 通知栏直接输入
+    private fun startSearch() {
+        if (discoveryStarted) return
+        discoveryStarted = true
+
+        serviceScope.launch {
+            val port = withContext(Dispatchers.Main) {
+                WirelessAdbDiscovery.discoverPairingPortWithTimeout(this@WirelessAdbService, 30_000)
+            }
+            if (port != null && port > 0) {
+                currentPort = port
+                Log.i(TAG, "发现配对端口: $port")
+                // 找到端口后，更新通知为"输入配对码"状态
+                val notif = createInputNotification(port)
+                updateNotification(notif)
+            }
+        }
+    }
+
+    private fun stopSearch() {
+        discoveryStarted = false
+    }
+
+    private fun updateNotification(notification: Notification) {
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                startForeground(
+                    NOTIF_ID,
+                    notification,
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_MANIFEST
+                )
+            } else {
+                startForeground(NOTIF_ID, notification)
+            }
+        } catch (e: Throwable) {
+            try {
+                getSystemService(NotificationManager::class.java)
+                    .notify(NOTIF_ID, notification)
+            } catch (_: Exception) {
+            }
+        }
+    }
+
+    // ---- 动作处理 ----
+
+    private fun onStart(): Notification {
+        startSearch()
+        return searchingNotification()
+    }
+
+    private fun onInput(code: String, port: Int): Notification {
+        val trimmedCode = code.trim()
+
+        if (!trimmedCode.matches(Regex("\\d{6}"))) {
+            return failedNotification("请输入 6 位数字配对码")
+        }
+
+        // 在 IO 线程执行配对
+        serviceScope.launch {
+            val result = withContext(Dispatchers.IO) {
+                WirelessAdbManager.pair("127.0.0.1", port, trimmedCode)
+            }
+            when (result) {
+                is WirelessAdbManager.PairResult.Success -> {
+                    Log.i(TAG, "配对成功")
+                    handlePairSuccess()
+                }
+                is WirelessAdbManager.PairResult.Failure -> {
+                    Log.e(TAG, "配对失败: ${result.message}")
+                    updateNotification(failedNotification(result.message))
+                }
+            }
+        }
+
+        return pairingNotification()
+    }
+
+    private fun handlePairSuccess() {
+        stopSearch()
+        updateNotification(successNotification())
+        // 2 秒后停止服务
+        serviceScope.launch {
+            kotlinx.coroutines.delay(3000)
+            stopSelf()
+        }
+    }
+
+    // ---- 通知构建 ----
+
+    private fun searchingNotification(): Notification {
+        return NotificationCompat.Builder(this, CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_notification_adb)
+            .setContentTitle(getString(R.string.wireless_adb_notif_title))
+            .setContentText(getString(R.string.wireless_adb_notif_searching))
+            .setOngoing(true)
+            .setProgress(0, 0, true)
+            .setContentIntent(openAppPendingIntent())
+            .addAction(openSettingsAction())
+            .addAction(stopAction())
+            .build()
+    }
+
+    private fun createInputNotification(port: Int): Notification {
         val remoteInput = RemoteInput.Builder(KEY_PAIR_INPUT)
             .setLabel(getString(R.string.wireless_adb_notif_input_label))
             .build()
 
-        val pairIntent = Intent(this, WirelessAdbService::class.java).apply {
-            action = ACTION_INPUT_PAIR
+        val replyIntent = Intent(this, WirelessAdbService::class.java).apply {
+            action = ACTION_REPLY
+            putExtra(KEY_PAIR_PORT, port)
         }
-        val pairPI = PendingIntent.getService(
-            this, 2, pairIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
+        val replyPI = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            PendingIntent.getForegroundService(
+                this, REQ_REPLY, replyIntent,
+                PendingIntent.FLAG_MUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+            )
+        } else {
+            PendingIntent.getService(
+                this, REQ_REPLY, replyIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT
+            )
+        }
 
-        val pairAction = NotificationCompat.Action.Builder(
+        val replyAction = NotificationCompat.Action.Builder(
             R.drawable.ic_notification_adb,
             getString(R.string.wireless_adb_notif_pair_action),
-            pairPI
+            replyPI
         ).addRemoteInput(remoteInput).build()
 
-        val openSettingsAction = NotificationCompat.Action.Builder(
-            R.drawable.ic_notification_adb,
-            getString(R.string.wireless_adb_notif_open_settings),
-            openSettingsPI
-        ).build()
-
-        // 点击通知 → 打开应用
-        val openAppIntent = packageManager.getLaunchIntentForPackage(packageName)
-        val openAppPI = if (openAppIntent != null) {
-            PendingIntent.getActivity(
-                this, 3, openAppIntent,
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-            )
-        } else null
-
-        val notification = NotificationCompat.Builder(this, CHANNEL_ID)
+        return NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification_adb)
             .setContentTitle(getString(R.string.wireless_adb_notif_title))
             .setContentText(getString(R.string.wireless_adb_notif_waiting))
             .setOngoing(true)
-            .setSilent(true)
-            .setContentIntent(openAppPI)
-            .addAction(openSettingsAction)
-            .addAction(pairAction)
-            .addAction(buildStopAction())
+            .setContentIntent(openAppPendingIntent())
+            .addAction(replyAction)
+            .addAction(stopAction())
             .build()
-
-        startForeground(NOTIF_ID, notification)
     }
 
-    /**
-     * 配对中状态
-     */
-    private fun showNotificationPairing() {
-        val notification = NotificationCompat.Builder(this, CHANNEL_ID)
+    private fun pairingNotification(): Notification {
+        return NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification_adb)
             .setContentTitle(getString(R.string.wireless_adb_notif_title))
             .setContentText(getString(R.string.wireless_adb_notif_pairing))
             .setOngoing(true)
-            .setSilent(true)
             .setProgress(0, 0, true)
-            .addAction(buildStopAction())
+            .addAction(stopAction())
             .build()
-
-        startForeground(NOTIF_ID, notification)
     }
 
-    /**
-     * 配对成功状态
-     */
-    private fun showNotificationSuccess() {
-        val notification = NotificationCompat.Builder(this, CHANNEL_ID)
+    private fun successNotification(): Notification {
+        return NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification_adb)
             .setContentTitle(getString(R.string.wireless_adb_notif_title))
             .setContentText(getString(R.string.wireless_adb_notif_paired))
-            .setOngoing(true)
-            .setSilent(true)
-            .addAction(buildStopAction())
+            .setOngoing(false)
+            .setAutoCancel(true)
             .build()
-
-        startForeground(NOTIF_ID, notification)
     }
 
-    /**
-     * 配对失败状态（保持等待，允许重新输入）
-     */
-    private fun showNotificationFailed(errorMsg: String) {
+    private fun failedNotification(errorMsg: String): Notification {
         val remoteInput = RemoteInput.Builder(KEY_PAIR_INPUT)
             .setLabel(getString(R.string.wireless_adb_notif_input_label))
             .build()
 
-        val pairIntent = Intent(this, WirelessAdbService::class.java).apply {
-            action = ACTION_INPUT_PAIR
+        val replyIntent = Intent(this, WirelessAdbService::class.java).apply {
+            action = ACTION_REPLY
+            putExtra(KEY_PAIR_PORT, currentPort)
         }
-        val pairPI = PendingIntent.getService(
-            this, 2, pairIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-        val pairAction = NotificationCompat.Action.Builder(
+        val replyPI = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            PendingIntent.getForegroundService(
+                this, REQ_REPLY, replyIntent,
+                PendingIntent.FLAG_MUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+            )
+        } else {
+            PendingIntent.getService(
+                this, REQ_REPLY, replyIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT
+            )
+        }
+
+        val retryAction = NotificationCompat.Action.Builder(
             R.drawable.ic_notification_adb,
             getString(R.string.wireless_adb_notif_retry),
-            pairPI
+            replyPI
         ).addRemoteInput(remoteInput).build()
 
-        val notification = NotificationCompat.Builder(this, CHANNEL_ID)
+        return NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification_adb)
             .setContentTitle(getString(R.string.wireless_adb_notif_title))
             .setContentText(getString(R.string.wireless_adb_notif_failed, errorMsg))
-            .setOngoing(true)
-            .setSilent(true)
-            .addAction(pairAction)
-            .addAction(buildStopAction())
+            .setOngoing(false)
+            .addAction(retryAction)
+            .addAction(stopAction())
             .build()
-
-        startForeground(NOTIF_ID, notification)
     }
 
-    private fun buildStopAction(): NotificationCompat.Action {
+    private fun stopAction(): NotificationCompat.Action {
         val stopIntent = Intent(this, WirelessAdbService::class.java).apply {
             action = ACTION_STOP
         }
         val stopPI = PendingIntent.getService(
-            this, 4, stopIntent,
+            this, REQ_STOP, stopIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
         return NotificationCompat.Action.Builder(
@@ -292,100 +389,50 @@ class WirelessAdbService : Service() {
         ).build()
     }
 
-    // ---- 配对处理 ----
-
-    /**
-     * 解析通知栏输入并执行配对。
-     *
-     * 和 Shizuku 一样：只需要输入 6 位配对码，
-     * 配对端口通过 mDNS 自动发现，主机固定为本机 127.0.0.1。
-     */
-    private fun handlePairInput(input: String) {
-        val code = input.trim()
-
-        // 只要 6 位数字配对码
-        if (!code.matches(Regex("\\d{6}"))) {
-            showNotificationFailed(getString(R.string.wireless_adb_notif_format_error))
-            return
+    private fun openSettingsAction(): NotificationCompat.Action {
+        val intent = Intent(this, WirelessAdbService::class.java).apply {
+            action = ACTION_OPEN_SETTINGS
         }
-
-        showNotificationSearching()
-        serviceScope.launch {
-            val port = WirelessAdbDiscovery.discoverPairingPortWithTimeout(this@WirelessAdbService)
-            if (port == null) {
-                Log.e(TAG, "自动发现配对端口失败")
-                showNotificationFailed(getString(R.string.wireless_adb_notif_discover_failed))
-                return@launch
-            }
-            // 配对隧道在本机，固定用 127.0.0.1
-            startPairing("127.0.0.1", port, code)
-        }
+        val pi = PendingIntent.getService(
+            this, REQ_OPEN_SETTINGS, intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        return NotificationCompat.Action.Builder(
+            R.drawable.ic_notification_adb,
+            getString(R.string.wireless_adb_notif_open_settings),
+            pi
+        ).build()
     }
 
-    /**
-     * 执行配对并更新通知状态
-     */
-    private fun startPairing(host: String, port: Int, code: String) {
-        showNotificationPairing()
-        serviceScope.launch {
-            val result = withContext(Dispatchers.IO) {
-                WirelessAdbManager.pair(host, port, code)
-            }
-            when (result) {
-                is WirelessAdbManager.PairResult.Success -> {
-                    Log.i(TAG, "通知栏配对成功: $host:$port")
-                    showNotificationSuccess()
-                }
-                is WirelessAdbManager.PairResult.Failure -> {
-                    Log.e(TAG, "通知栏配对失败: ${result.message}")
-                    showNotificationFailed(result.message)
-                }
-            }
-        }
-    }
-
-    /**
-     * 正在自动搜索配对端口
-     */
-    private fun showNotificationSearching() {
-        val notification = NotificationCompat.Builder(this, CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_notification_adb)
-            .setContentTitle(getString(R.string.wireless_adb_notif_title))
-            .setContentText(getString(R.string.wireless_adb_notif_searching))
-            .setOngoing(true)
-            .setSilent(true)
-            .setProgress(0, 0, true)
-            .addAction(buildStopAction())
-            .build()
-
-        startForeground(NOTIF_ID, notification)
+    private fun openAppPendingIntent(): PendingIntent? {
+        val launchIntent = packageManager.getLaunchIntentForPackage(packageName)
+            ?: return null
+        return PendingIntent.getActivity(
+            this, 0, launchIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
     }
 
     // ---- 工具 ----
 
+    @SuppressLint("InlinedApi")
     private fun openWirelessDebugSettings() {
         try {
-            val intent = Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS).apply {
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            val intent = android.provider.Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS.let {
+                Intent(it).apply {
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                }
             }
             startActivity(intent)
         } catch (_: Exception) {
             try {
-                val intent = Intent(Settings.ACTION_WIRELESS_SETTINGS).apply {
+                val intent = Intent(android.provider.Settings.ACTION_WIRELESS_SETTINGS).apply {
                     flags = Intent.FLAG_ACTIVITY_NEW_TASK
                 }
                 startActivity(intent)
             } catch (_: Exception) {
                 Log.e(TAG, "无法打开无线调试设置")
             }
-        }
-    }
-
-    private fun openApp() {
-        val intent = packageManager.getLaunchIntentForPackage(packageName)
-        if (intent != null) {
-            intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
-            startActivity(intent)
         }
     }
 }
