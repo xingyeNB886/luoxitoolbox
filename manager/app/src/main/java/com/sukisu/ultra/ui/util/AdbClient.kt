@@ -211,19 +211,23 @@ class AdbClient(
     // ---- TLS ----
 
     private fun createSslContext(): SSLContext {
-        val keyManager = object : X509ExtendedKeyManager() {
+        val keyManager = object : javax.net.ssl.X509KeyManager {
             private val alias = "adb_key"
 
             override fun chooseClientAlias(
                 keyTypes: Array<out String>,
-                issuers: Array<out java.security.Principal>?,
-                socket: Socket?
+                issuers: Array<out java.security.Principal>?
             ): String? {
                 for (kt in keyTypes) {
                     if (kt.equals("RSA", ignoreCase = true)) return alias
                 }
                 return null
             }
+
+            override fun chooseServerAlias(
+                keyType: String,
+                issuers: Array<out java.security.Principal>?
+            ): String? = null
 
             override fun getCertificateChain(alias: String?): Array<X509Certificate>? {
                 return if (alias == this.alias) arrayOf(certificate) else null
@@ -233,18 +237,9 @@ class AdbClient(
                 return if (alias == this.alias) privateKey else null
             }
 
-            override fun getClientAliases(keyType: String?, issuers: Array<out java.security.Principal>?) =
-                null
+            override fun getClientAliases(keyType: String?, issuers: Array<out java.security.Principal>?): Array<String>? = null
 
-            override fun getServerAliases(
-                keyType: String,
-                issuers: Array<out java.security.Principal>?
-            ): Array<String>? = null
-
-            override fun chooseServerAlias(
-                keyType: String,
-                issuers: Array<out java.security.Principal>?
-            ): String? = null
+            override fun getServerAliases(keyType: String, issuers: Array<out java.security.Principal>?): Array<String>? = null
         }
 
         val trustManager = object : X509ExtendedTrustManager() {
