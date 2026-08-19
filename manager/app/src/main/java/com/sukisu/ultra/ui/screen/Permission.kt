@@ -74,6 +74,7 @@ import com.sukisu.ultra.ui.theme.CardConfig.cardElevation
 import com.sukisu.ultra.ui.theme.getCardColors
 import com.sukisu.ultra.ui.util.PermissionGrantType
 import com.sukisu.ultra.ui.util.PermissionManager
+import com.sukisu.ultra.ui.util.WirelessAdbDiscovery
 import com.sukisu.ultra.ui.util.WirelessAdbManager
 import com.sukisu.ultra.ui.util.rootAvailable
 import com.sukisu.ultra.service.WirelessAdbService
@@ -448,6 +449,34 @@ private fun WirelessDebuggingCard(scope: kotlinx.coroutines.CoroutineScope) {
         }
     }
 
+    /** 执行配对并更新配对输入框状态 */
+    fun doPair(ctx: Context, code: String, host: String, port: Int) {
+        pairing = true
+        statusMsg = ctx.getString(R.string.wireless_adb_pairing)
+        scope.launch(Dispatchers.IO) {
+            val result = WirelessAdbManager.pair(host, port, code)
+            withContext(Dispatchers.Main) {
+                pairing = false
+                when (result) {
+                    is WirelessAdbManager.PairResult.Success -> {
+                        paired = true
+                        statusMsg = ctx.getString(R.string.wireless_adb_pair_success)
+                        Toast.makeText(
+                            ctx,
+                            R.string.wireless_adb_pair_success,
+                            Toast.LENGTH_LONG
+                        ).show()
+                    }
+                    is WirelessAdbManager.PairResult.Failure -> {
+                        statusMsg = ctx.getString(
+                            R.string.wireless_adb_pair_failed, result.message
+                        )
+                    }
+                }
+            }
+        }
+    }
+
     ElevatedCard(
         colors = getCardColors(MaterialTheme.colorScheme.surfaceVariant),
         elevation = CardDefaults.cardElevation(defaultElevation = cardElevation),
@@ -637,47 +666,37 @@ private fun WirelessDebuggingCard(scope: kotlinx.coroutines.CoroutineScope) {
                     Spacer(Modifier.width(12.dp))
                 }
                 Button(
-                    enabled = !pairing && !paired &&
-                        pairingCode.length == 6 && hostPort.contains(":"),
+                    enabled = !pairing && !paired && pairingCode.length == 6,
                     onClick = {
-                        val parts = hostPort.split(":")
-                        if (parts.size != 2 || pairingCode.length != 6) {
-                            statusMsg = context.getString(R.string.wireless_adb_invalid_input)
-                            return@Button
-                        }
-                        val host = parts[0].trim()
-                        val port = parts[1].trim().toIntOrNull()
-                        if (host.isEmpty() || port == null || port <= 0 || port > 65535) {
-                            statusMsg = context.getString(R.string.wireless_adb_invalid_input)
-                            return@Button
-                        }
-
-                        scope.launch(Dispatchers.IO) {
-                            withContext(Dispatchers.Main) {
-                                pairing = true
-                                statusMsg = context.getString(R.string.wireless_adb_pairing)
+                        val code = pairingCode
+                        // 如果填写了 IP:端口 则手动配对，否则自动发现端口
+                        val manualHostPort = hostPort.trim()
+                        if (manualHostPort.contains(":")) {
+                            val parts = manualHostPort.split(":")
+                            val host = parts[0].trim()
+                            val port = parts[1].trim().toIntOrNull()
+                            if (parts.size != 2 || host.isEmpty() || port == null || port <= 0 || port > 65535) {
+                                statusMsg = context.getString(R.string.wireless_adb_invalid_input)
+                                return@Button
                             }
+                            doPair(context, code, host, port)
+                            return@Button
+                        }
 
-                            val result = WirelessAdbManager.pair(host, port, pairingCode)
-
-                            withContext(Dispatchers.Main) {
+                        // 自动发现（和 Shizuku 一样：只输配对码，自动拿 IP 和端口）
+                        pairing = true
+                        statusMsg = context.getString(R.string.wireless_adb_pairing)
+                        scope.launch {
+                            val port = WirelessAdbDiscovery.discoverPairingPortWithTimeout(context)
+                            if (port == null) {
                                 pairing = false
-                                when (result) {
-                                    is WirelessAdbManager.PairResult.Success -> {
-                                        paired = true
-                                        statusMsg = context.getString(R.string.wireless_adb_pair_success)
-                                        Toast.makeText(
-                                            context,
-                                            R.string.wireless_adb_pair_success,
-                                            Toast.LENGTH_LONG
-                                        ).show()
-                                    }
-                                    is WirelessAdbManager.PairResult.Failure -> {
-                                        statusMsg = context.getString(
-                                            R.string.wireless_adb_pair_failed, result.message
-                                        )
-                                    }
-                                }
+                                statusMsg = context.getString(
+                                    R.string.wireless_adb_notif_discover_failed
+                                )
+                            } else {
+                                pairing = false
+                                statusMsg = ""
+                                doPair(context, code, "127.0.0.1", port)
                             }
                         }
                     }

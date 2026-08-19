@@ -15,6 +15,7 @@ import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.RemoteInput
 import com.sukisu.ultra.R
+import com.sukisu.ultra.ui.util.WirelessAdbDiscovery
 import com.sukisu.ultra.ui.util.WirelessAdbManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -288,47 +289,65 @@ class WirelessAdbService : Service() {
     // ---- 配对处理 ----
 
     /**
-     * 解析通知栏输入并执行配对
-     * 格式: "配对码 IP:端口" 如 "123456 192.168.1.5:43211"
+     * 解析通知栏输入并执行配对。
+     *
+     * 支持两种格式：
+     *   1. 纯 6 位配对码（推荐）：自动通过 mDNS 发现配对端口，
+     *      主机固定为 127.0.0.1，用户不用管 IP 和端口，和 Shizuku 一样。
+     *   2. "配对码 IP:端口"（手动后备）：如 "123456 192.168.1.5:43211"
      */
     private fun handlePairInput(input: String) {
-        val parts = input.split("\\s+".toRegex())
-        if (parts.size < 2) {
+        val trimmed = input.trim()
+
+        // 尝试解析手动格式 "码 IP:端口"
+        val parts = trimmed.split("\\s+".toRegex())
+        if (parts.size >= 2) {
+            val code = parts[0].trim()
+            val hostPort = parts[1].trim()
+            if (code.matches(Regex("\\d{6}"))) {
+                val colonIdx = hostPort.lastIndexOf(':')
+                if (colonIdx > 0 && colonIdx < hostPort.length - 1) {
+                    val host = hostPort.substring(0, colonIdx).trim()
+                    val port = hostPort.substring(colonIdx + 1).trim().toIntOrNull()
+                    if (host.isNotEmpty() && port != null && port in 1..65535) {
+                        startPairing(host, port, code)
+                        return
+                    }
+                }
+            }
+        }
+
+        // 纯 6 位配对码：自动发现配对端口（和 Shizuku 一致）
+        if (!trimmed.matches(Regex("\\d{6}"))) {
             showNotificationFailed(getString(R.string.wireless_adb_notif_format_error))
             return
         }
 
-        val code = parts[0].trim()
-        val hostPort = parts[1].trim()
-
-        if (!code.matches(Regex("\\d{6}"))) {
-            showNotificationFailed(getString(R.string.wireless_adb_notif_format_error))
-            return
+        showNotificationSearching()
+        serviceScope.launch {
+            val port = WirelessAdbDiscovery.discoverPairingPortWithTimeout(this@WirelessAdbService)
+            if (port == null) {
+                Log.e(TAG, "自动发现配对端口失败")
+                showNotificationFailed(getString(R.string.wireless_adb_notif_discover_failed))
+                return@launch
+            }
+            // 配对隧道在本机，固定用 127.0.0.1
+            startPairing("127.0.0.1", port, trimmed)
         }
+    }
 
-        val colonIdx = hostPort.lastIndexOf(':')
-        if (colonIdx <= 0 || colonIdx == hostPort.length - 1) {
-            showNotificationFailed(getString(R.string.wireless_adb_notif_format_error))
-            return
-        }
-
-        val host = hostPort.substring(0, colonIdx).trim()
-        val port = hostPort.substring(colonIdx + 1).trim().toIntOrNull()
-        if (host.isEmpty() || port == null || port <= 0 || port > 65535) {
-            showNotificationFailed(getString(R.string.wireless_adb_notif_format_error))
-            return
-        }
-
-        // 开始配对
+    /**
+     * 执行配对并更新通知状态
+     */
+    private fun startPairing(host: String, port: Int, code: String) {
         showNotificationPairing()
-
         serviceScope.launch {
             val result = withContext(Dispatchers.IO) {
                 WirelessAdbManager.pair(host, port, code)
             }
             when (result) {
                 is WirelessAdbManager.PairResult.Success -> {
-                    Log.i(TAG, "通知栏配对成功")
+                    Log.i(TAG, "通知栏配对成功: $host:$port")
                     showNotificationSuccess()
                 }
                 is WirelessAdbManager.PairResult.Failure -> {
@@ -337,6 +356,23 @@ class WirelessAdbService : Service() {
                 }
             }
         }
+    }
+
+    /**
+     * 正在自动搜索配对端口
+     */
+    private fun showNotificationSearching() {
+        val notification = NotificationCompat.Builder(this, CHANNEL_ID)
+            .setSmallIcon(android.R.drawable.stat_sys_download)
+            .setContentTitle(getString(R.string.wireless_adb_notif_title))
+            .setContentText(getString(R.string.wireless_adb_notif_searching))
+            .setOngoing(true)
+            .setSilent(true)
+            .setProgress(0, 0, true)
+            .addAction(buildStopAction())
+            .build()
+
+        startForeground(NOTIF_ID, notification)
     }
 
     // ---- 工具 ----

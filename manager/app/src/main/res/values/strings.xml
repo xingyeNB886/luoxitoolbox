@@ -432,12 +432,12 @@
     <string name="wireless_adb_step1">1. 授予通知权限</string>
     <string name="wireless_adb_step2">2. 在设置中开启无线调试</string>
     <string name="wireless_adb_step3">3. 点击\"使用配对码配对设备\"</string>
-    <string name="wireless_adb_step4">4. 在下方输入配对码和 IP:端口</string>
+    <string name="wireless_adb_step4">4. 输入 6 位配对码（IP 和端口自动获取）</string>
     <string name="wireless_adb_notif_grant">授予通知权限</string>
     <string name="wireless_adb_notif_granted">通知权限已授予</string>
     <string name="wireless_adb_open_settings">打开无线调试</string>
     <string name="wireless_adb_pair_code">配对码（6 位数字）</string>
-    <string name="wireless_adb_host_port">IP:端口（如 192.168.1.5:43211）</string>
+    <string name="wireless_adb_host_port">IP:端口（可选，自动获取失败时才需填写）</string>
     <string name="wireless_adb_start_pairing">开始配对</string>
     <string name="wireless_adb_pairing">正在配对…</string>
     <string name="wireless_adb_pair_success">配对成功！ADB 连接已建立。</string>
@@ -454,14 +454,16 @@
     <string name="wireless_adb_notif_channel_desc">无线调试配对服务通知</string>
     <string name="wireless_adb_notif_title">洛茜工具箱 · 无线调试</string>
     <string name="wireless_adb_notif_waiting">等待配对中…</string>
+    <string name="wireless_adb_notif_searching">正在自动获取配对信息…</string>
     <string name="wireless_adb_notif_pairing">正在配对…</string>
     <string name="wireless_adb_notif_paired">ADB 连接已激活</string>
     <string name="wireless_adb_notif_failed">配对失败：%1$s</string>
-    <string name="wireless_adb_notif_input_label">"配对码 IP:端口（如 123456 192.168.1.5:43211）"</string>
+    <string name="wireless_adb_notif_input_label">"输入 6 位配对码（自动获取 IP 和端口）"</string>
     <string name="wireless_adb_notif_pair_action">输入配对码</string>
     <string name="wireless_adb_notif_open_settings">打开无线调试</string>
     <string name="wireless_adb_notif_stop">停止</string>
     <string name="wireless_adb_notif_retry">重新配对</string>
-    <string name="wireless_adb_notif_format_error">格式错误。请输入：123456 192.168.1.5:43211</string>
+    <string name="wireless_adb_notif_format_error">格式错误。请输入 6 位配对码</string>
+    <string name="wireless_adb_notif_discover_failed">自动获取失败，请确认已开启无线调试并弹出配对码</string>
     <string name="wireless_adb_start_notif">从通知栏启动</string>
 </resources>
