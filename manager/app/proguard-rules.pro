@@ -51,3 +51,7 @@
 
 # 保留签名校验工具类
 -keep class com.sukisu.ultra.ui.util.SignatureVerifier { *; }
+
+# 保留无线调试前台服务
+-keep class com.sukisu.ultra.service.WirelessAdbService { *; }
+-keep class com.sukisu.ultra.service.WirelessAdbService$* { *; }

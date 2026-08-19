@@ -76,6 +76,7 @@ import com.sukisu.ultra.ui.util.PermissionGrantType
 import com.sukisu.ultra.ui.util.PermissionManager
 import com.sukisu.ultra.ui.util.WirelessAdbManager
 import com.sukisu.ultra.ui.util.rootAvailable
+import com.sukisu.ultra.service.WirelessAdbService
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -523,7 +524,30 @@ private fun WirelessDebuggingCard(scope: kotlinx.coroutines.CoroutineScope) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
 
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(12.dp))
+
+            // 从通知栏启动（类似 Shizuku）
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Button(
+                    enabled = checkNotificationPermission() && !pairing,
+                    onClick = {
+                        WirelessAdbService.start(context)
+                        Toast.makeText(
+                            context,
+                            R.string.wireless_adb_notif_waiting,
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    },
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text(stringResource(R.string.wireless_adb_start_notif))
+                }
+            }
+
+            Spacer(Modifier.height(12.dp))
 
             // 按钮：授予通知权限 + 打开无线调试设置
             Row(

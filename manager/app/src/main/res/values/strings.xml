@@ -448,4 +448,20 @@
     <string name="wireless_adb_notif_denied">Notification permission denied. Service notification is required.</string>
     <string name="wireless_adb_status_idle">Not paired</string>
     <string name="wireless_adb_status_paired">ADB connection active</string>
+
+    <!-- 无线调试通知栏 -->
+    <string name="wireless_adb_notif_channel_name">Wireless ADB</string>
+    <string name="wireless_adb_notif_channel_desc">Wireless debugging pairing service notification</string>
+    <string name="wireless_adb_notif_title">LuoxiToolbox Wireless ADB</string>
+    <string name="wireless_adb_notif_waiting">Waiting for pairing code…</string>
+    <string name="wireless_adb_notif_pairing">Pairing…</string>
+    <string name="wireless_adb_notif_paired">ADB connection active</string>
+    <string name="wireless_adb_notif_failed">Pairing failed: %1$s</string>
+    <string name="wireless_adb_notif_input_label">"Code IP:Port (e.g. 123456 192.168.1.5:43211)"</string>
+    <string name="wireless_adb_notif_pair_action">Enter pairing code</string>
+    <string name="wireless_adb_notif_open_settings">Open wireless debugging</string>
+    <string name="wireless_adb_notif_stop">Stop</string>
+    <string name="wireless_adb_notif_retry">Retry pairing</string>
+    <string name="wireless_adb_notif_format_error">Format error. Use: 123456 192.168.1.5:43211</string>
+    <string name="wireless_adb_start_notif">Start from notification</string>
 </resources>
