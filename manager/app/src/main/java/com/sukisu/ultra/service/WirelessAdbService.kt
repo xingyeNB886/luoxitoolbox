@@ -215,7 +215,7 @@ class WirelessAdbService : Service() {
      */
     private fun showNotificationSuccess() {
         val notification = NotificationCompat.Builder(this, CHANNEL_ID)
-            .setSmallIcon(android.R.drawable.stat_sys_data_bluetooth_connected)
+            .setSmallIcon(android.R.drawable.stat_sys_data_bluetooth)
             .setContentTitle(getString(R.string.wireless_adb_notif_title))
             .setContentText(getString(R.string.wireless_adb_notif_paired))
             .setOngoing(true)
