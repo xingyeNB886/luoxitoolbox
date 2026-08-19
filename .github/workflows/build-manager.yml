@@ -230,8 +230,6 @@ jobs:
         run: |
           GRADLE_VERSION=8.12.1
           GRADLE_ZIP=gradle-${GRADLE_VERSION}-bin.zip
-          GRADLE_DIST_DIR=${HOME}/.gradle/wrapper/dists/gradle-${GRADLE_VERSION}-bin
-          mkdir -p "${GRADLE_DIST_DIR}"
           # Try multiple mirrors
           for URL in \
             "https://services.gradle.org/distributions/${GRADLE_ZIP}" \
@@ -239,19 +237,14 @@ jobs:
             "https://mirror.tsinghua.edu.cn/gradle/${GRADLE_ZIP}" \
           ; do
             echo "Trying: $URL"
-            if wget -q --tries=3 --timeout=30 -O "${GRADLE_DIST_DIR}/${GRADLE_ZIP}" "$URL"; then
+            if wget -q --tries=3 --timeout=30 -O "/tmp/${GRADLE_ZIP}" "$URL"; then
               echo "Downloaded from: $URL"
               break
             fi
           done
-          # Compute hash dir like the wrapper does
-          HASH=$(sha1sum "${GRADLE_DIST_DIR}/${GRADLE_ZIP}" | awk '{print $1}')
-          HASH_DIR="${GRADLE_DIST_DIR}/${HASH}"
-          mkdir -p "${HASH_DIR}"
-          cd "${HASH_DIR}"
-          unzip -q "../${GRADLE_ZIP}"
-          touch "${GRADLE_ZIP}.ok"
-          echo "Gradle pre-installed at: ${HASH_DIR}"
+          # Install system-wide
+          sudo unzip -q "/tmp/${GRADLE_ZIP}" -d /opt/
+          echo "/opt/gradle-${GRADLE_VERSION}/bin" >> $GITHUB_PATH
 
       - name: Build with Gradle
         run: |
@@ -262,7 +255,7 @@ jobs:
             echo 'android.native.buildOutput=verbose'
           } >> gradle.properties
           sed -i 's/org.gradle.configuration-cache=true//g' gradle.properties
-          ./gradlew clean assembleRelease
+          gradle clean assembleRelease
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         if: ${{ ( github.event_name != 'pull_request' && github.ref == 'refs/heads/main' ) || github.ref_type == 'tag' }}
