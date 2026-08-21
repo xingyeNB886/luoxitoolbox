@@ -398,12 +398,7 @@
     <string name="permission_root_request_button">Request Root</string>
     <string name="permission_refresh_button">Refresh status</string>
     <string name="permission_grant_type_both">Both authorized</string>
-    <string name="permission_shizuku_install_title">Shizuku not installed?</string>
-    <string name="permission_shizuku_install_summary">Get shell-level access via Shizuku to use all features without Root. First install may require \"Install unknown apps\" permission.</string>
-    <string name="install_shizuku">Install Shizuku</string>
-    <string name="preparing">Preparing…</string>
     <string name="shizuku_permission_tip">Open Shizuku → find \"洛茜工具箱\" → enable authorization; this page will auto-detect after authorization (up to 2 minutes)</string>
-    <string name="apk_read_error">Failed to read APK: %s</string>
     <string name="init_title">Initialize</string>
     <string name="init_summary_prefix">Grant permission first, then initialize. Only needs to be done once.</string>
     <string name="init_status_done">Already initialized, no need to repeat</string>

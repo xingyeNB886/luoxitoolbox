@@ -394,12 +394,7 @@
     <string name="permission_root_request_button">请求 Root</string>
     <string name="permission_refresh_button">刷新状态</string>
     <string name="permission_grant_type_both">双重授权</string>
-    <string name="permission_shizuku_install_title">没有安装 Shizuku？</string>
-    <string name="permission_shizuku_install_summary">Shizuku 可提供 ADB 级权限，无需 Root 即可使用本工具全部功能。首次安装可能需要授予\"安装未知应用\"权限。</string>
-    <string name="install_shizuku">安装 Shizuku</string>
-    <string name="preparing">准备中…</string>
     <string name="shizuku_permission_tip">打开 Shizuku → 找到\"洛茜工具箱\" → 开启授权；授权后本页会自动检测（最长 2 分钟）</string>
-    <string name="apk_read_error">读取 APK 失败：%s</string>
     <string name="init_title">初始化</string>
     <string name="init_summary_prefix">先授予权限，再进行初始化。仅需一次。</string>
     <string name="init_status_done">已初始化，无需重复</string>

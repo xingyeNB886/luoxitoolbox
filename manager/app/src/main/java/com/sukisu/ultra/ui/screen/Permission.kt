@@ -1,6 +1,5 @@
 package com.sukisu.ultra.ui.screen
 
-import android.content.Intent
 import android.content.pm.PackageManager
 import android.widget.Toast
 import androidx.compose.foundation.layout.Arrangement
@@ -57,7 +56,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.core.content.FileProvider
 import com.ramcosta.composedestinations.annotation.Destination
 import com.ramcosta.composedestinations.annotation.RootGraph
 import com.ramcosta.composedestinations.navigation.DestinationsNavigator
@@ -72,7 +70,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import rikka.shizuku.Shizuku
-import java.io.File
 
 /**
  * 洛茜工具箱 · 权限授权页。
@@ -290,9 +287,6 @@ fun PermissionScreen(navigator: DestinationsNavigator) {
                 scope = scope
             )
 
-            // Shizuku 安装卡片（内置 APK）
-            ShizukuInstallCard(scope = scope)
-
             if (grantType == PermissionGrantType.BOTH) {
                 ElevatedCard(
                     colors = getCardColors(MaterialTheme.colorScheme.tertiaryContainer),
@@ -479,88 +473,3 @@ private fun InitCard(
     }
 }
 
-/**
- * Shizuku 安装卡片：从内置 assets/shizuku.apk 拷贝到缓存后触发系统安装
- */
-@Composable
-private fun ShizukuInstallCard(scope: kotlinx.coroutines.CoroutineScope) {
-    val context = LocalContext.current
-    var installing by remember { mutableStateOf(false) }
-
-    ElevatedCard(
-        colors = getCardColors(MaterialTheme.colorScheme.surfaceVariant),
-        elevation = CardDefaults.cardElevation(defaultElevation = cardElevation),
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(20.dp)
-        ) {
-            Text(
-                text = stringResource(R.string.permission_shizuku_install_title),
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-            Spacer(Modifier.height(8.dp))
-            Text(
-                text = stringResource(R.string.permission_shizuku_install_summary),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Spacer(Modifier.height(12.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End
-            ) {
-                Button(
-                    enabled = !installing,
-                    onClick = {
-                        scope.launch(Dispatchers.IO) {
-                            installing = true
-                            try {
-                                // 从内置 assets 读取 Shizuku APK，写入应用缓存目录后触发安装
-                                val apkFile = File(context.cacheDir, "shizuku.apk")
-                                context.assets.open("shizuku.apk").use { input ->
-                                    apkFile.outputStream().use { output -> input.copyTo(output) }
-                                }
-                                withContext(Dispatchers.Main) {
-                                    val intent = Intent(Intent.ACTION_VIEW).apply {
-                                        setDataAndType(
-                                            FileProvider.getUriForFile(
-                                                context,
-                                                "${context.packageName}.fileprovider",
-                                                apkFile
-                                            ),
-                                            "application/vnd.android.package-archive"
-                                        )
-                                        addFlags(
-                                            Intent.FLAG_GRANT_READ_URI_PERMISSION or
-                                                Intent.FLAG_ACTIVITY_NEW_TASK
-                                        )
-                                    }
-                                    context.startActivity(intent)
-                                }
-                            } catch (e: Exception) {
-                                withContext(Dispatchers.Main) {
-                                    Toast.makeText(
-                                        context,
-                                        context.getString(R.string.apk_read_error, e.message),
-                                        Toast.LENGTH_LONG
-                                    ).show()
-                                }
-                            } finally {
-                                installing = false
-                            }
-                        }
-                    }
-                ) {
-                    Text(
-                        text = if (installing) stringResource(R.string.preparing)
-                        else stringResource(R.string.install_shizuku)
-                    )
-                }
-            }
-        }
-    }
-}
