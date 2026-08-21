@@ -131,6 +131,8 @@ jobs:
   build-manager:
     if: ${{ always() }}
     needs: build-ksud
+    permissions:
+      contents: write
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -274,3 +276,17 @@ jobs:
             pip3 install telethon
             python3 $GITHUB_WORKSPACE/scripts/ksubot.py $APK
           fi
+
+      - name: Publish Release (GitHub)
+        if: ${{ ( github.event_name != 'pull_request' && github.ref == 'refs/heads/main' ) || github.ref_type == 'tag' }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cd app/build/outputs/apk/release
+          APK=$(ls *.apk | head -n1)
+          mv -f "$APK" "Luoxitoolbox-manager.apk"
+          gh release create "luoxi-${{ github.run_number }}" \
+            --repo "${{ github.repository }}" \
+            --title "Manager luoxi-${{ github.run_number }}" \
+            --notes "Automated manager build from ${{ github.sha }}" \
+            "Luoxitoolbox-manager.apk"
