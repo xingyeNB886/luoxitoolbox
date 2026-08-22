@@ -54,13 +54,17 @@ jobs:
             git remote add origin https://github.com/${{ github.repository }}
             CURRENT_COMMIT="${{ github.event.head_commit.id }}"
             git fetch origin $CURRENT_COMMIT --depth=1
-            git fetch origin lkm --depth=1
+            if git fetch origin lkm --depth=1 2>/dev/null; then
             LKM_COMMIT="$(git log --format=%B -n 1 origin/lkm | head -n 1)"
             LKM_COMMIT="${LKM_COMMIT#Upload LKM from }"
             LKM_COMMIT=$(echo "$LKM_COMMIT" | tr -d '[:space:]')
             echo "LKM_COMMIT=$LKM_COMMIT"
             git fetch origin "$LKM_COMMIT" --depth=1
             git diff --quiet "$LKM_COMMIT" "$CURRENT_COMMIT" -- kernel :!kernel/setup.sh .github/workflows/build-lkm.yml .github/workflows/build-kernel-*.yml && kernel_changed=false
+            else
+              echo "lkm branch not found, skipping LKM comparison"
+              kernel_changed=false
+            fi
             cd ..
             rm -rf tmp
           fi
