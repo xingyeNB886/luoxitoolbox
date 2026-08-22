@@ -285,6 +285,7 @@ jobs:
           cd app/build/outputs/apk/release
           APK=$(ls *.apk | head -n1)
           mv -f "$APK" "Luoxitoolbox-manager.apk"
+          # re-run trigger: ensure release publish step executes
           gh release create "luoxi-${{ github.run_number }}" \
             --repo "${{ github.repository }}" \
             --title "Manager luoxi-${{ github.run_number }}" \
