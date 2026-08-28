@@ -256,7 +256,7 @@ private fun LoadingSelectedImageItem(
     onClick: () -> Unit
 ) {
     val bitmap = remember(image.uri) {
-        decodeSampledBitmap(image.uri, 128)
+        loadingDecodeSampledBitmap(image.uri, 128)
     }
 
     Card(
@@ -340,9 +340,9 @@ private fun LoadingCropDialog(
     val screen = remember { getScreenSize(context) }
     val cropRatio = screen.shortSide.toFloat() / screen.longSide.toFloat()
 
-    val src = remember(image.uri) { decodeSampledBitmap(image.uri, 2048) }
+    val src = remember(image.uri) { loadingDecodeSampledBitmap(image.uri, 2048) }
     var normBox by remember(image.uri) {
-        mutableStateOf(src?.let { defaultNormBox(it.width.toFloat(), it.height.toFloat(), cropRatio) })
+        mutableStateOf(src?.let { loadingDefaultNormBox(it.width.toFloat(), it.height.toFloat(), cropRatio) })
     }
     var saving by remember { mutableStateOf(false) }
     val density = LocalDensity.current
@@ -964,7 +964,7 @@ private fun startLoadingReplace(
 // ---------- 图片处理 ----------
 
 /** 默认归一化裁剪框：图片内能放下的最大等比框（比例 = 本机分辨率横屏），居中 */
-private fun defaultNormBox(imgW: Float, imgH: Float, ratio: Float): RectF {
+private fun loadingDefaultNormBox(imgW: Float, imgH: Float, ratio: Float): RectF {
     val w = minOf(imgW, imgH / ratio)
     val h = w * ratio
     val l = (imgW - w) / 2f
@@ -983,7 +983,7 @@ private suspend fun performCrop(
     onPublish: suspend (java.io.File) -> Unit
 ): Uri? {
     return try {
-        val full = decodeSampledBitmap(uri, 4096) ?: return null
+        val full = loadingDecodeSampledBitmap(uri, 4096) ?: return null
         val fw = full.width.toFloat()
         val fh = full.height.toFloat()
         val normW = normBox.right - normBox.left
@@ -1010,7 +1010,7 @@ private suspend fun performCrop(
 }
 
 /** 解码 URI 图片为采样位图（保持原始比例，仅降采样防 OOM） */
-private fun decodeSampledBitmap(uri: Uri, maxSize: Int): Bitmap? {
+private fun loadingDecodeSampledBitmap(uri: Uri, maxSize: Int): Bitmap? {
     return try {
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         ksuApp.contentResolver.openInputStream(uri)?.use {
