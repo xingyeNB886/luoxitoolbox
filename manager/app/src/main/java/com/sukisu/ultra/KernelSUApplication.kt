@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.res.Configuration
 import android.content.res.Resources
 import android.os.Build
+import androidx.core.content.edit
 import coil.Coil
 import coil.ImageLoader
 import com.dergoogler.mmrl.platform.Platform
