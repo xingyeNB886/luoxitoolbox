@@ -392,7 +392,7 @@
     <string name="permission_screen_title">Permission</string>
     <string name="permission_screen_subtitle">Please grant one of the following privileges to enable full features.</string>
     <string name="permission_shizuku_title">Shizuku</string>
-    <string name="permission_shizuku_summary">Get shell level access through Shizuku service (device needs Shizuku app installed and ADB activated).</string>
+    <string name="permission_shizuku_summary">Get shell level access through Shizuku service (device needs Shizuku app installed and ADB activated). If this app is not shown in Shizuku list, restart Shizuku or pull to refresh the list.</string>
     <string name="permission_shizuku_not_granted">Not authorized</string>
     <string name="permission_shizuku_granted">Authorized</string>
     <string name="permission_shizuku_request_button">Authorize Shizuku</string>

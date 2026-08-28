@@ -78,6 +78,7 @@ fun FunctionScreen(navigator: DestinationsNavigator) {
                 .fillMaxSize()
                 .padding(innerPadding)
                 .verticalScroll(rememberScrollState())
+                .padding(top = 12.dp)
                 .padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {

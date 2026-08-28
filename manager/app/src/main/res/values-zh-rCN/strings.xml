@@ -388,7 +388,7 @@
     <string name="permission_screen_title">权限获取</string>
     <string name="permission_screen_subtitle">请授予以下任一权限以启用全部功能</string>
     <string name="permission_shizuku_title">Shizuku</string>
-    <string name="permission_shizuku_summary">通过 Shizuku 服务获取 Shell 级别权限（需安装 Shizuku 应用并激活 ADB）</string>
+    <string name="permission_shizuku_summary">通过 Shizuku 服务获取 Shell 级别权限（需安装 Shizuku 应用并激活 ADB）。若 Shizuku 授权列表未显示本应用，请重启 Shizuku 或下拉刷新列表</string>
     <string name="permission_shizuku_not_granted">未授权</string>
     <string name="permission_shizuku_granted">已授权</string>
     <string name="permission_shizuku_request_button">授权 Shizuku</string>
