@@ -73,7 +73,12 @@ jobs:
             echo 'android.native.buildOutput=verbose'
           } >> gradle.properties
           sed -i 's/org.gradle.configuration-cache=true//g' gradle.properties
-          ./gradlew clean assembleRelease 2>&1 | tee /tmp/gradle-build.log
+          ./gradlew clean assembleRelease 2>&1 | tee /tmp/gradle-build.log || {
+            echo "::group::Gradle errors"
+            grep -iE "^e: |error:|unresolved|conflicting|redeclaration|exception|FAILURE|> Task.*FAILED" /tmp/gradle-build.log | head -60 | sed 's/^/::error::/'
+            echo "::endgroup::"
+            exit 1
+          }
 
       - name: Upload gradle build log
         if: failure()
