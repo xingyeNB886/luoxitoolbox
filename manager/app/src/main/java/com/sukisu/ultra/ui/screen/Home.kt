@@ -126,6 +126,7 @@ import com.sukisu.ultra.ui.util.getRealResolution
 import com.sukisu.ultra.ui.util.reboot
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -552,9 +553,29 @@ private fun StatusCard(
         }
     }
 
+    // 轻量授权状态检测（轮询用）：只做 binder/属性查询，不执行 shell 命令
+    fun refreshGrant() {
+        scope.launch(Dispatchers.IO) {
+            val working = PermissionManager.isAnyGranted()
+            val label = PermissionManager.getGrantLabel()
+            withContext(Dispatchers.Main) {
+                isWorking = working
+                grantLabel = label
+            }
+        }
+    }
+
     // 首次进入 + 每次回到前台时刷新（覆盖从 Shizuku App 外部授权后返回的场景）
     LaunchedEffect(context) {
         refreshStatus()
+    }
+    // 低频兜底轮询：授权变化可能来自外部（Shizuku 列表授权、binder 重连），
+    // 每 5 秒轻量检测一次，保证主页状态卡及时更新
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(5000)
+            refreshGrant()
+        }
     }
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
