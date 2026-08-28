@@ -165,7 +165,7 @@ object PermissionManager {
         val root = isRootGranted()
         val shizuku = isShizukuGranted()
         return when {
-            root -> "<Root>"
+            root -> "<root>"
             shizuku -> "<ADB>"
             else -> ""
         }

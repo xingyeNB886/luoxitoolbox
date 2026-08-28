@@ -69,6 +69,7 @@ import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
@@ -87,6 +88,9 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.core.content.edit
 import androidx.core.content.pm.PackageInfoCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.ramcosta.composedestinations.annotation.Destination
 import com.ramcosta.composedestinations.annotation.RootGraph
 import com.ramcosta.composedestinations.generated.destinations.InstallScreenDestination
@@ -349,6 +353,7 @@ private fun StatusCard(
     onClickGrant: () -> Unit = {}
 ) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     var isWorking by remember { mutableStateOf(false) }
     var grantLabel by remember { mutableStateOf("") }
     // 状态卡下方真实信息行（工具版本 / 超级用户数 / 模块数 / KPM模块数 / SUSFS支持）
@@ -358,36 +363,58 @@ private fun StatusCard(
     var kpmModuleCount by remember { mutableStateOf(0) }
     var susfsSupport by remember { mutableStateOf("") }
 
-    // 首次进入检测授权状态（Root / Shizuku）并读取可核对的真实数据
-    LaunchedEffect(context) {
-        withContext(Dispatchers.IO) {
-            isWorking = PermissionManager.isAnyGranted()
-            grantLabel = PermissionManager.getGrantLabel()
+    // 重新检测授权状态并读取真实数据；可在任意线程调用（内部切 IO 检测 / Main 更新）
+    fun refreshStatus() {
+        scope.launch(Dispatchers.IO) {
+            val working = PermissionManager.isAnyGranted()
+            val label = PermissionManager.getGrantLabel()
 
             val (vName, vCode) = getManagerVersion(context)
-            infoVersion = if (vName.isNotBlank()) "$vName ($vCode)" else BuildConfig.VERSION_NAME
+            val version = if (vName.isNotBlank()) "$vName ($vCode)" else BuildConfig.VERSION_NAME
 
             // 真实查询：KSU 驱动在线时返回真实计数，离线时如实返回空/0
-            superuserCount = runCatching { getSuperuserCount() }.getOrDefault(0)
-            moduleCount = runCatching { getModuleCount() }.getOrDefault(0)
+            val suCount = runCatching { getSuperuserCount() }.getOrDefault(0)
+            val modCount = runCatching { getModuleCount() }.getOrDefault(0)
 
             // KPM 模块数（始终显示；无 KPM 驱动时如实显示 0）
-            kpmModuleCount = runCatching { getKpmModuleCount() }.getOrDefault(0)
+            val kpmCount = runCatching { getKpmModuleCount() }.getOrDefault(0)
 
             // SusFS 支持状态（始终显示；空时显示"未知"）
-            susfsSupport = runCatching { getSuSFS() }.getOrDefault("")
-            if (susfsSupport.isBlank()) {
-                susfsSupport = "Unknown"
+            var susfs = runCatching { getSuSFS() }.getOrDefault("")
+            if (susfs.isBlank()) {
+                susfs = "Unknown"
+            }
+
+            withContext(Dispatchers.Main) {
+                isWorking = working
+                grantLabel = label
+                infoVersion = version
+                superuserCount = suCount
+                moduleCount = modCount
+                kpmModuleCount = kpmCount
+                susfsSupport = susfs
             }
         }
     }
 
+    // 首次进入 + 每次回到前台时刷新（覆盖从 Shizuku App 外部授权后返回的场景）
+    LaunchedEffect(context) {
+        refreshStatus()
+    }
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                refreshStatus()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
     // 授权状态变化时自动刷新（Shizuku 授权弹窗回调 / Binder 变化）
     DisposableEffect(Unit) {
-        val listener: () -> Unit = {
-            isWorking = PermissionManager.isAnyGranted()
-            grantLabel = PermissionManager.getGrantLabel()
-        }
+        val listener: () -> Unit = { refreshStatus() }
         PermissionManager.addOnChangeListener(listener)
         onDispose { PermissionManager.removeOnChangeListener(listener) }
     }

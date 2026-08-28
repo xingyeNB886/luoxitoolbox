@@ -19,7 +19,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.Button
@@ -124,7 +126,8 @@ fun ImageEditorDialog(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(20.dp),
+                        .padding(20.dp)
+                        .verticalScroll(rememberScrollState()),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Row(
@@ -160,9 +163,9 @@ fun ImageEditorDialog(
                         val imgH = src.height.toFloat()
                         val imgAspect = imgW / imgH
 
-                        // 画布尺寸跟随图片比例（宽上限 320dp、高上限 420dp，竖屏适配）
+                        // 画布尺寸跟随图片比例（宽上限 320dp、高上限 380dp，竖屏适配）
                         val maxW = 320.dp
-                        val maxH = 420.dp
+                        val maxH = 380.dp
                         val dispW: Dp
                         val dispH: Dp
                         if (maxW / maxH > imgAspect) {
