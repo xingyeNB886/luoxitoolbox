@@ -61,8 +61,7 @@
                 android:resource="@xml/filepaths" />
         </provider>
 
-        <!--
-            洛茜工具箱：Shizuku ContentProvider（按 Shizuku 官方接入文档配置）。
+        <!-- 洛茜工具箱：Shizuku ContentProvider（按 Shizuku 官方接入文档配置）。
             - exported="true" → 允许 Shizuku App 跨进程调用
             - permission="android.permission.INTERACT_ACROSS_USERS_FULL" → 系统级跨用户权限
         -->
@@ -73,6 +72,11 @@
             android:exported="true"
             android:multiprocess="false"
             android:permission="android.permission.INTERACT_ACROSS_USERS_FULL" />
+
+        <!-- 声明 Shizuku v3 兼容，使应用出现在 Shizuku 授权列表中（未授权时也能被 Shizuku 识别） -->
+        <meta-data
+            android:name="moe.shizuku.client.V3_SUPPORT"
+            android:value="true" />
     </application>
 
 </manifest>

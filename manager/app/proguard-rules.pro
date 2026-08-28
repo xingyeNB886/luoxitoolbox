@@ -45,3 +45,15 @@
 -keep class com.sukisu.ultra.ui.webui.WebViewInterface { *; }
 
 -keep,allowobfuscation class * extends com.dergoogler.mmrl.platform.content.IService { *; }
+
+# Shizuku / Sui（Provider/Binder 按名反序列化，混淆即失效）
+-keep class rikka.shizuku.** { *; }
+-keep class moe.shizuku.** { *; }
+-keep class org.lsposed.hiddenapibypass.** { *; }
+
+# Shizuku UserService（跨进程 Binder 按类名反序列化）
+-keep class com.sukisu.ultra.service.IShellService { *; }
+-keep class com.sukisu.ultra.service.ShellService { *; }
+
+# Shizuku 授权监听（反射回调）
+-keep class com.sukisu.ultra.ui.util.PermissionManager { *; }
