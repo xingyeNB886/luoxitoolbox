@@ -43,6 +43,7 @@ import com.ramcosta.composedestinations.annotation.RootGraph
 import com.ramcosta.composedestinations.generated.destinations.LoadingImageScreenDestination
 import com.ramcosta.composedestinations.navigation.DestinationsNavigator
 import com.sukisu.ultra.ui.theme.CardConfig
+import com.sukisu.ultra.ui.theme.CardConfig.cardAlpha
 import com.sukisu.ultra.ui.theme.CardConfig.cardElevation
 import com.sukisu.ultra.ui.theme.getCardColors
 
@@ -53,12 +54,15 @@ import com.sukisu.ultra.ui.theme.getCardColors
 @Destination<RootGraph>
 @Composable
 fun FunctionScreen(navigator: DestinationsNavigator) {
+    val cardColor = MaterialTheme.colorScheme.surfaceVariant
+    val cardAlpha = CardConfig.cardAlpha
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text("功能") },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f)
+                    containerColor = cardColor.copy(alpha = cardAlpha),
+                    scrolledContainerColor = cardColor.copy(alpha = cardAlpha)
                 ),
                 windowInsets = WindowInsets.safeDrawing.only(
                     WindowInsetsSides.Top + WindowInsetsSides.Horizontal

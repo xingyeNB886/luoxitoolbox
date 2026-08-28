@@ -28,6 +28,11 @@ object CloudUpdateManager {
 
     private const val QQ_COLLECTION_URL = "https://sharechain.qq.com/895c780b3b254605d50f3af4f1d9e05b?qq_aio_chat_type=2"
 
+    private const val PREFS_NAME = "settings"
+
+    /** 缓存上次联网检测到的云端内部版本号（断网时用于对比，防止断网绕过强制更新） */
+    private const val KEY_LAST_KNOWN_VERSION = "last_known_cloud_version"
+
     data class CloudData(
         val internalVersion: Int = 0,
         val downloadUrl: String = "",
@@ -92,6 +97,24 @@ object CloudUpdateManager {
     }
 
     /**
+     * 读取上次联网检测到的云端内部版本号（断网时返回缓存值，防止绕过强制更新）。
+     */
+    fun getCachedCloudVersion(): Int {
+        return runCatching {
+            ksuApp.getSharedPreferences(PREFS_NAME, android.content.Context.MODE_PRIVATE)
+                .getInt(KEY_LAST_KNOWN_VERSION, 0)
+        }.getOrDefault(0)
+    }
+
+    private fun saveCachedCloudVersion(version: Int) {
+        if (version <= 0) return
+        runCatching {
+            ksuApp.getSharedPreferences(PREFS_NAME, android.content.Context.MODE_PRIVATE)
+                .edit().putInt(KEY_LAST_KNOWN_VERSION, version).apply()
+        }
+    }
+
+    /**
      * 从QQ收藏获取云端数据
      */
     suspend fun fetchCloudData(): CloudData = withContext(Dispatchers.IO) {
@@ -102,7 +125,10 @@ object CloudUpdateManager {
             val response = ksuApp.okhttpClient.newCall(request).execute()
             if (!response.isSuccessful) return@withContext CloudData()
             val body = response.body?.string() ?: return@withContext CloudData()
-            parseCloudData(body)
+            val data = parseCloudData(body)
+            // 拉取成功后缓存版本号，断网时仍可对比
+            saveCachedCloudVersion(data.internalVersion)
+            data
         }.getOrDefault(CloudData())
     }
 

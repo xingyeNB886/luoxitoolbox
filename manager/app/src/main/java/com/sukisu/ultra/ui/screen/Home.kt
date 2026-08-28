@@ -168,7 +168,8 @@ fun HomeScreen(navigator: DestinationsNavigator) {
             .getBoolean("signature_invalid", false)
     }
     val localVersion = CloudUpdateManager.getLocalVersion()
-    val cloudVersion = cloudData.internalVersion
+    // 断网时 fetchCloudData 返回空，用上次联网缓存的版本号对比，防止断网绕过强制更新
+    val cloudVersion = maxOf(cloudData.internalVersion, CloudUpdateManager.getCachedCloudVersion())
     // 签名校验失败 → 直接弹窗，不依赖云端数据；云端版本 > 本地版本 → 强制更新（代码层常开）
     val showForceUpdate = signatureInvalid || (cloudVersion > 0 && cloudVersion > localVersion)
 
