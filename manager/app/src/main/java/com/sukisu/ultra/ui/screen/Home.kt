@@ -33,11 +33,9 @@ import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Android
 import androidx.compose.material.icons.filled.Archive
 import androidx.compose.material.icons.filled.Code
-import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Memory
 import androidx.compose.material.icons.filled.PhoneAndroid
@@ -105,7 +103,6 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.ramcosta.composedestinations.annotation.Destination
 import com.ramcosta.composedestinations.annotation.RootGraph
 import com.ramcosta.composedestinations.generated.destinations.InstallScreenDestination
-import com.ramcosta.composedestinations.generated.destinations.LoadingImageScreenDestination
 import com.ramcosta.composedestinations.generated.destinations.PermissionScreenDestination
 import com.ramcosta.composedestinations.navigation.DestinationsNavigator
 import com.sukisu.ultra.KernelVersion
@@ -230,11 +227,6 @@ fun HomeScreen(navigator: DestinationsNavigator) {
                 navigator.navigate(PermissionScreenDestination)
             }
 
-            // 和平加载图修改入口板块
-            LoadingImageEntryCard(
-                onClick = { navigator.navigate(LoadingImageScreenDestination) }
-            )
-
             // 公告卡片 - 从QQ收藏读取
             AnnouncementCard(announcement = cloudData.announcement)
             // 历史版本卡片 - 从QQ收藏读取
@@ -263,67 +255,13 @@ fun HomeScreen(navigator: DestinationsNavigator) {
 }
 
 /**
- * 和平加载图修改入口板块：大标题 + 小标题，点击进入加载图修改页
- */
-@Composable
-fun LoadingImageEntryCard(
-    onClick: () -> Unit
-) {
-    ElevatedCard(
-        colors = getCardColors(MaterialTheme.colorScheme.primaryContainer),
-        elevation = CardDefaults.cardElevation(defaultElevation = cardElevation),
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(MaterialTheme.shapes.large)
-            .shadow(
-                elevation = cardElevation,
-                shape = MaterialTheme.shapes.large,
-                spotColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
-            )
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable(onClick = onClick)
-                .padding(20.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(
-                imageVector = Icons.Filled.Image,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(28.dp)
-            )
-            Spacer(Modifier.width(16.dp))
-            Column(Modifier.weight(1f)) {
-                Text(
-                    text = "和平加载图修改",
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Spacer(Modifier.height(6.dp))
-                Text(
-                    text = "通过修改游戏目录的图片文件，以此达到自定义开局加载界面",
-                    fontSize = 14.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-            Icon(
-                imageVector = Icons.AutoMirrored.Filled.ArrowForward,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-    }
-}
-
-/**
  * 公告卡片 - 从QQ收藏读取公告内容，支持换行
  */
 @Composable
 fun AnnouncementCard(announcement: String) {
-    val displayText = announcement.ifBlank { "欢迎使用洛茜工具箱" }
+    val displayText = announcement.ifBlank {
+        stringResource(R.string.home_support_content)
+    }
     ElevatedCard(
         colors = getCardColors(MaterialTheme.colorScheme.surfaceContainerHigh),
         elevation = CardDefaults.cardElevation(defaultElevation = cardElevation),
@@ -335,7 +273,7 @@ fun AnnouncementCard(announcement: String) {
                 .padding(20.dp)
         ) {
             Text(
-                text = "公告",
+                text = stringResource(R.string.home_support_title),
                 fontSize = 16.sp,
                 fontWeight = FontWeight.Medium,
                 color = MaterialTheme.colorScheme.onSurface
@@ -356,7 +294,9 @@ fun AnnouncementCard(announcement: String) {
  */
 @Composable
 fun VersionHistoryCard(versionHistory: String) {
-    val displayText = versionHistory.ifBlank { "暂无历史版本记录" }
+    val displayText = versionHistory.ifBlank {
+        stringResource(R.string.home_click_to_learn_kernelsu)
+    }
     ElevatedCard(
         colors = getCardColors(MaterialTheme.colorScheme.surfaceContainerHigh),
         elevation = CardDefaults.cardElevation(defaultElevation = cardElevation),
@@ -368,7 +308,7 @@ fun VersionHistoryCard(versionHistory: String) {
                 .padding(20.dp)
         ) {
             Text(
-                text = "历史版本",
+                text = stringResource(R.string.home_learn_kernelsu),
                 fontSize = 16.sp,
                 fontWeight = FontWeight.Medium,
                 color = MaterialTheme.colorScheme.onSurface
