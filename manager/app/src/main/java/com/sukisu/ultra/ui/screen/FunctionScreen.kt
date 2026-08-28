@@ -18,7 +18,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Archive
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material3.CardDefaults
@@ -41,7 +40,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ramcosta.composedestinations.annotation.Destination
 import com.ramcosta.composedestinations.annotation.RootGraph
-import com.ramcosta.composedestinations.generated.destinations.BackupRestoreScreenDestination
 import com.ramcosta.composedestinations.generated.destinations.LoadingImageScreenDestination
 import com.ramcosta.composedestinations.navigation.DestinationsNavigator
 import com.sukisu.ultra.ui.theme.CardConfig
@@ -84,12 +82,6 @@ fun FunctionScreen(navigator: DestinationsNavigator) {
                 subtitle = "通过修改游戏目录的图片文件，以此达到自定义开局加载界面",
                 icon = Icons.Filled.Image,
                 onClick = { navigator.navigate(LoadingImageScreenDestination) }
-            )
-            FunctionEntryCard(
-                title = "备份还原",
-                subtitle = "备份游戏加载图文件，或从备份目录 / 自定义 zip 还原",
-                icon = Icons.Filled.Archive,
-                onClick = { navigator.navigate(BackupRestoreScreenDestination) }
             )
             Spacer(Modifier.height(16.dp))
         }

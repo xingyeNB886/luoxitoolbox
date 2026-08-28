@@ -1,11 +1,7 @@
 package com.sukisu.ultra.ui.screen
 
 import android.content.Context
-import android.content.Intent
-import android.net.Uri
 import android.widget.Toast
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -37,20 +33,17 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import androidx.core.content.FileProvider
 import androidx.core.content.edit
 import com.maxkeppeker.sheets.core.models.base.IconSource
 import com.maxkeppeler.sheets.list.models.ListOption
 import com.ramcosta.composedestinations.annotation.Destination
 import com.ramcosta.composedestinations.annotation.RootGraph
-import com.ramcosta.composedestinations.generated.destinations.AppProfileTemplateScreenDestination
 import com.ramcosta.composedestinations.generated.destinations.FlashScreenDestination
 import com.ramcosta.composedestinations.generated.destinations.MoreSettingsScreenDestination
 import com.ramcosta.composedestinations.navigation.DestinationsNavigator
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import com.sukisu.ultra.BuildConfig
 import com.sukisu.ultra.Natives
 import com.sukisu.ultra.R
 import com.sukisu.ultra.*
@@ -59,9 +52,6 @@ import com.sukisu.ultra.ui.theme.*
 import com.sukisu.ultra.ui.theme.CardConfig.cardAlpha
 import com.sukisu.ultra.ui.theme.CardConfig.cardElevation
 import com.sukisu.ultra.ui.util.LocalSnackbarHost
-import com.sukisu.ultra.ui.util.getBugreportFile
-import java.time.LocalDateTime
-import java.time.format.DateTimeFormatter
 import com.sukisu.ultra.ui.component.KsuIsValid
 import com.dergoogler.mmrl.platform.Platform
 
@@ -95,94 +85,6 @@ fun SettingScreen(navigator: DestinationsNavigator) {
         ) {
             val context = LocalContext.current
             val scope = rememberCoroutineScope()
-            val exportBugreportLauncher = rememberLauncherForActivityResult(
-                ActivityResultContracts.CreateDocument("application/gzip")
-            ) { uri: Uri? ->
-                if (uri == null) return@rememberLauncherForActivityResult
-                scope.launch(Dispatchers.IO) {
-                    loadingDialog.show()
-                    context.contentResolver.openOutputStream(uri)?.use { output ->
-                        getBugreportFile(context).inputStream().use {
-                            it.copyTo(output)
-                        }
-                    }
-                    loadingDialog.hide()
-                    snackBarHost.showSnackbar(context.getString(R.string.log_saved))
-                }
-            }
-
-            // 配置
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceContainerLow.copy(alpha = cardAlpha)
-                ),
-                elevation = CardDefaults.cardElevation(defaultElevation = cardElevation)
-            ) {
-                Column(modifier = Modifier.padding(vertical = 8.dp)) {
-                    Text(
-                        text = stringResource(R.string.configuration),
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-                    )
-
-                    // 配置文件模板入口
-                    val profileTemplate = stringResource(id = R.string.settings_profile_template)
-                    KsuIsValid {
-                        SettingItem(
-                            icon = Icons.Filled.Fence,
-                            title = profileTemplate,
-                            summary = stringResource(id = R.string.settings_profile_template_summary),
-                            onClick = {
-                                navigator.navigate(AppProfileTemplateScreenDestination)
-                            }
-                        )
-                    }
-
-                    // 卸载模块开关
-                    var umountChecked by rememberSaveable {
-                        mutableStateOf(Natives.isDefaultUmountModules())
-                    }
-
-                    KsuIsValid {
-                        SwitchSettingItem(
-                            icon = Icons.Filled.FolderDelete,
-                            title = stringResource(id = R.string.settings_umount_modules_default),
-                            summary = stringResource(id = R.string.settings_umount_modules_default_summary),
-                            checked = umountChecked,
-                            onCheckedChange = {
-                                if (Natives.setDefaultUmountModules(it)) {
-                                    umountChecked = it
-                                }
-                            }
-                        )
-                    }
-
-                    // SU 禁用开关（仅在兼容版本显示）
-                    KsuIsValid {
-                        if (Natives.version >= Natives.MINIMAL_SUPPORTED_SU_COMPAT) {
-                            var isSuDisabled by rememberSaveable {
-                                mutableStateOf(!Natives.isSuEnabled())
-                            }
-                            SwitchSettingItem(
-                                icon = Icons.Filled.RemoveModerator,
-                                title = stringResource(id = R.string.settings_disable_su),
-                                summary = stringResource(id = R.string.settings_disable_su_summary),
-                                checked = isSuDisabled,
-                                onCheckedChange = { checked ->
-                                    val shouldEnable = !checked
-                                    if (Natives.setSuEnabled(shouldEnable)) {
-                                        isSuDisabled = !shouldEnable
-                                    }
-                                }
-                            )
-                        }
-                    }
-                }
-            }
 
             // 应用设置
             Card(
@@ -278,105 +180,6 @@ fun SettingScreen(navigator: DestinationsNavigator) {
                             navigator.navigate(MoreSettingsScreenDestination)
                         }
                     )
-                }
-            }
-
-            // 工具
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceContainerLow.copy(alpha = cardAlpha)
-                ),
-                elevation = CardDefaults.cardElevation(defaultElevation = cardElevation)
-            ) {
-                Column(modifier = Modifier.padding(vertical = 8.dp)) {
-                    Text(
-                        text = stringResource(R.string.tools),
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-                    )
-
-                    var showBottomsheet by remember { mutableStateOf(false) }
-
-                    SettingItem(
-                        icon = Icons.Filled.BugReport,
-                        title = stringResource(id = R.string.send_log),
-                        onClick = {
-                            showBottomsheet = true
-                        }
-                    )
-
-                    if (showBottomsheet) {
-                        ModalBottomSheet(
-                            onDismissRequest = { showBottomsheet = false },
-                            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                        ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(16.dp),
-                                horizontalArrangement = Arrangement.SpaceEvenly
-                            ) {
-                                LogActionButton(
-                                    icon = Icons.Filled.Save,
-                                    text = stringResource(R.string.save_log),
-                                    onClick = {
-                                        val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd_HH_mm")
-                                        val current = LocalDateTime.now().format(formatter)
-                                        exportBugreportLauncher.launch("KernelSU_bugreport_${current}.tar.gz")
-                                        showBottomsheet = false
-                                    }
-                                )
-
-                                LogActionButton(
-                                    icon = Icons.Filled.Share,
-                                    text = stringResource(R.string.send_log),
-                                    onClick = {
-                                        scope.launch {
-                                            val bugreport = loadingDialog.withLoading {
-                                                withContext(Dispatchers.IO) {
-                                                    getBugreportFile(context)
-                                                }
-                                            }
-
-                                            val uri: Uri =
-                                                FileProvider.getUriForFile(
-                                                    context,
-                                                    "${BuildConfig.APPLICATION_ID}.fileprovider",
-                                                    bugreport
-                                                )
-
-                                            val shareIntent = Intent(Intent.ACTION_SEND).apply {
-                                                putExtra(Intent.EXTRA_STREAM, uri)
-                                                setDataAndType(uri, "application/gzip")
-                                                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                                            }
-
-                                            context.startActivity(
-                                                Intent.createChooser(
-                                                    shareIntent,
-                                                    context.getString(R.string.send_log)
-                                                )
-                                            )
-
-                                            showBottomsheet = false
-                                        }
-                                    }
-                                )
-                            }
-                            Spacer(modifier = Modifier.height(16.dp))
-                        }
-                    }
-
-                    val lkmMode = Natives.version >= Natives.MINIMAL_SUPPORTED_KERNEL_LKM && Natives.isLkmMode
-                    if (lkmMode) {
-                        UninstallItem(navigator) {
-                            loadingDialog.withLoading(it)
-                        }
-                    }
                 }
             }
 

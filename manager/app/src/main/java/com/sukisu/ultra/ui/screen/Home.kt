@@ -5,16 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
-import android.os.PowerManager
 import android.system.Os
-import androidx.annotation.StringRes
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.spring
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -34,12 +25,10 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Android
-import androidx.compose.material.icons.filled.Archive
 import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Memory
 import androidx.compose.material.icons.filled.PhoneAndroid
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Storage
@@ -51,8 +40,6 @@ import androidx.compose.material.icons.outlined.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -102,16 +89,13 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.ramcosta.composedestinations.annotation.Destination
 import com.ramcosta.composedestinations.annotation.RootGraph
-import com.ramcosta.composedestinations.generated.destinations.InstallScreenDestination
 import com.ramcosta.composedestinations.generated.destinations.PermissionScreenDestination
 import com.ramcosta.composedestinations.navigation.DestinationsNavigator
 import com.sukisu.ultra.KernelVersion
-import com.sukisu.ultra.Natives
 import com.sukisu.ultra.R
 import com.sukisu.ultra.BuildConfig
 import com.sukisu.ultra.getKernelVersion
 import com.sukisu.ultra.ksuApp
-import com.sukisu.ultra.ui.component.KsuIsValid
 import com.sukisu.ultra.ui.component.rememberConfirmDialog
 import com.sukisu.ultra.ui.theme.CardConfig
 import com.sukisu.ultra.ui.theme.CardConfig.cardElevation
@@ -201,7 +185,6 @@ fun HomeScreen(navigator: DestinationsNavigator) {
         topBar = {
             TopBar(
                 kernelVersion,
-                onInstallClick = { navigator.navigate(InstallScreenDestination) },
                 scrollBehavior = scrollBehavior
             )
         },
@@ -228,14 +211,14 @@ fun HomeScreen(navigator: DestinationsNavigator) {
                 navigator.navigate(PermissionScreenDestination)
             }
 
+            val prefs = remember { context.getSharedPreferences("app_prefs", Context.MODE_PRIVATE) }
+
+            InfoCard()
+
             // 公告卡片 - 从QQ收藏读取
             AnnouncementCard(announcement = cloudData.announcement)
             // 历史版本卡片 - 从QQ收藏读取
             VersionHistoryCard(versionHistory = cloudData.versionHistory)
-
-            val prefs = remember { context.getSharedPreferences("app_prefs", Context.MODE_PRIVATE) }
-
-            InfoCard()
 
             Spacer(Modifier.height(16.dp))
         }
@@ -261,7 +244,7 @@ fun HomeScreen(navigator: DestinationsNavigator) {
 @Composable
 fun AnnouncementCard(announcement: String) {
     val displayText = announcement.ifBlank {
-        stringResource(R.string.home_support_content)
+        "暂无公告"
     }
     ElevatedCard(
         colors = getCardColors(MaterialTheme.colorScheme.surfaceContainerHigh),
@@ -274,7 +257,7 @@ fun AnnouncementCard(announcement: String) {
                 .padding(20.dp)
         ) {
             Text(
-                text = stringResource(R.string.home_support_title),
+                text = "公告",
                 fontSize = 16.sp,
                 fontWeight = FontWeight.Medium,
                 color = MaterialTheme.colorScheme.onSurface
@@ -296,7 +279,7 @@ fun AnnouncementCard(announcement: String) {
 @Composable
 fun VersionHistoryCard(versionHistory: String) {
     val displayText = versionHistory.ifBlank {
-        stringResource(R.string.home_click_to_learn_kernelsu)
+        "暂无历史版本"
     }
     ElevatedCard(
         colors = getCardColors(MaterialTheme.colorScheme.surfaceContainerHigh),
@@ -309,7 +292,7 @@ fun VersionHistoryCard(versionHistory: String) {
                 .padding(20.dp)
         ) {
             Text(
-                text = stringResource(R.string.home_learn_kernelsu),
+                text = "历史版本",
                 fontSize = 16.sp,
                 fontWeight = FontWeight.Medium,
                 color = MaterialTheme.colorScheme.onSurface
@@ -428,25 +411,10 @@ fun ForceUpdateDialog(
     }
 }
 
-@Composable
-fun RebootDropdownItem(@StringRes id: Int, reason: String = "") {
-    DropdownMenuItem(
-        text = { Text(stringResource(id)) },
-        onClick = { reboot(reason) },
-        leadingIcon = {
-            Icon(
-                imageVector = Icons.Filled.Refresh,
-                contentDescription = null,
-            )
-        }
-    )
-}
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun TopBar(
     kernelVersion: KernelVersion,
-    onInstallClick: () -> Unit,
     scrollBehavior: TopAppBarScrollBehavior? = null
 ) {
     val cardColor = MaterialTheme.colorScheme.surfaceVariant
@@ -463,42 +431,6 @@ private fun TopBar(
             containerColor = cardColor.copy(alpha = cardAlpha),
             scrolledContainerColor = cardColor.copy(alpha = cardAlpha)
         ),
-        actions = {
-            IconButton(onClick = onInstallClick) {
-                Icon(
-                    Icons.Filled.Archive,
-                    contentDescription = stringResource(R.string.install),
-                )
-            }
-
-            var showDropdown by remember { mutableStateOf(false) }
-            KsuIsValid {
-                IconButton(onClick = {
-                    showDropdown = true
-                }) {
-                    Icon(
-                        imageVector = Icons.Filled.Refresh,
-                        contentDescription = stringResource(id = R.string.reboot)
-                    )
-
-                    DropdownMenu(expanded = showDropdown, onDismissRequest = {
-                        showDropdown = false
-                    }) {
-                        RebootDropdownItem(id = R.string.reboot)
-
-                        val pm = LocalContext.current.getSystemService(Context.POWER_SERVICE) as PowerManager?
-                        @Suppress("DEPRECATION")
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && pm?.isRebootingUserspaceSupported == true) {
-                            RebootDropdownItem(id = R.string.reboot_userspace, reason = "userspace")
-                        }
-                        RebootDropdownItem(id = R.string.reboot_recovery, reason = "recovery")
-                        RebootDropdownItem(id = R.string.reboot_bootloader, reason = "bootloader")
-                        RebootDropdownItem(id = R.string.reboot_download, reason = "download")
-                        RebootDropdownItem(id = R.string.reboot_edl, reason = "edl")
-                    }
-                }
-            }
-        },
         windowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal),
         scrollBehavior = scrollBehavior
     )
@@ -638,13 +570,6 @@ private fun StatusCard(
                         text = workingText,
                         style = MaterialTheme.typography.titleMedium,
                         color = MaterialTheme.colorScheme.onSurface
-                    )
-
-                    Spacer(Modifier.height(4.dp))
-                    Text(
-                        text = summaryText,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
 
                     // 状态卡下方信息行：标签+冒号+值，一行一句（原版样式）
