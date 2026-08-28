@@ -35,6 +35,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
@@ -83,6 +84,7 @@ import com.ramcosta.composedestinations.generated.destinations.BackupRestoreScre
 import com.ramcosta.composedestinations.generated.destinations.LoadingEditScreenDestination
 import com.ramcosta.composedestinations.navigation.DestinationsNavigator
 import com.sukisu.ultra.ksuApp
+import com.sukisu.ultra.ui.theme.CardConfig
 import com.sukisu.ultra.ui.theme.CardConfig.cardAlpha
 import com.sukisu.ultra.ui.util.FileManagerUtils
 import com.sukisu.ultra.ui.util.FileManagerUtils.ReplaceResult
