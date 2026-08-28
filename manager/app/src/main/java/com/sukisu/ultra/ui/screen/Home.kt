@@ -2,6 +2,8 @@ package com.sukisu.ultra.ui.screen
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import android.os.Build
 import android.os.PowerManager
 import android.system.Os
@@ -31,9 +33,11 @@ import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Android
 import androidx.compose.material.icons.filled.Archive
 import androidx.compose.material.icons.filled.Code
+import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Memory
 import androidx.compose.material.icons.filled.PhoneAndroid
@@ -46,6 +50,8 @@ import androidx.compose.material.icons.outlined.Block
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Warning
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -86,6 +92,8 @@ import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.core.content.edit
 import androidx.core.content.pm.PackageInfoCompat
 import androidx.lifecycle.Lifecycle
@@ -94,6 +102,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.ramcosta.composedestinations.annotation.Destination
 import com.ramcosta.composedestinations.annotation.RootGraph
 import com.ramcosta.composedestinations.generated.destinations.InstallScreenDestination
+import com.ramcosta.composedestinations.generated.destinations.LoadingImageScreenDestination
 import com.ramcosta.composedestinations.generated.destinations.PermissionScreenDestination
 import com.ramcosta.composedestinations.navigation.DestinationsNavigator
 import com.sukisu.ultra.KernelVersion
@@ -112,9 +121,8 @@ import com.sukisu.ultra.ui.util.getModuleCount
 import com.sukisu.ultra.ui.util.getSuSFS
 import com.sukisu.ultra.ui.util.getSuperuserCount
 import com.sukisu.ultra.ui.util.PermissionManager
-import com.sukisu.ultra.ui.util.checkNewVersion
+import com.sukisu.ultra.ui.util.CloudUpdateManager
 import com.sukisu.ultra.ui.util.getRealResolution
-import com.sukisu.ultra.ui.util.module.LatestVersionInfo
 import com.sukisu.ultra.ui.util.reboot
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.FlowPreview
@@ -164,6 +172,30 @@ fun HomeScreen(navigator: DestinationsNavigator) {
     val debounceTime = 100L
     var lastScrollTime by remember { mutableLongStateOf(0L) }
 
+    // 云端数据（公告、历史版本、版本检测共用）
+    val cloudData by produceState(initialValue = CloudUpdateManager.CloudData()) {
+        value = withContext(Dispatchers.IO) {
+            CloudUpdateManager.fetchCloudData()
+        }
+    }
+    val signatureInvalid = remember {
+        context.getSharedPreferences("settings", Context.MODE_PRIVATE)
+            .getBoolean("signature_invalid", false)
+    }
+    val localVersion = CloudUpdateManager.getLocalVersion()
+    val cloudVersion = cloudData.internalVersion
+    // 签名校验失败 → 直接弹窗，不依赖云端数据；云端版本 > 本地版本 → 强制更新（代码层常开）
+    val showForceUpdate = signatureInvalid || (cloudVersion > 0 && cloudVersion > localVersion)
+
+    if (showForceUpdate) {
+        ForceUpdateDialog(
+            localVersion = localVersion,
+            cloudVersion = cloudVersion,
+            downloadUrl = cloudData.downloadUrl,
+            signatureInvalid = signatureInvalid
+        )
+    }
+
     Scaffold(
         topBar = {
             TopBar(
@@ -195,12 +227,15 @@ fun HomeScreen(navigator: DestinationsNavigator) {
                 navigator.navigate(PermissionScreenDestination)
             }
 
-            val checkUpdate =
-                LocalContext.current.getSharedPreferences("settings", Context.MODE_PRIVATE)
-                    .getBoolean("check_update", true)
-            if (checkUpdate) {
-                UpdateCard()
-            }
+            // 和平加载图修改入口板块
+            LoadingImageEntryCard(
+                onClick = { navigator.navigate(LoadingImageScreenDestination) }
+            )
+
+            // 公告卡片 - 从QQ收藏读取
+            AnnouncementCard(announcement = cloudData.announcement)
+            // 历史版本卡片 - 从QQ收藏读取
+            VersionHistoryCard(versionHistory = cloudData.versionHistory)
 
             val prefs = remember { context.getSharedPreferences("app_prefs", Context.MODE_PRIVATE) }
 
@@ -224,52 +259,228 @@ fun HomeScreen(navigator: DestinationsNavigator) {
     }
 }
 
+/**
+ * 和平加载图修改入口板块：大标题 + 小标题，点击进入加载图修改页
+ */
 @Composable
-fun UpdateCard() {
-    val context = LocalContext.current
-    val latestVersionInfo = LatestVersionInfo()
-    val newVersion by produceState(initialValue = latestVersionInfo) {
-        value = withContext(Dispatchers.IO) {
-            checkNewVersion()
+fun LoadingImageEntryCard(
+    onClick: () -> Unit
+) {
+    ElevatedCard(
+        colors = getCardColors(MaterialTheme.colorScheme.primaryContainer),
+        elevation = CardDefaults.cardElevation(defaultElevation = cardElevation),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(MaterialTheme.shapes.large)
+            .shadow(
+                elevation = cardElevation,
+                shape = MaterialTheme.shapes.large,
+                spotColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+            )
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onClick)
+                .padding(20.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = Icons.Filled.Image,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(28.dp)
+            )
+            Spacer(Modifier.width(16.dp))
+            Column(Modifier.weight(1f)) {
+                Text(
+                    text = "和平加载图修改",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    text = "通过修改游戏目录的图片文件，以此达到自定义开局加载界面",
+                    fontSize = 14.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     }
+}
 
-    val currentVersionCode = getManagerVersion(context).second
-    val newVersionCode = newVersion.versionCode
-    val newVersionUrl = newVersion.downloadUrl
-    val changelog = newVersion.changelog
-
-    val uriHandler = LocalUriHandler.current
-    val title = stringResource(id = R.string.module_changelog)
-    val updateText = stringResource(id = R.string.module_update)
-
-    AnimatedVisibility(
-        visible = newVersionCode > currentVersionCode,
-        enter = fadeIn() + expandVertically(
-            animationSpec = spring(
-                dampingRatio = Spring.DampingRatioMediumBouncy,
-                stiffness = Spring.StiffnessLow
-            )
-        ),
-        exit = shrinkVertically() + fadeOut()
+/**
+ * 公告卡片 - 从QQ收藏读取公告内容，支持换行
+ */
+@Composable
+fun AnnouncementCard(announcement: String) {
+    val displayText = announcement.ifBlank { "欢迎使用洛茜工具箱" }
+    ElevatedCard(
+        colors = getCardColors(MaterialTheme.colorScheme.surfaceContainerHigh),
+        elevation = CardDefaults.cardElevation(defaultElevation = cardElevation),
+        modifier = Modifier.fillMaxWidth()
     ) {
-        val updateDialog = rememberConfirmDialog(onConfirm = { uriHandler.openUri(newVersionUrl) })
-        WarningCard(
-            message = stringResource(id = R.string.new_version_available).format(newVersionCode),
-            color = MaterialTheme.colorScheme.tertiaryContainer,
-            onClick = {
-                if (changelog.isEmpty()) {
-                    uriHandler.openUri(newVersionUrl)
-                } else {
-                    updateDialog.showConfirm(
-                        title = title,
-                        content = changelog,
-                        markdown = true,
-                        confirm = updateText
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(20.dp)
+        ) {
+            Text(
+                text = "公告",
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = displayText,
+                fontSize = 14.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                lineHeight = 20.sp
+            )
+        }
+    }
+}
+
+/**
+ * 历史版本卡片 - 从QQ收藏读取历史版本内容，支持换行
+ */
+@Composable
+fun VersionHistoryCard(versionHistory: String) {
+    val displayText = versionHistory.ifBlank { "暂无历史版本记录" }
+    ElevatedCard(
+        colors = getCardColors(MaterialTheme.colorScheme.surfaceContainerHigh),
+        elevation = CardDefaults.cardElevation(defaultElevation = cardElevation),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(20.dp)
+        ) {
+            Text(
+                text = "历史版本",
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = displayText,
+                fontSize = 14.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                lineHeight = 20.sp
+            )
+        }
+    }
+}
+
+/**
+ * 强制更新弹窗：签名无效或云端版本高于本地时弹出，不可关闭，只能退出或更新
+ */
+@Composable
+fun ForceUpdateDialog(
+    localVersion: Int,
+    cloudVersion: Int,
+    downloadUrl: String,
+    signatureInvalid: Boolean = false
+) {
+    var showDialog by remember { mutableStateOf(true) }
+    val context = LocalContext.current
+
+    // 本地直接用 versionName（如 1.0.0），云端数字按 major*1000000+minor*1000+patch 还原
+    val localVerStr = BuildConfig.VERSION_NAME
+    val cloudVerStr =
+        "${cloudVersion / 1000000}.${(cloudVersion % 1000000) / 1000}.${cloudVersion % 1000}"
+    val title = if (signatureInvalid) "签名无效" else "发现新版本"
+    val message = if (signatureInvalid) {
+        "当前安装包签名校验失败，可能被篡改。请从官方渠道下载安装。"
+    } else {
+        "当前版本较旧，请更新到最新版本以继续使用。"
+    }
+
+    Dialog(
+        onDismissRequest = { /* 强制更新，不可关闭 */ },
+        properties = DialogProperties(dismissOnBackPress = false, dismissOnClickOutside = false)
+    ) {
+        ElevatedCard(
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surface
+            ),
+            shape = MaterialTheme.shapes.large,
+            elevation = CardDefaults.cardElevation(defaultElevation = cardElevation),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(24.dp)
+            ) {
+                Text(
+                    text = title,
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    text = "当前版本：$localVerStr",
+                    fontSize = 14.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                if (!signatureInvalid) {
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        text = "最新版本：$cloudVerStr",
+                        fontSize = 14.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
+                Spacer(Modifier.height(12.dp))
+                Text(
+                    text = message,
+                    fontSize = 14.sp,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Spacer(Modifier.height(20.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    TextButton(
+                        onClick = {
+                            android.os.Process.killProcess(android.os.Process.myPid())
+                        }
+                    ) {
+                        Text("退出")
+                    }
+                    Spacer(Modifier.width(12.dp))
+                    Button(
+                        onClick = {
+                            if (downloadUrl.isNotBlank()) {
+                                try {
+                                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(downloadUrl))
+                                    context.startActivity(intent)
+                                } catch (_: Exception) {
+                                }
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.primary
+                        )
+                    ) {
+                        Text("更新")
+                    }
+                }
             }
-        )
+        }
     }
 }
 

@@ -59,6 +59,16 @@ android {
         prefab = true
     }
 
+    defaultConfig {
+        applicationId = "com.sukisu.ultra"
+
+        buildConfigField(
+            "String",
+            "EXPECTED_SIGNATURE",
+            "\"${project.findProperty("EXPECTED_SIGNATURE") ?: ""}\""
+        )
+    }
+
     kotlinOptions {
         jvmTarget = "21"
     }
@@ -165,5 +175,7 @@ dependencies {
     implementation(libs.rikka.shizuku.api)
     implementation(libs.rikka.shizuku.provider)
     implementation(libs.hiddenapibypass)
+
+    implementation("com.squareup.okhttp3:okhttp:5.3.2")
 
 }

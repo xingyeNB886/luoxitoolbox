@@ -9,14 +9,19 @@ import android.os.Build
 import coil.Coil
 import coil.ImageLoader
 import com.dergoogler.mmrl.platform.Platform
+import com.sukisu.ultra.ui.util.CloudUpdateManager
 import me.zhanghai.android.appiconloader.coil.AppIconFetcher
 import me.zhanghai.android.appiconloader.coil.AppIconKeyer
+import okhttp3.Cache
+import okhttp3.OkHttpClient
 import java.io.File
 import java.util.Locale
 
 lateinit var ksuApp: KernelSUApplication
 
 class KernelSUApplication : Application() {
+
+    lateinit var okhttpClient: OkHttpClient
 
     override fun attachBaseContext(base: Context) {
         // 【第一优先】Hidden API 豁免（在系统创建 ContentProvider 之前！）
@@ -77,6 +82,16 @@ class KernelSUApplication : Application() {
         super.onCreate()
         ksuApp = this
 
+        // 防篡改签名校验（结果供首页强制更新弹窗使用）
+        val prefs = getSharedPreferences("settings", Context.MODE_PRIVATE)
+        runCatching {
+            prefs.edit()
+                .putBoolean("signature_invalid", !CloudUpdateManager.verifyAppSignature(this))
+                .apply()
+        }.onFailure {
+            prefs.edit().putBoolean("signature_invalid", true).apply()
+        }
+
         Platform.setHiddenApiExemptions()
 
         // 洛茜工具箱：安装 Shizuku Binder 监听（授权弹窗结果 / Binder 变化 → 推 Flow）
@@ -84,6 +99,19 @@ class KernelSUApplication : Application() {
         runCatching {
             com.sukisu.ultra.ui.util.PermissionManager.installListenersIfNeeded()
         }
+
+        // 云端更新 / 公告用 OkHttp 客户端
+        okhttpClient = OkHttpClient.Builder()
+            .cache(Cache(File(cacheDir, "okhttp"), 10L * 1024 * 1024))
+            .addInterceptor { block ->
+                block.proceed(
+                    block.request().newBuilder()
+                        .header("User-Agent", "SukiSU/${BuildConfig.VERSION_CODE}")
+                        .header("Accept-Language", Locale.getDefault().toLanguageTag())
+                        .build()
+                )
+            }
+            .build()
 
         val context = this
         val iconSize = resources.getDimensionPixelSize(android.R.dimen.app_icon_size)

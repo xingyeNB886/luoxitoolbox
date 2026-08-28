@@ -204,23 +204,6 @@ fun SettingScreen(navigator: DestinationsNavigator) {
 
                     val prefs = context.getSharedPreferences("settings", Context.MODE_PRIVATE)
 
-                    // 更新检查开关
-                    var checkUpdate by rememberSaveable {
-                        mutableStateOf(
-                            prefs.getBoolean("check_update", true)
-                        )
-                    }
-                    SwitchSettingItem(
-                        icon = Icons.Filled.Update,
-                        title = stringResource(id = R.string.settings_check_update),
-                        summary = stringResource(id = R.string.settings_check_update_summary),
-                        checked = checkUpdate,
-                        onCheckedChange = {
-                            prefs.edit {putBoolean("check_update", it) }
-                            checkUpdate = it
-                        }
-                    )
-
                     // Web调试开关
                     var enableWebDebugging by rememberSaveable {
                         mutableStateOf(
