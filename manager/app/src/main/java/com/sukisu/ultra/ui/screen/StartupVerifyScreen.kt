@@ -284,6 +284,15 @@ fun StartupVerifyScreen(onContinue: () -> Unit) {
                             ) {
                                 Text(stringResource(R.string.startup_exit), fontWeight = FontWeight.SemiBold)
                             }
+                            OutlinedButton(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(54.dp),
+                                shape = RoundedCornerShape(16.dp),
+                                onClick = { onContinue() },
+                            ) {
+                                Text(stringResource(R.string.startup_continue), fontWeight = FontWeight.SemiBold)
+                            }
                             Button(
                                 modifier = Modifier
                                     .weight(1f)
