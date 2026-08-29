@@ -95,6 +95,7 @@ fun BackupRestoreScreen(navigator: DestinationsNavigator) {
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
+                .padding(top = 12.dp)
                 .padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
