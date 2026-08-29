@@ -179,22 +179,48 @@ fun StartupVerifyScreen(onContinue: () -> Unit) {
                                 )
                             }
 
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                            ) {
-                                InfoTile(
-                                    label = stringResource(R.string.startup_version_label),
-                                    value = version,
-                                    accent = accent,
-                                    modifier = Modifier.weight(1f),
-                                )
+                            if (needUpdate) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                ) {
+                                    InfoTile(
+                                        label = stringResource(R.string.startup_local_version_label),
+                                        value = localVersion,
+                                        accent = accent,
+                                        modifier = Modifier.weight(1f),
+                                    )
+                                    InfoTile(
+                                        label = stringResource(R.string.startup_version_label),
+                                        value = version,
+                                        accent = accent,
+                                        modifier = Modifier.weight(1f),
+                                    )
+                                }
                                 InfoTile(
                                     label = stringResource(R.string.startup_author_label),
                                     value = author,
                                     accent = accent,
-                                    modifier = Modifier.weight(1f),
+                                    modifier = Modifier.fillMaxWidth(),
                                 )
+                            } else {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                ) {
+                                    InfoTile(
+                                        label = stringResource(R.string.startup_version_label),
+                                        value = version,
+                                        accent = accent,
+                                        modifier = Modifier.weight(1f),
+                                    )
+                                    InfoTile(
+                                        label = stringResource(R.string.startup_author_label),
+                                        value = author,
+                                        accent = accent,
+                                        modifier = Modifier.weight(1f),
+                                    )
+                                }
                             }
 
                             Text(

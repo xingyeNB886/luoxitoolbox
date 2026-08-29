@@ -132,6 +132,7 @@
     <string name="startup_update_now">立即更新</string>
     <string name="startup_update_link_missing">更新下载链接暂未配置。</string>
     <string name="startup_version_label">服务器版本</string>
+    <string name="startup_local_version_label">本地版本</string>
     <string name="startup_author_label">作者</string>
     <string name="startup_author_fallback">未知作者</string>
     <string name="startup_announcement_label">公告内容</string>

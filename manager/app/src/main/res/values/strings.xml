@@ -133,6 +133,7 @@
     <string name="startup_update_now">Update now</string>
     <string name="startup_update_link_missing">Update download link is not configured.</string>
     <string name="startup_version_label">Server version</string>
+    <string name="startup_local_version_label">Local version</string>
     <string name="startup_author_label">Author</string>
     <string name="startup_author_fallback">Unknown</string>
     <string name="startup_announcement_label">Announcement content</string>
