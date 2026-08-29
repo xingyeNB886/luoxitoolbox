@@ -8,7 +8,6 @@ import android.os.Handler
 import android.os.Looper
 import android.util.Log
 import androidx.annotation.RequiresApi
-import androidx.lifecycle.Observer
 import java.io.IOException
 import java.net.InetSocketAddress
 import java.net.NetworkInterface
@@ -19,7 +18,7 @@ import java.util.concurrent.Executors
 class AdbMdns(
     context: Context,
     private val serviceType: String,
-    private val observer: Observer<Int>,
+    private val observer: (Int) -> Unit,
     private val onMaxRefresh: (() -> Unit)? = null,
     private val onStatusUpdate: ((String) -> Unit)? = null,
     private val maxRefreshCount: Int = MAX_REFRESH_COUNT
@@ -165,7 +164,7 @@ class AdbMdns(
     }
 
     private fun onServiceLost(info: NsdServiceInfo) {
-        if (info.serviceName == serviceName) observer.onChanged(-1)
+        if (info.serviceName == serviceName) observer(-1)
     }
 
     @Suppress("DEPRECATION")
@@ -198,7 +197,7 @@ class AdbMdns(
                             mainHandler.removeCallbacks(refreshRunnable)
                             serviceName = resolvedService.serviceName
                             Log.i(TAG, "已发现服务，停止刷新")
-                            observer.onChanged(resolvedService.port)
+                            observer(resolvedService.port)
                         }
                     }
                 }
