@@ -216,8 +216,6 @@ fun HomeScreen(navigator: DestinationsNavigator) {
 
             InfoCard()
 
-            // 公告卡片 - 从QQ收藏读取
-            AnnouncementCard(announcement = cloudData.announcement)
             // 历史版本卡片 - 从QQ收藏读取
             VersionHistoryCard(versionHistory = cloudData.versionHistory)
 

@@ -40,19 +40,13 @@ class KernelSUApplication : Application() {
             }
         }
 
-        val prefs = base.getSharedPreferences("settings", MODE_PRIVATE)
-        val languageCode = prefs.getString("app_language", "") ?: ""
+        // 应用固定简体中文
+        val locale = Locale.SIMPLIFIED_CHINESE
+        Locale.setDefault(locale)
 
-        var context = base
-        if (languageCode.isNotEmpty()) {
-            val locale = Locale.forLanguageTag(languageCode)
-            Locale.setDefault(locale)
-
-            val config = Configuration(base.resources.configuration)
-            config.setLocale(locale)
-
-            context = base.createConfigurationContext(config)
-        }
+        val config = Configuration(base.resources.configuration)
+        config.setLocale(locale)
+        val context = base.createConfigurationContext(config)
 
         super.attachBaseContext(context)
     }
@@ -60,20 +54,15 @@ class KernelSUApplication : Application() {
     @SuppressLint("ObsoleteSdkInt")
     override fun getResources(): Resources {
         val resources = super.getResources()
-        val prefs = getSharedPreferences("settings", MODE_PRIVATE)
-        val languageCode = prefs.getString("app_language", "") ?: ""
+        val locale = Locale.SIMPLIFIED_CHINESE
+        val config = Configuration(resources.configuration)
+        config.setLocale(locale)
 
-        if (languageCode.isNotEmpty()) {
-            val locale = Locale.forLanguageTag(languageCode)
-            val config = Configuration(resources.configuration)
-            config.setLocale(locale)
-
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                return createConfigurationContext(config).resources
-            } else {
-                @Suppress("DEPRECATION")
-                resources.updateConfiguration(config, resources.displayMetrics)
-            }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            return createConfigurationContext(config).resources
+        } else {
+            @Suppress("DEPRECATION")
+            resources.updateConfiguration(config, resources.displayMetrics)
         }
 
         return resources

@@ -32,6 +32,7 @@ import io.sukisu.ultra.UltraToolInstall
 import com.sukisu.ultra.Natives
 import com.sukisu.ultra.ksuApp
 import com.sukisu.ultra.ui.screen.BottomBarDestination
+import com.sukisu.ultra.ui.screen.StartupVerifyScreen
 import com.sukisu.ultra.ui.theme.*
 import com.sukisu.ultra.ui.theme.CardConfig.cardAlpha
 import com.sukisu.ultra.ui.util.*
@@ -51,25 +52,20 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    // 应用保存的语言设置
+    // 应用语言固定简体中文
     @SuppressLint("ObsoleteSdkInt")
     private fun applyLanguageSetting() {
-        val prefs = getSharedPreferences("settings", MODE_PRIVATE)
-        val languageCode = prefs.getString("app_language", "") ?: ""
+        val locale = Locale.SIMPLIFIED_CHINESE
+        Locale.setDefault(locale)
 
-        if (languageCode.isNotEmpty()) {
-            val locale = Locale.forLanguageTag(languageCode)
-            Locale.setDefault(locale)
-
-            val resources = resources
-            val config = Configuration(resources.configuration)
-            config.setLocale(locale)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                createConfigurationContext(config)
-            } else {
-                @Suppress("DEPRECATION")
-                resources.updateConfiguration(config, resources.displayMetrics)
-            }
+        val resources = resources
+        val config = Configuration(resources.configuration)
+        config.setLocale(locale)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            createConfigurationContext(config)
+        } else {
+            @Suppress("DEPRECATION")
+            resources.updateConfiguration(config, resources.displayMetrics)
         }
     }
 
@@ -144,33 +140,41 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             KernelSUTheme {
-                val navController = rememberNavController()
-                val snackBarHostState = remember { SnackbarHostState() }
+                // 启动验证：每次进入应用先读取云端公告，验证通过后才进入主页
+                var startupVerified by rememberSaveable { mutableStateOf(false) }
+                if (!startupVerified) {
+                    StartupVerifyScreen(
+                        onContinue = { startupVerified = true }
+                    )
+                } else {
+                    val navController = rememberNavController()
+                    val snackBarHostState = remember { SnackbarHostState() }
 
-                // pre-init platform to faster start WebUI X activities
-                LaunchedEffect(Unit) {
-                    initPlatform()
-                }
+                    // pre-init platform to faster start WebUI X activities
+                    LaunchedEffect(Unit) {
+                        initPlatform()
+                    }
 
-                Scaffold(
-                    bottomBar = { BottomBar(navController) },
-                    contentWindowInsets = WindowInsets(0, 0, 0, 0)
-                ) { innerPadding ->
-                    CompositionLocalProvider(
-                        LocalSnackbarHost provides snackBarHostState
-                    ) {
-                        DestinationsNavHost(
-                            modifier = Modifier.padding(innerPadding),
-                            navGraph = NavGraphs.root as NavHostGraphSpec,
-                            navController = navController,
-                            defaultTransitions = object : NavHostAnimatedDestinationStyle() {
-                                override val enterTransition: AnimatedContentTransitionScope<NavBackStackEntry>.() -> EnterTransition
-                                    get() = { fadeIn(animationSpec = tween(340)) }
-                                override val exitTransition: AnimatedContentTransitionScope<NavBackStackEntry>.() -> ExitTransition
-                                    get() = { fadeOut(animationSpec = tween(340)) }
+                    Scaffold(
+                        bottomBar = { BottomBar(navController) },
+                        contentWindowInsets = WindowInsets(0, 0, 0, 0)
+                    ) { innerPadding ->
+                        CompositionLocalProvider(
+                            LocalSnackbarHost provides snackBarHostState
+                        ) {
+                            DestinationsNavHost(
+                                modifier = Modifier.padding(innerPadding),
+                                navGraph = NavGraphs.root as NavHostGraphSpec,
+                                navController = navController,
+                                defaultTransitions = object : NavHostAnimatedDestinationStyle() {
+                                    override val enterTransition: AnimatedContentTransitionScope<NavBackStackEntry>.() -> EnterTransition
+                                        get() = { fadeIn(animationSpec = tween(340)) }
+                                    override val exitTransition: AnimatedContentTransitionScope<NavBackStackEntry>.() -> ExitTransition
+                                        get() = { fadeOut(animationSpec = tween(340)) }
                             }
                         )
                     }
+                }
                 }
             }
         }

@@ -153,52 +153,12 @@ fun MoreSettingsScreen(navigator: DestinationsNavigator) {
 
     // 获取当前语言设置
     var currentLanguage by remember {
-        mutableStateOf(prefs.getString("app_language", "") ?: "")
+        mutableStateOf("zh-CN")
     }
 
-    // 获取支持的语言列表
+    // 只保留简体中文
     val supportedLanguages = remember {
-        val languages = mutableListOf<Pair<String, String>>()
-        languages.add("" to context.getString(R.string.language_follow_system))
-        val locales = context.resources.configuration.locales
-        for (i in 0 until locales.size()) {
-            val locale = locales.get(i)
-            val code = locale.toLanguageTag()
-            if (!languages.any { it.first == code }) {
-                languages.add(code to locale.getDisplayName(locale))
-            }
-        }
-
-        val commonLocales = listOf(
-            Locale.forLanguageTag("en"), // 英语
-            Locale.forLanguageTag("zh-CN"), // 简体中文
-            Locale.forLanguageTag("zh-HK"), // 繁体中文(香港)
-            Locale.forLanguageTag("zh-TW"), // 繁体中文(台湾)
-            Locale.forLanguageTag("ja"), // 日语
-            Locale.forLanguageTag("fr"), // 法语
-            Locale.forLanguageTag("de"), // 德语
-            Locale.forLanguageTag("es"), // 西班牙语
-            Locale.forLanguageTag("it"), // 意大利语
-            Locale.forLanguageTag("ru"), // 俄语
-            Locale.forLanguageTag("pt"), // 葡萄牙语
-            Locale.forLanguageTag("ko"), // 韩语
-            Locale.forLanguageTag("vi")  // 越南语
-        )
-
-        for (locale in commonLocales) {
-            val code = locale.toLanguageTag()
-            if (!languages.any { it.first == code }) {
-                val config = Configuration(context.resources.configuration)
-                config.setLocale(locale)
-                try {
-                    val testContext = context.createConfigurationContext(config)
-                    testContext.getString(R.string.language_follow_system)
-                    languages.add(code to locale.getDisplayName(locale))
-                } catch (_: Exception) {
-                }
-            }
-        }
-        languages
+        listOf("zh-CN" to context.getString(R.string.language_chinese))
     }
 
     var showLanguageDialog by remember { mutableStateOf(false) }
