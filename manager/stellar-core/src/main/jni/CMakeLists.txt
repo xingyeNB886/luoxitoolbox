@@ -17,12 +17,11 @@ else ()
     add_definitions(-DDEBUG)
 endif ()
 
-find_package(cxx REQUIRED CONFIG)
 
 add_executable(libstellar.so
         starter.cpp misc.cpp selinux.cpp cgroup.cpp)
 
-target_link_libraries(libstellar.so log cxx::cxx)
+target_link_libraries(libstellar.so log)
 
 if (NOT CMAKE_BUILD_TYPE STREQUAL "Debug")
     add_custom_command(TARGET libstellar.so POST_BUILD
@@ -33,7 +32,7 @@ add_library(adb SHARED
         adb_pairing.cpp misc.cpp)
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../cpp/boringssl/include)
-target_link_libraries(adb log ${CMAKE_CURRENT_SOURCE_DIR}/../cpp/boringssl/libcrypto_static.a cxx::cxx)
+target_link_libraries(adb log ${CMAKE_CURRENT_SOURCE_DIR}/../cpp/boringssl/libcrypto_static.a)
 
 if (NOT CMAKE_BUILD_TYPE STREQUAL "Debug")
     add_custom_command(TARGET adb POST_BUILD
@@ -52,4 +51,4 @@ endif ()
 
 add_library(rish SHARED rish.cpp)
 
-target_link_libraries(rish log cxx::cxx)
+target_link_libraries(rish log)
