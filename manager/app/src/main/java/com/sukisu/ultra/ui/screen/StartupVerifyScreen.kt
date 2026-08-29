@@ -130,7 +130,8 @@ fun StartupVerifyScreen(onContinue: () -> Unit) {
                     is VerifyState.Success -> {
                         val needUpdate = s.cloud.internalVersion > localVersionCode
                         val accent = if (needUpdate) colors.error else colors.primary
-                        val version = s.cloud.internalVersion.toString()
+                        // 内部版本号 1000000 → 显示 1.0.0
+                        val version = formatInternalVersion(s.cloud.internalVersion)
                         val author = s.cloud.author.ifBlank {
                             stringResource(R.string.startup_author_fallback)
                         }
@@ -364,6 +365,10 @@ fun StartupVerifyScreen(onContinue: () -> Unit) {
         }
     }
 }
+
+/** 内部版本号（如 1000000）转显示版本号（如 1.0.0） */
+private fun formatInternalVersion(v: Int): String =
+    "${v / 1000000}.${(v % 1000000) / 1000}.${v % 1000}"
 
 @Composable
 private fun LoadingContent(colors: androidx.compose.material3.ColorScheme) {
