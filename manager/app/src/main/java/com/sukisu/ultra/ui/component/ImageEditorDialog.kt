@@ -8,7 +8,8 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -180,64 +181,71 @@ fun ImageEditorDialog(
                                 .clip(RoundedCornerShape(12.dp))
                                 .background(Color.Black)
                                 .pointerInput(src) {
-                                    var mode = 0   // 0=无操作 1=移动框 2=缩放角
-                                    var corner = 0 // 0=左上 1=右上 2=左下 3=右下
-                                    detectDragGestures(
-                                        onDragStart = { p ->
-                                            val nb = normBox ?: return@detectDragGestures
-                                            val cwR = size.width.toFloat()
-                                            val chR = size.height.toFloat()
-                                            val s = cwR / imgW
-                                            // 裁剪框四角在画布上的像素位置
-                                            val bl = nb.left * imgW * s
-                                            val bt = nb.top * imgH * s
-                                            val br = nb.right * imgW * s
-                                            val bb = nb.bottom * imgH * s
-                                            val grab = with(density) { 26.dp.toPx() }
-                                            val corners = arrayOf(
-                                                Offset(bl, bt), Offset(br, bt),
-                                                Offset(bl, bb), Offset(br, bb)
-                                            )
-                                            val hit = corners.indexOfFirst { (it - p).getDistance() <= grab }
-                                            if (hit >= 0) {
-                                                mode = 2; corner = hit
-                                            } else if (p.x >= bl && p.x <= br && p.y >= bt && p.y <= bb) {
-                                                mode = 1
-                                            } else {
-                                                mode = 0
-                                            }
-                                        },
-                                        onDrag = { change, drag ->
-                                            val nb = normBox ?: return@detectDragGestures
-                                            val cwR = size.width.toFloat()
-                                            val chR = size.height.toFloat()
-                                            val s = cwR / imgW
+                                    awaitEachGesture {
+                                        val down = awaitFirstDown(requireUnconsumed = false)
+                                        val nb = normBox ?: return@awaitEachGesture
+                                        val cwR = size.width.toFloat()
+                                        val chR = size.height.toFloat()
+                                        val s = cwR / imgW
+                                        // 裁剪框四角在画布上的像素位置
+                                        val bl = nb.left * imgW * s
+                                        val bt = nb.top * imgH * s
+                                        val br = nb.right * imgW * s
+                                        val bb = nb.bottom * imgH * s
+                                        val grab = with(density) { 26.dp.toPx() }
+                                        val corners = arrayOf(
+                                            Offset(bl, bt), Offset(br, bt),
+                                            Offset(bl, bb), Offset(br, bb)
+                                        )
+                                        val hit = corners.indexOfFirst { (it - down.position).getDistance() <= grab }
+                                        val mode: Int
+                                        val corner: Int
+                                        if (hit >= 0) {
+                                            mode = 2; corner = hit
+                                        } else if (down.position.x >= bl && down.position.x <= br && down.position.y >= bt && down.position.y <= bb) {
+                                            mode = 1; corner = 0
+                                        } else {
+                                            // 框外按下：不消费，交给父级滚动（图片底部可滚出来划到）
+                                            return@awaitEachGesture
+                                        }
+
+                                        down.consume()
+                                        var lastX = down.position.x
+                                        var lastY = down.position.y
+                                        while (true) {
+                                            val event = awaitPointerEvent()
+                                            val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                                            if (change.changedToUpIgnoreConsumed()) break
+                                            change.consume()
+                                            val dx = change.position.x - lastX
+                                            val dy = change.position.y - lastY
+                                            lastX = change.position.x
+                                            lastY = change.position.y
+                                            val cur = normBox ?: break
                                             if (mode == 1) {
-                                                change.consume()
                                                 // 整体移动：归一化偏移，钳制在 [0, 1-尺寸]
-                                                val dnX = drag.x / s / imgW
-                                                val dnY = drag.y / s / imgH
-                                                val nw = nb.right - nb.left
-                                                val nh = nb.bottom - nb.top
-                                                val nl = (nb.left + dnX).coerceIn(0f, 1f - nw)
-                                                val nt = (nb.top + dnY).coerceIn(0f, 1f - nh)
+                                                val dnX = dx / s / imgW
+                                                val dnY = dy / s / imgH
+                                                val nw = cur.right - cur.left
+                                                val nh = cur.bottom - cur.top
+                                                val nl = (cur.left + dnX).coerceIn(0f, 1f - nw)
+                                                val nt = (cur.top + dnY).coerceIn(0f, 1f - nh)
                                                 normBox = RectF(nl, nt, nl + nw, nt + nh)
                                             } else if (mode == 2) {
-                                                change.consume()
                                                 // 对角固定缩放：对角点不动，拖动点向拖动方向移动，保持比例
                                                 val px = change.position.x / s
                                                 val py = change.position.y / s
-                                                val fixX = if (corner == 0 || corner == 2) nb.right * imgW else nb.left * imgW
-                                                val fixY = if (corner == 0 || corner == 1) nb.bottom * imgH else nb.top * imgH
-                                                val dx = px - fixX
-                                                val dy = py - fixY
-                                                val dirX = if (dx >= 0f) 1f else -1f
-                                                val dirY = if (dy >= 0f) 1f else -1f
+                                                val fixX = if (corner == 0 || corner == 2) cur.right * imgW else cur.left * imgW
+                                                val fixY = if (corner == 0 || corner == 1) cur.bottom * imgH else cur.top * imgH
+                                                val dx2 = px - fixX
+                                                val dy2 = py - fixY
+                                                val dirX = if (dx2 >= 0f) 1f else -1f
+                                                val dirY = if (dy2 >= 0f) 1f else -1f
                                                 val availX = if (dirX > 0f) imgW - fixX else fixX
                                                 val availY = if (dirY > 0f) imgH - fixY else fixY
                                                 val wMax = minOf(availX, availY / cropRatio, minOf(imgW, imgH / cropRatio))
                                                 val wMin = minOf(24f, wMax)
-                                                var w = maxOf(kotlin.math.abs(dx), kotlin.math.abs(dy) / cropRatio)
+                                                var w = maxOf(kotlin.math.abs(dx2), kotlin.math.abs(dy2) / cropRatio)
                                                 w = w.coerceIn(wMin, wMax)
                                                 val h = w * cropRatio
                                                 val nl = (minOf(fixX, fixX + dirX * w) / imgW).coerceIn(0f, 1f)
@@ -247,7 +255,7 @@ fun ImageEditorDialog(
                                                 normBox = RectF(nl, nt, nr, nb2)
                                             }
                                         }
-                                    )
+                                    }
                                 }
                         ) {
                             val cw = size.width
