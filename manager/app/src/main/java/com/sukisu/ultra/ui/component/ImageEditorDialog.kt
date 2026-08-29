@@ -126,8 +126,7 @@ fun ImageEditorDialog(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(20.dp)
-                        .verticalScroll(rememberScrollState()),
+                        .padding(20.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Row(
@@ -208,12 +207,12 @@ fun ImageEditorDialog(
                                             }
                                         },
                                         onDrag = { change, drag ->
-                                            change.consume()
                                             val nb = normBox ?: return@detectDragGestures
                                             val cwR = size.width.toFloat()
                                             val chR = size.height.toFloat()
                                             val s = cwR / imgW
                                             if (mode == 1) {
+                                                change.consume()
                                                 // 整体移动：归一化偏移，钳制在 [0, 1-尺寸]
                                                 val dnX = drag.x / s / imgW
                                                 val dnY = drag.y / s / imgH
@@ -223,6 +222,7 @@ fun ImageEditorDialog(
                                                 val nt = (nb.top + dnY).coerceIn(0f, 1f - nh)
                                                 normBox = RectF(nl, nt, nl + nw, nt + nh)
                                             } else if (mode == 2) {
+                                                change.consume()
                                                 // 对角固定缩放：对角点不动，拖动点向拖动方向移动，保持比例
                                                 val px = change.position.x / s
                                                 val py = change.position.y / s

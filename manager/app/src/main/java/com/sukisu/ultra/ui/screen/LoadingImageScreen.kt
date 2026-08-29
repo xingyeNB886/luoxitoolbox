@@ -213,6 +213,8 @@ private fun LoadingEntryCard(
 fun LoadingEditScreen(navigator: DestinationsNavigator) {
     var images by remember { mutableStateOf(listOf<LoadingSelectedImage>()) }
     var editingIdx by remember { mutableStateOf<Int?>(null) }
+    val cardColor = MaterialTheme.colorScheme.surfaceVariant
+    val cardAlpha = CardConfig.cardAlpha
 
     Scaffold(
         topBar = {
@@ -224,7 +226,8 @@ fun LoadingEditScreen(navigator: DestinationsNavigator) {
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f)
+                    containerColor = cardColor.copy(alpha = cardAlpha),
+                    scrolledContainerColor = cardColor.copy(alpha = cardAlpha)
                 ),
                 windowInsets = WindowInsets.safeDrawing.only(
                     WindowInsetsSides.Top + WindowInsetsSides.Horizontal
@@ -475,8 +478,7 @@ private fun LoadingCropDialog(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(20.dp)
-                        .verticalScroll(rememberScrollState()),
+                        .padding(20.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Row(
@@ -512,9 +514,9 @@ private fun LoadingCropDialog(
                         val imgH = src.height.toFloat()
                         val imgAspect = imgW / imgH
 
-                        // 画布尺寸跟随图片比例（宽上限 320dp、高上限 300dp）
+                        // 画布尺寸跟随图片比例（宽上限 320dp、高上限 280dp）
                         val maxW = 320.dp
-                        val maxH = 300.dp
+                        val maxH = 280.dp
                         val dispW: Dp
                         val dispH: Dp
                         if (maxW / maxH > imgAspect) {
@@ -556,12 +558,12 @@ private fun LoadingCropDialog(
                                             }
                                         },
                                         onDrag = { change, drag ->
-                                            change.consume()
                                             val nb = normBox ?: return@detectDragGestures
                                             val cwR = size.width.toFloat()
                                             val chR = size.height.toFloat()
                                             val s = cwR / imgW
                                             if (mode == 1) {
+                                                change.consume()
                                                 // 整体移动：归一化偏移，钳制在 [0, 1-尺寸]
                                                 val dnX = drag.x / s / imgW
                                                 val dnY = drag.y / s / imgH
@@ -571,6 +573,7 @@ private fun LoadingCropDialog(
                                                 val nt = (nb.top + dnY).coerceIn(0f, 1f - nh)
                                                 normBox = RectF(nl, nt, nl + nw, nt + nh)
                                             } else if (mode == 2) {
+                                                change.consume()
                                                 // 对角固定缩放：对角点不动，拖动点向拖动方向移动，保持比例
                                                 val px = change.position.x / s
                                                 val py = change.position.y / s
