@@ -1124,7 +1124,7 @@ private suspend fun performCrop(
         }
         val opts = BitmapFactory.Options().apply { inSampleSize = sample }
         val cropped = ksuApp.contentResolver.openInputStream(uri)?.use { ins ->
-            val decoder: BitmapRegionDecoder = BitmapRegionDecoder.newInstance(ins, false)
+            val decoder: BitmapRegionDecoder = BitmapRegionDecoder.newInstance(ins, false) ?: return null
             try {
                 decoder.decodeRegion(android.graphics.Rect(l, t, r, b), opts)
             } finally {
