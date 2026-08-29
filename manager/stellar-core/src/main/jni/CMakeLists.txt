@@ -17,7 +17,6 @@ else ()
     add_definitions(-DDEBUG)
 endif ()
 
-find_package(crypto_static REQUIRED CONFIG)
 find_package(cxx REQUIRED CONFIG)
 
 add_executable(libstellar.so
@@ -33,7 +32,8 @@ endif ()
 add_library(adb SHARED
         adb_pairing.cpp misc.cpp)
 
-target_link_libraries(adb log crypto_static::crypto_static cxx::cxx)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../cpp/boringssl/include)
+target_link_libraries(adb log ${CMAKE_CURRENT_SOURCE_DIR}/../cpp/boringssl/libcrypto_static.a cxx::cxx)
 
 if (NOT CMAKE_BUILD_TYPE STREQUAL "Debug")
     add_custom_command(TARGET adb POST_BUILD
