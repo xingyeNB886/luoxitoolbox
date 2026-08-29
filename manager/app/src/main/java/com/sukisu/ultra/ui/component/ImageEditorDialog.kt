@@ -215,7 +215,7 @@ fun ImageEditorDialog(
                                         while (true) {
                                             val event = awaitPointerEvent()
                                             val change = event.changes.firstOrNull { it.id == down.id } ?: break
-                                            if (change.changedToUpIgnoreConsumed()) break
+                                            if (!change.pressed) break
                                             change.consume()
                                             val dx = change.position.x - lastX
                                             val dy = change.position.y - lastY
