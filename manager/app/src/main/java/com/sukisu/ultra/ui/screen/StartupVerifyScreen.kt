@@ -58,16 +58,16 @@ import kotlinx.coroutines.withContext
  * 联网读取 QQ 收藏的公告/作者/版本，验证通过后才允许进入主页；
  * 没有联网时显示「无法完成启动验证」，只能重试或退出。
  */
+private sealed interface VerifyState {
+    data object Loading : VerifyState
+    data class Success(val cloud: CloudUpdateManager.CloudData) : VerifyState
+    data object Failure : VerifyState
+}
+
 @Composable
 fun StartupVerifyScreen(onContinue: () -> Unit) {
     val colors = MaterialTheme.colorScheme
     val context = LocalContext.current
-
-    sealed interface VerifyState {
-        data object Loading : VerifyState
-        data class Success(val cloud: CloudUpdateManager.CloudData) : VerifyState
-        data object Failure : VerifyState
-    }
 
     var state by remember { mutableStateOf<VerifyState>(VerifyState.Loading) }
     var refreshGeneration by remember { mutableIntStateOf(0) }
