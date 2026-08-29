@@ -368,15 +368,14 @@ fun ImageEditorDialog(
 }
 
 /**
- * 默认归一化裁剪框：图片内能放下的最大等比框的 80%（比例 = 本机竖屏真实分辨率），居中。
- * 缩小默认框以保证四周都有移动空间，可拖动到图片任意角落再放大。
+ * 默认归一化裁剪框：图片内能放下的最大等比框（比例 = 本机竖屏真实分辨率），水平居中、贴图片顶部。
  * 返回归一化坐标（0-1）。
  */
 private fun defaultNormBox(imgW: Float, imgH: Float, ratio: Float): RectF {
-    val w = minOf(imgW, imgH / ratio) * 0.8f
+    val w = minOf(imgW, imgH / ratio)
     val h = w * ratio
     val l = (imgW - w) / 2f
-    val t = (imgH - h) / 2f
+    val t = 0f
     return RectF(l / imgW, t / imgH, (l + w) / imgW, (t + h) / imgH)
 }
 
