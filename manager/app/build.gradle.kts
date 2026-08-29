@@ -178,4 +178,8 @@ dependencies {
 
     implementation("com.squareup.okhttp3:okhttp:5.3.2")
 
+    implementation(project(":stellar-api"))
+    implementation(project(":stellar-server"))
+    implementation(libs.refine.runtime)
+
 }

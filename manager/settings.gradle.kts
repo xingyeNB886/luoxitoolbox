@@ -7,6 +7,9 @@ pluginManagement {
         google()
         mavenCentral()
     }
+    plugins {
+        id("dev.rikka.tools.refine") version "4.4.0"
+    }
 }
 
 dependencyResolutionManagement {
@@ -19,3 +22,5 @@ dependencyResolutionManagement {
 
 rootProject.name = "KernelSU"
 include(":app")
+include(":stellar-api")
+include(":stellar-server")
