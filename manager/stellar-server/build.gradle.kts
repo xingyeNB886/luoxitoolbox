@@ -24,6 +24,7 @@ dependencies {
     implementation(libs.androidx.annotation)
     implementation(libs.gson)
     implementation(libs.dev.rikka.rikkax.parcelablelist)
+    implementation(libs.rikka.shizuku.api)
 
     implementation(libs.rikka.hidden.compat)
     compileOnly(libs.rikka.hidden.stub)
