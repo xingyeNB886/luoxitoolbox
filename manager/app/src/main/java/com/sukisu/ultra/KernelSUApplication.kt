@@ -71,6 +71,8 @@ class KernelSUApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         ksuApp = this
+        // Stellar 自激活核心的 Application 单例
+        runCatching { roro.stellar.manager.application = this }
 
         // 防篡改签名校验（结果供首页强制更新弹窗使用）
         val prefs = getSharedPreferences("settings", Context.MODE_PRIVATE)

@@ -24,3 +24,4 @@ rootProject.name = "KernelSU"
 include(":app")
 include(":stellar-api")
 include(":stellar-server")
+include(":stellar-core")

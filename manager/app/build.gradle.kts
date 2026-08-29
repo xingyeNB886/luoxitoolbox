@@ -180,6 +180,7 @@ dependencies {
 
     implementation(project(":stellar-api"))
     implementation(project(":stellar-server"))
+    implementation(project(":stellar-core"))
     implementation(libs.refine.runtime)
 
 }
