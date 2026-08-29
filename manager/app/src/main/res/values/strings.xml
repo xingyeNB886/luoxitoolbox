@@ -148,9 +148,10 @@
     <string name="startup_failed_message">Startup verification failed. Please check your network and retry.</string>
     <string name="language_chinese">Chinese (Simplified)</string>
     <string name="function">Function</string>
-    <string name="permission_shizuku_install_title">Stellar not activated?</string>
-    <string name="permission_shizuku_install_summary">Stellar provides ADB-level permission, all features work without Root. Supports wireless debugging self-activation.</string>
-    <string name="install_shizuku">Get permission via Stellar</string>
+    <string name="permission_framework_title">Choose privilege framework</string>
+    <string name="permission_framework_summary">Both Shizuku and Stellar provide ADB-level permission. Built-in installers, pick one to install and activate.</string>
+    <string name="install_shizuku">Install Shizuku</string>
+    <string name="install_stellar">Install Stellar</string>
     <string name="preparing">Preparing…</string>
     <string name="apk_read_error">Failed to read APK: %1$s</string>
     <string name="grant_root_failed">Failed to grant root!</string>

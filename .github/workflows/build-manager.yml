@@ -55,6 +55,15 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
+      - name: 下载内置提权框架 APK（Shizuku / Stellar）
+        run: |
+          mkdir -p app/src/main/assets
+          curl -L -o app/src/main/assets/shizuku.apk \
+            "https://github.com/RikkaApps/Shizuku/releases/download/v13.6.0/shizuku-v13.6.0.r1086.2650830c-release.apk"
+          curl -L -o app/src/main/assets/stellar.apk \
+            "https://github.com/roro2239/Stellar/releases/download/v1.1%28101000%29/stellar-v1.1-release.apk"
+          ls -lh app/src/main/assets/
+
       - name: Build with Gradle
         run: |
           set -o pipefail

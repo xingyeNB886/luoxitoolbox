@@ -17,7 +17,7 @@ cmaker {
                 "-DANDROID_STL=none",
             )
         )
-        abiFilters("arm64-v8a")
+        abiFilters("arm64-v8a", "x86_64", "armeabi-v7a")
     }
     buildTypes {
         if (it.name == "release") {

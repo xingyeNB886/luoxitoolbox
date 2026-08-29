@@ -147,9 +147,10 @@
     <string name="startup_failed_message">安全启动验证未完成，请检查网络后重试。</string>
     <string name="language_chinese">简体中文</string>
     <string name="function">功能</string>
-    <string name="permission_shizuku_install_title">未激活 Stellar？</string>
-    <string name="permission_shizuku_install_summary">Stellar 可提供 ADB 级权限，无需 Root 即可使用本工具全部功能，支持无线调试自激活。</string>
-    <string name="install_shizuku">通过 Stellar 获取权限</string>
+    <string name="permission_framework_title">选择提权框架</string>
+    <string name="permission_framework_summary">Shizuku 与 Stellar 均可提供 ADB 级权限，已内置安装包，二选一安装后激活即可使用</string>
+    <string name="install_shizuku">安装 Shizuku</string>
+    <string name="install_stellar">安装 Stellar</string>
     <string name="preparing">准备中…</string>
     <string name="apk_read_error">读取安装包失败：%1$s</string>
     <string name="grant_root_failed">获取 root 失败！</string>

@@ -305,6 +305,9 @@ fun PermissionScreen(navigator: DestinationsNavigator) {
                 scope = scope
             )
 
+            // 选择提权框架：内置 Shizuku / Stellar 安装包
+            InstallFrameworkCard(scope = scope)
+
             if (grantType == PermissionGrantType.BOTH) {
                 ElevatedCard(
                     colors = getCardColors(MaterialTheme.colorScheme.tertiaryContainer),
@@ -331,6 +334,115 @@ fun PermissionScreen(navigator: DestinationsNavigator) {
 /**
  * 权限卡片：标题 + 副标题 + 状态 + 授权按钮
  */
+/**
+ * 选择提权框架卡片：内置 Shizuku / Stellar 安装包，用户选择安装其一。
+ */
+@Composable
+private fun InstallFrameworkCard(scope: kotlinx.coroutines.CoroutineScope) {
+    val context = LocalContext.current
+    var installing by remember { mutableStateOf<String?>(null) }
+
+    ElevatedCard(
+        colors = getCardColors(MaterialTheme.colorScheme.surfaceVariant),
+        elevation = CardDefaults.cardElevation(defaultElevation = cardElevation),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(20.dp)
+        ) {
+            Text(
+                text = stringResource(R.string.permission_framework_title),
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = stringResource(R.string.permission_framework_summary),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(Modifier.height(12.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End
+            ) {
+                Button(
+                    enabled = installing == null,
+                    onClick = {
+                        installing = "stellar"
+                        installApkFromAssets(context, "stellar.apk", scope) {
+                            installing = null
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.primary
+                    )
+                ) {
+                    Text(if (installing == "stellar") stringResource(R.string.preparing) else stringResource(R.string.install_stellar))
+                }
+                Spacer(Modifier.size(8.dp))
+                OutlinedButton(
+                    enabled = installing == null,
+                    onClick = {
+                        installing = "shizuku"
+                        installApkFromAssets(context, "shizuku.apk", scope) {
+                            installing = null
+                        }
+                    }
+                ) {
+                    Text(if (installing == "shizuku") stringResource(R.string.preparing) else stringResource(R.string.install_shizuku))
+                }
+            }
+        }
+    }
+}
+
+/** 从内置 assets 安装 APK（触发系统安装） */
+private fun installApkFromAssets(
+    context: android.content.Context,
+    assetName: String,
+    scope: kotlinx.coroutines.CoroutineScope,
+    onDone: () -> Unit
+) {
+    scope.launch(Dispatchers.IO) {
+        try {
+            val apkFile = File(context.cacheDir, assetName)
+            context.assets.open(assetName).use { input ->
+                apkFile.outputStream().use { output -> input.copyTo(output) }
+            }
+            withContext(Dispatchers.Main) {
+                val intent = Intent(Intent.ACTION_VIEW).apply {
+                    setDataAndType(
+                        FileProvider.getUriForFile(
+                            context,
+                            "${context.packageName}.fileprovider",
+                            apkFile
+                        ),
+                        "application/vnd.android.package-archive"
+                    )
+                    addFlags(
+                        Intent.FLAG_GRANT_READ_URI_PERMISSION or
+                                Intent.FLAG_ACTIVITY_NEW_TASK
+                    )
+                }
+                context.startActivity(intent)
+            }
+        } catch (e: Exception) {
+            withContext(Dispatchers.Main) {
+                Toast.makeText(
+                    context,
+                    context.getString(R.string.apk_read_error, e.message),
+                    Toast.LENGTH_LONG
+                ).show()
+            }
+        } finally {
+            withContext(Dispatchers.Main) { onDone() }
+        }
+    }
+}
+
 @Composable
 private fun PermissionCardItem(
     title: String,
