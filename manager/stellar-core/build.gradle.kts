@@ -14,6 +14,7 @@ android {
     defaultConfig {
         externalNativeBuild {
             cmake {
+                arguments += "-DANDROID_STL=c++_shared"
                 abiFilters += listOf("arm64-v8a")
             }
         }
