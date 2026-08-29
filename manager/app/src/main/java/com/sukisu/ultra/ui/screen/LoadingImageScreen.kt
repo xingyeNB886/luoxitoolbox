@@ -2,6 +2,7 @@ package com.sukisu.ultra.ui.screen
 
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.BitmapRegionDecoder
 import android.graphics.RectF
 import android.net.Uri
 import android.view.WindowManager
@@ -13,7 +14,8 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -478,7 +480,8 @@ private fun LoadingCropDialog(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(20.dp),
+                        .padding(20.dp)
+                        .verticalScroll(rememberScrollState()),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Row(
@@ -531,63 +534,70 @@ private fun LoadingCropDialog(
                                 .clip(RoundedCornerShape(12.dp))
                                 .background(Color.Black)
                                 .pointerInput(src) {
-                                    var mode = 0   // 0=无操作 1=移动框 2=缩放角
-                                    var corner = 0 // 0=左上 1=右上 2=左下 3=右下
-                                    detectDragGestures(
-                                        onDragStart = { p ->
-                                            val nb = normBox ?: return@detectDragGestures
-                                            val cwR = size.width.toFloat()
-                                            val chR = size.height.toFloat()
-                                            val s = cwR / imgW
-                                            val bl = nb.left * imgW * s
-                                            val bt = nb.top * imgH * s
-                                            val br = nb.right * imgW * s
-                                            val bb = nb.bottom * imgH * s
-                                            val grab = with(density) { 26.dp.toPx() }
-                                            val corners = arrayOf(
-                                                Offset(bl, bt), Offset(br, bt),
-                                                Offset(bl, bb), Offset(br, bb)
-                                            )
-                                            val hit = corners.indexOfFirst { (it - p).getDistance() <= grab }
-                                            if (hit >= 0) {
-                                                mode = 2; corner = hit
-                                            } else if (p.x >= bl && p.x <= br && p.y >= bt && p.y <= bb) {
-                                                mode = 1
-                                            } else {
-                                                mode = 0
-                                            }
-                                        },
-                                        onDrag = { change, drag ->
-                                            val nb = normBox ?: return@detectDragGestures
-                                            val cwR = size.width.toFloat()
-                                            val chR = size.height.toFloat()
-                                            val s = cwR / imgW
+                                    awaitEachGesture {
+                                        val down = awaitFirstDown(requireUnconsumed = false)
+                                        val nb = normBox ?: return@awaitEachGesture
+                                        val cwR = size.width.toFloat()
+                                        val chR = size.height.toFloat()
+                                        val s = cwR / imgW
+                                        val bl = nb.left * imgW * s
+                                        val bt = nb.top * imgH * s
+                                        val br = nb.right * imgW * s
+                                        val bb = nb.bottom * imgH * s
+                                        val grab = with(density) { 26.dp.toPx() }
+                                        val corners = arrayOf(
+                                            Offset(bl, bt), Offset(br, bt),
+                                            Offset(bl, bb), Offset(br, bb)
+                                        )
+                                        val hit = corners.indexOfFirst { (it - down.position).getDistance() <= grab }
+                                        val mode: Int
+                                        val corner: Int
+                                        if (hit >= 0) {
+                                            mode = 2; corner = hit
+                                        } else if (down.position.x >= bl && down.position.x <= br && down.position.y >= bt && down.position.y <= bb) {
+                                            mode = 1; corner = 0
+                                        } else {
+                                            // 框外按下：不消费，交给父级滚动（图片底部可滚出来）
+                                            return@awaitEachGesture
+                                        }
+
+                                        down.consume()
+                                        var lastX = down.position.x
+                                        var lastY = down.position.y
+                                        while (true) {
+                                            val event = awaitPointerEvent()
+                                            val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                                            if (!change.pressed) break
+                                            change.consume()
+                                            val dx = change.position.x - lastX
+                                            val dy = change.position.y - lastY
+                                            lastX = change.position.x
+                                            lastY = change.position.y
+                                            val cur = normBox ?: break
                                             if (mode == 1) {
-                                                change.consume()
-                                                // 整体移动：归一化偏移，钳制在 [0, 1-尺寸]
-                                                val dnX = drag.x / s / imgW
-                                                val dnY = drag.y / s / imgH
-                                                val nw = nb.right - nb.left
-                                                val nh = nb.bottom - nb.top
-                                                val nl = (nb.left + dnX).coerceIn(0f, 1f - nw)
-                                                val nt = (nb.top + dnY).coerceIn(0f, 1f - nh)
+                                                // 整体移动：水平用 cwR/imgW，垂直用 chR/imgH，换算精确
+                                                val dnX = dx / s / imgW
+                                                val dnY = dy * imgH / chR
+                                                val nw = cur.right - cur.left
+                                                val nh = cur.bottom - cur.top
+                                                val nl = (cur.left + dnX).coerceIn(0f, 1f - nw)
+                                                val nt = (cur.top + dnY).coerceIn(0f, 1f - nh)
                                                 normBox = RectF(nl, nt, nl + nw, nt + nh)
                                             } else if (mode == 2) {
-                                                change.consume()
-                                                // 对角固定缩放：对角点不动，拖动点向拖动方向移动，保持比例
+                                                // 对角固定缩放
                                                 val px = change.position.x / s
-                                                val py = change.position.y / s
-                                                val fixX = if (corner == 0 || corner == 2) nb.right * imgW else nb.left * imgW
-                                                val fixY = if (corner == 0 || corner == 1) nb.bottom * imgH else nb.top * imgH
-                                                val dx = px - fixX
-                                                val dy = py - fixY
-                                                val dirX = if (dx >= 0f) 1f else -1f
-                                                val dirY = if (dy >= 0f) 1f else -1f
+                                                val py = change.position.y * imgH / chR
+                                                val fixX = if (corner == 0 || corner == 2) cur.right * imgW else cur.left * imgW
+                                                val fixY = if (corner == 0 || corner == 1) cur.bottom * imgH else cur.top * imgH
+                                                val dx2 = px - fixX
+                                                val dy2 = py - fixY
+                                                val dirX = if (dx2 >= 0f) 1f else -1f
+                                                val dirY = if (dy2 >= 0f) 1f else -1f
                                                 val availX = if (dirX > 0f) imgW - fixX else fixX
                                                 val availY = if (dirY > 0f) imgH - fixY else fixY
                                                 val wMax = minOf(availX, availY / cropRatio, minOf(imgW, imgH / cropRatio))
                                                 val wMin = minOf(24f, wMax)
-                                                var w = maxOf(kotlin.math.abs(dx), kotlin.math.abs(dy) / cropRatio)
+                                                var w = maxOf(kotlin.math.abs(dx2), kotlin.math.abs(dy2) / cropRatio)
                                                 w = w.coerceIn(wMin, wMax)
                                                 val h = w * cropRatio
                                                 val nl = (minOf(fixX, fixX + dirX * w) / imgW).coerceIn(0f, 1f)
@@ -597,7 +607,7 @@ private fun LoadingCropDialog(
                                                 normBox = RectF(nl, nt, nr, nb2)
                                             }
                                         }
-                                    )
+                                    }
                                 }
                         ) {
                             val cwR = size.width.roundToInt().toFloat()
@@ -1079,7 +1089,7 @@ private fun loadingDefaultNormBox(imgW: Float, imgH: Float, ratio: Float): RectF
 }
 
 /**
- * 执行裁剪：以高分辨率（≤4096）重新解码原图，按归一化框裁剪，
+ * 执行裁剪：用 BitmapRegionDecoder 只解码目标裁剪区域（不解全图，速度快很多），
  * 结果存为中转目录 JPEG 文件，并通过 onPublish 复制到 luoxi/裁剪/
  */
 private suspend fun performCrop(
@@ -1089,25 +1099,41 @@ private suspend fun performCrop(
     onPublish: suspend (java.io.File) -> Unit
 ): Uri? {
     return try {
-        val full = loadingDecodeSampledBitmap(uri, 4096) ?: return null
-        val fw = full.width.toFloat()
-        val fh = full.height.toFloat()
+        // 先取原图全尺寸（仅读边界，很快）
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        ksuApp.contentResolver.openInputStream(uri)?.use {
+            BitmapFactory.decodeStream(it, null, bounds)
+        }
+        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
+        val fw = bounds.outWidth.toFloat()
+        val fh = bounds.outHeight.toFloat()
         val normW = normBox.right - normBox.left
         val boxW = normW * fw
         val boxH = boxW * cropRatio
         val cx = (normBox.left + normBox.right) / 2f * fw
         val cy = (normBox.top + normBox.bottom) / 2f * fh
-        val l = (cx - boxW / 2f).roundToInt().coerceIn(0, full.width - 1)
-        val t = (cy - boxH / 2f).roundToInt().coerceIn(0, full.height - 1)
-        val r = (cx + boxW / 2f).roundToInt().coerceIn(l + 1, full.width)
-        val b = (cy + boxH / 2f).roundToInt().coerceIn(t + 1, full.height)
-        val cropped = Bitmap.createBitmap(full, l, t, r - l, b - t)
+        val l = (cx - boxW / 2f).roundToInt().coerceIn(0, bounds.outWidth - 1)
+        val t = (cy - boxH / 2f).roundToInt().coerceIn(0, bounds.outHeight - 1)
+        val r = (cx + boxW / 2f).roundToInt().coerceIn(l + 1, bounds.outWidth)
+        val b = (cy + boxH / 2f).roundToInt().coerceIn(t + 1, bounds.outHeight)
+
+        // 按目标区域尺寸采样（最长边 ≤4096），只解码该区域
+        var sample = 1
+        while (maxOf(r - l, b - t) / (sample * 2) >= 4096) {
+            sample *= 2
+        }
+        val opts = BitmapFactory.Options().apply { inSampleSize = sample }
+        val cropped = ksuApp.contentResolver.openInputStream(uri)?.use { ins ->
+            BitmapRegionDecoder.newInstance(ins, false).use { decoder ->
+                decoder.decodeRegion(android.graphics.Rect(l, t, r, b), opts)
+            }
+        } ?: return null
+
         val stamp = java.text.SimpleDateFormat("yyyyMMdd_HHmmss_SSS", java.util.Locale.getDefault())
             .format(java.util.Date())
         val f = java.io.File(FileManagerUtils.workDir(), "crop_$stamp.jpg")
         java.io.FileOutputStream(f).use { cropped.compress(Bitmap.CompressFormat.JPEG, 95, it) }
-        if (cropped !== full) cropped.recycle()
-        full.recycle()
+        cropped.recycle()
         onPublish(f)
         Uri.fromFile(f)
     } catch (e: Exception) {
