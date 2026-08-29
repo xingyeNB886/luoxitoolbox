@@ -31,6 +31,6 @@ android {
 }
 
 dependencies {
-    implementation("io.github.vvb2060.ndk:boringssl:20251124")
+    implementation("io.github.vvb2060.ndk:boringssl:20250114")
     implementation(libs.kotlinx.coroutines.core)
 }
