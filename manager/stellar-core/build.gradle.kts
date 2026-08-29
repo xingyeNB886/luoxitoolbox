@@ -39,4 +39,6 @@ android {
 
 dependencies {
     implementation(libs.kotlinx.coroutines.core)
+    implementation(libs.androidx.annotation)
+    implementation("org.bouncycastle:bcpkix-jdk18on:1.80")
 }
