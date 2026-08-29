@@ -24,6 +24,13 @@ android {
             path = file("src/main/jni/CMakeLists.txt")
         }
     }
+    buildTypes {
+        release {
+            ndk {
+                abiFilters += listOf("arm64-v8a")
+            }
+        }
+    }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_21
         targetCompatibility = JavaVersion.VERSION_21
