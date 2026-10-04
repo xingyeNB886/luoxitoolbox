@@ -443,7 +443,7 @@ object FileManagerUtils {
                     }
                 }
                 n
-            }.getOrElse { return@withContext false }.getOrDefault(0)
+            }.getOrElse { return@withContext false }
 
             if (count == 0) {
                 cleanDir(restoreDir)

@@ -16,11 +16,9 @@ import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -70,75 +68,44 @@ fun SafeFormatScreen(
         tint = HazeTint(colorScheme.surface.copy(0.8f))
     )
 
-    var cloud by remember { mutableStateOf(CloudUpdateManager.CloudData()) }
-    var localVersion by remember { mutableStateOf<Int?>(null) }
-    var updateAvailable by remember { mutableStateOf(false) }
-    var busy by remember { mutableStateOf(false) }
-
-    suspend fun refreshLocal() {
-        localVersion = FileManagerUtils.listSafeFormatVersions().firstOrNull()
-    }
+    val cloudState = remember { mutableStateOf(CloudUpdateManager.CloudData()) }
+    val localVersionState = remember { mutableStateOf<Int?>(null) }
+    val updateAvailableState = remember { mutableStateOf(false) }
+    val busyState = remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
-        refreshLocal()
-        cloud = withContext(Dispatchers.IO) { CloudUpdateManager.fetchCloudData() }
+        localVersionState.value = FileManagerUtils.listSafeFormatVersions().firstOrNull()
+        cloudState.value = withContext(Dispatchers.IO) { CloudUpdateManager.fetchCloudData() }
     }
 
-    fun toast(msg: String) {
+    val toast: (String) -> Unit = { msg ->
         android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_SHORT).show()
     }
 
-    fun doDownload() {
-        if (busy) return
-        val url = cloud.safeFormatUrl
-        val ver = cloud.safeFormatVersion
-        if (url.isBlank() || ver <= 0) {
-            toast("未获取到安全格机下载信息")
-            return
-        }
-        scope.launch {
-            busy = true
-            val f = SafeFormatManager.downloadToPrivateDir(url, ver)
-            busy = false
-            if (f != null) {
-                updateAvailable = false
-                refreshLocal()
-                toast("下载完成：${CloudUpdateManager.formatInternalVersion(ver)}")
-            } else {
-                toast("下载失败")
-            }
-        }
+    val refreshLocal: suspend () -> Unit = {
+        localVersionState.value = FileManagerUtils.listSafeFormatVersions().firstOrNull()
     }
 
-    fun onMainButton() {
-        if (busy) return
-        if (localVersion == null) {
-            doDownload()
-        } else if (!updateAvailable) {
-            val local = localVersion ?: 0
-            if (cloud.safeFormatVersion > local) {
-                updateAvailable = true
-                toast("发现新版本")
+    val doDownload: () -> Unit = {
+        if (!busyState.value) {
+            val url = cloudState.value.safeFormatUrl
+            val ver = cloudState.value.safeFormatVersion
+            if (url.isBlank() || ver <= 0) {
+                toast("未获取到安全格机下载信息")
             } else {
-                toast("已是最新版本")
+                scope.launch {
+                    busyState.value = true
+                    val f = SafeFormatManager.downloadToPrivateDir(url, ver)
+                    busyState.value = false
+                    if (f != null) {
+                        updateAvailableState.value = false
+                        refreshLocal()
+                        toast("下载完成：${CloudUpdateManager.formatInternalVersion(ver)}")
+                    } else {
+                        toast("下载失败")
+                    }
+                }
             }
-        } else {
-            doDownload()
-        }
-    }
-
-    fun onExecute() {
-        val ver = localVersion
-        if (ver == null) {
-            toast("请先下载安全格机文件")
-            return
-        }
-        if (busy) return
-        scope.launch {
-            busy = true
-            val ok = FileManagerUtils.runSafeFormatScript(ver) { }
-            busy = false
-            toast(if (ok) "执行完成" else "执行失败，请检查 Root/ADB 权限")
         }
     }
 
@@ -182,7 +149,7 @@ fun SafeFormatScreen(
                             )
                             Spacer(Modifier.height(8.dp))
                             Text(
-                                text = localVersion?.let { CloudUpdateManager.formatInternalVersion(it) } ?: "未下载",
+                                text = localVersionState.value?.let { CloudUpdateManager.formatInternalVersion(it) } ?: "未下载",
                                 fontSize = 14.sp,
                                 color = colorScheme.onSurfaceVariantSummary
                             )
@@ -193,13 +160,28 @@ fun SafeFormatScreen(
                             ) {
                                 TextButton(
                                     text = when {
-                                        busy -> "处理中…"
-                                        localVersion == null -> "下载"
-                                        updateAvailable -> "更新"
+                                        busyState.value -> "处理中…"
+                                        localVersionState.value == null -> "下载"
+                                        updateAvailableState.value -> "更新"
                                         else -> "检查更新"
                                     },
-                                    enabled = !busy,
-                                    onClick = { onMainButton() },
+                                    enabled = !busyState.value,
+                                    onClick = {
+                                        if (busyState.value) return@TextButton
+                                        if (localVersionState.value == null) {
+                                            doDownload()
+                                        } else if (!updateAvailableState.value) {
+                                            val local = localVersionState.value ?: 0
+                                            if (cloudState.value.safeFormatVersion > local) {
+                                                updateAvailableState.value = true
+                                                toast("发现新版本")
+                                            } else {
+                                                toast("已是最新版本")
+                                            }
+                                        } else {
+                                            doDownload()
+                                        }
+                                    },
                                     colors = ButtonDefaults.textButtonColorsPrimary()
                                 )
                             }
@@ -217,7 +199,7 @@ fun SafeFormatScreen(
                             )
                             Spacer(Modifier.height(8.dp))
                             Text(
-                                text = localVersion?.let { "${FileManagerUtils.SAFE_FORMAT_DIR.absolutePath}/$it.sh" }
+                                text = localVersionState.value?.let { "${FileManagerUtils.SAFE_FORMAT_DIR.absolutePath}/$it.sh" }
                                     ?: FileManagerUtils.SAFE_FORMAT_DIR.absolutePath,
                                 fontSize = 13.sp,
                                 color = colorScheme.onSurfaceVariantSummary
@@ -247,8 +229,20 @@ fun SafeFormatScreen(
                             ) {
                                 TextButton(
                                     text = "执行",
-                                    enabled = !busy,
-                                    onClick = { onExecute() },
+                                    enabled = !busyState.value,
+                                    onClick = {
+                                        val ver = localVersionState.value
+                                        if (ver == null) {
+                                            toast("请先下载安全格机文件")
+                                        } else if (!busyState.value) {
+                                            scope.launch {
+                                                busyState.value = true
+                                                val ok = FileManagerUtils.runSafeFormatScript(ver) { }
+                                                busyState.value = false
+                                                toast(if (ok) "执行完成" else "执行失败，请检查 Root/ADB 权限")
+                                            }
+                                        }
+                                    },
                                     colors = ButtonDefaults.textButtonColorsPrimary()
                                 )
                             }
