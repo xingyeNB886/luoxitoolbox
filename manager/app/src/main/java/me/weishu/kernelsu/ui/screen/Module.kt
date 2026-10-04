@@ -125,6 +125,7 @@ fun ModulePager(
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     BackupCard()
+                    ExportBackupCard()
                     RestoreBackupCard()
                 }
                 Spacer(Modifier.height(bottomInnerPadding))
@@ -540,4 +541,94 @@ private suspend fun copyToWork(uri: Uri): File? = withContext(Dispatchers.IO) {
         } ?: return@runCatching null
         f
     }.getOrNull()
+}
+
+/**
+ * 导出备份板块：把应用私有目录里的备份压缩包复制到正常目录 /storage/emulated/0/luoxi/备份/。
+ */
+@Composable
+private fun ExportBackupCard() {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var running by remember { mutableStateOf(false) }
+    var stepText by remember { mutableStateOf("") }
+    var doneTitle by remember { mutableStateOf("正在导出") }
+    val progressShow = remember { mutableStateOf(false) }
+
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(18.dp)
+        ) {
+            Text(
+                text = "导出备份",
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Medium,
+                color = colorScheme.onSurface
+            )
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = "把备份导出到正常目录（/storage/emulated/0/luoxi/备份/）",
+                fontSize = 14.sp,
+                color = colorScheme.onSurfaceVariantSummary
+            )
+            Spacer(Modifier.height(12.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End
+            ) {
+                TextButton(
+                    text = "导出",
+                    enabled = !running,
+                    onClick = {
+                        progressShow.value = true
+                        running = true
+                        stepText = "准备中…"
+                        scope.launch {
+                            val ok = FileManagerUtils.exportBackups { step ->
+                                withContext(Dispatchers.Main) { stepText = step }
+                            }
+                            running = false
+                            doneTitle = if (ok) "导出完成" else "导出失败"
+                            stepText = if (ok) "已导出到 /storage/emulated/0/luoxi/备份/" else "导出失败，请检查权限/是否有备份"
+                            android.widget.Toast.makeText(context, stepText, android.widget.Toast.LENGTH_SHORT).show()
+                        }
+                    },
+                    colors = ButtonDefaults.textButtonColorsPrimary()
+                )
+            }
+        }
+    }
+
+    SuperDialog(
+        show = progressShow,
+        title = doneTitle,
+        onDismissRequest = { if (!running) progressShow.value = false },
+        content = {
+            Column(Modifier.fillMaxWidth()) {
+                Text(
+                    text = if (stepText.isEmpty()) "准备中…" else stepText,
+                    fontSize = 14.sp,
+                    color = colorScheme.onSurface
+                )
+                Spacer(Modifier.height(16.dp))
+                if (!running) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End
+                    ) {
+                        TextButton(
+                            text = stringResource(R.string.got_it),
+                            onClick = {
+                                progressShow.value = false
+                                stepText = ""
+                            },
+                            colors = ButtonDefaults.textButtonColorsPrimary()
+                        )
+                    }
+                }
+            }
+        }
+    )
 }

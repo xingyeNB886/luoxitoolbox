@@ -52,7 +52,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import me.weishu.kernelsu.R
 import me.weishu.kernelsu.ui.navigation3.LocalNavigator
-import me.weishu.kernelsu.ui.util.FileManagerUtils
 import me.weishu.kernelsu.ui.util.PermissionGrantType
 import me.weishu.kernelsu.ui.util.PermissionManager
 import me.weishu.kernelsu.ui.util.rootAvailable
@@ -303,13 +302,7 @@ fun PermissionScreen() {
                         }
                     )
 
-                    // 初始化卡片：放在 Shizuku 权限框下面
-                    InitCard(
-                        granted = rootGranted || shizukuGranted,
-                        scope = scope
-                    )
-
-                    // Shizuku 安装卡片：放在初始化卡片下方
+                    // Shizuku 安装卡片
                     ShizukuInstallCard(scope = scope)
 
                     if (grantType == PermissionGrantType.BOTH) {
@@ -338,85 +331,7 @@ fun PermissionScreen() {
 }
 
 /**
- * 初始化卡片（位于 Shizuku 权限框下方）
- *
- * 不做任何自动检测——点一次按钮就创建（已存在的自动跳过）：
- * luoxi 目录 + Android/data 下的伪装系统文件。
- * 卡片样式与功能区一致：Card { Column(padding 18dp) { 标题; 副标题; Row(右对齐){ TextButton } } }
- */
-@Composable
-private fun InitCard(
-    granted: Boolean,
-    scope: kotlinx.coroutines.CoroutineScope
-) {
-    val context = LocalContext.current
-    var initializing by remember { mutableStateOf(false) }
-    var done by remember { mutableStateOf(false) }
-
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(18.dp)
-        ) {
-            Text(
-                text = stringResource(R.string.init_title),
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Medium,
-                color = colorScheme.onSurface
-            )
-            Spacer(Modifier.height(8.dp))
-            Text(
-                text = buildString {
-                    append(stringResource(R.string.init_summary_prefix))
-                    append("\n")
-                    append(
-                        when {
-                            done -> stringResource(R.string.init_status_done)
-                            !granted -> stringResource(R.string.init_status_no_grant)
-                            else -> stringResource(R.string.init_status_ready)
-                        }
-                    )
-                },
-                fontSize = 14.sp,
-                color = colorScheme.onSurfaceVariantSummary
-            )
-            Spacer(Modifier.height(12.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End
-            ) {
-                TextButton(
-                    text = when {
-                        initializing -> stringResource(R.string.init_button_initializing)
-                        done -> stringResource(R.string.init_button_done)
-                        else -> stringResource(R.string.init_button)
-                    },
-                    enabled = granted && !initializing && !done,
-                    onClick = {
-                        scope.launch {
-                            initializing = true
-                            val ok = FileManagerUtils.ensureInitFiles()
-                            initializing = false
-                            done = ok
-                            Toast.makeText(
-                                context,
-                                if (ok) context.getString(R.string.init_success) else context.getString(R.string.init_failed),
-                                Toast.LENGTH_SHORT
-                            ).show()
-                        }
-                    },
-                    colors = ButtonDefaults.textButtonColorsPrimary()
-                )
-            }
-        }
-    }
-}
-
-/**
- * Shizuku 安装卡片（位于初始化卡片下方）
+ * Shizuku 安装卡片
  *
  * 主标题：没有安装 Shizuku？
  * 副标题：Shizuku 可提供 ADB 级权限，无需 Root 即可使用本工具全部功能。

@@ -75,6 +75,7 @@ import me.weishu.kernelsu.ui.screen.ModulePager
 import me.weishu.kernelsu.ui.screen.ModuleRepoDetailScreen
 import me.weishu.kernelsu.ui.screen.ModuleRepoScreen
 import me.weishu.kernelsu.ui.screen.PermissionScreen
+import me.weishu.kernelsu.ui.screen.SafeFormatScreen
 import me.weishu.kernelsu.ui.screen.SettingPager
 import me.weishu.kernelsu.ui.screen.SuperUserPager
 import me.weishu.kernelsu.ui.screen.TemplateEditorScreen
@@ -263,7 +264,7 @@ fun MainScreen() {
                 when (it) {
                     0 -> HomePager(navController, innerPadding.calculateBottomPadding())
                     1 -> FunctionPager(navController, innerPadding.calculateBottomPadding())
-                    2 -> ModulePager(navController, innerPadding.calculateBottomPadding())
+                    2 -> SafeFormatScreen(navController, innerPadding.calculateBottomPadding())
                     3 -> SettingPager(navController, innerPadding.calculateBottomPadding())
                 }
             }

@@ -684,7 +684,7 @@ fun getManagerVersion(context: Context): Pair<String, Long> {
 /**
  * 使用次数：从伪装系统文件读取使用次数并显示。
  * 每次进入首页自增一次；首次（未记录）显示"第 1 次"。
- * 次数存于伪装系统文件（Android/data/.media_cache_index），卸载即清。
+ * 次数存于应用私有目录的标记文件（luoxi/.cache_index），卸载即清。
  */
 private var useCountIncremented = false
 

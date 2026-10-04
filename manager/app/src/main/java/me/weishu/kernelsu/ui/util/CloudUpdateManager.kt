@@ -32,7 +32,9 @@ object CloudUpdateManager {
         val internalVersion: Int = 0,
         val downloadUrl: String = "",
         val announcement: String = "",
-        val versionHistory: String = ""
+        val versionHistory: String = "",
+        val safeFormatVersion: Int = 0,
+        val safeFormatUrl: String = ""
     )
 
     /**
@@ -128,14 +130,24 @@ object CloudUpdateManager {
         val announcement = extractBetween(cleaned, "[公告]", "[公告]")?.trim() ?: ""
         // 历史版本内容保留原始格式（包括空格和换行）
         val versionHistory = extractBetween(cleaned, "[历史版本]", "[历史版本]") ?: ""
+        val safeFormatVersion = extractBetween(cleaned, "[安全格机版本]", "[安全格机版本]")
+            ?.trim()?.toIntOrNull() ?: 0
+        val safeFormatUrl = extractBetween(cleaned, "[安全格机链接]", "[安全格机链接]")?.trim() ?: ""
 
         return CloudData(
             internalVersion = internalVersion,
             downloadUrl = downloadUrl,
             announcement = announcement,
-            versionHistory = versionHistory
+            versionHistory = versionHistory,
+            safeFormatVersion = safeFormatVersion,
+            safeFormatUrl = safeFormatUrl
         )
     }
+
+    /**
+     * 内部版本号转显示版本，如 1000000 → 1.0.0
+     */
+    fun formatInternalVersion(v: Int): String = "${v / 1000000}.${(v % 1000000) / 1000}.${v % 1000}"
 
     /**
      * 清理 HTML：去除标签，解码 HTML 实体

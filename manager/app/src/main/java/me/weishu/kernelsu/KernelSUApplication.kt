@@ -135,6 +135,15 @@ class KernelSUApplication : Application(), ViewModelStoreOwner {
             }
             EarlyCrashHandler.markStage("onCreate_suVmLoaded")
 
+            // 自动初始化应用私有目录（备份/文件输出/裁剪/安全格机，幂等，无需用户操作）
+            runCatching {
+                Thread {
+                    kotlinx.coroutines.runBlocking {
+                        me.weishu.kernelsu.ui.util.FileManagerUtils.ensureInitFiles()
+                    }
+                }.start()
+            }
+
             runCatching {
                 val webroot = File(dataDir, "webroot")
                 if (!webroot.exists()) {
