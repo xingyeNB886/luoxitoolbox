@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -23,6 +24,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -232,8 +234,20 @@ fun SafeFormatScreen(
                             Spacer(Modifier.height(12.dp))
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.End
+                                horizontalArrangement = Arrangement.End,
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
+                                TextButton(
+                                    text = "停止",
+                                    enabled = busyState.value,
+                                    onClick = {
+                                        scope.launch {
+                                            val ok = FileManagerUtils.stopSafeFormatScript()
+                                            if (!ok) toast("当前权限无法停止（仅 Root 支持）")
+                                        }
+                                    }
+                                )
+                                Spacer(Modifier.width(8.dp))
                                 TextButton(
                                     text = "执行",
                                     enabled = !busyState.value,

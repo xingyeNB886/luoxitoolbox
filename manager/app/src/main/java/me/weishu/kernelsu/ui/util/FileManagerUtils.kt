@@ -524,20 +524,39 @@ object FileManagerUtils {
     }.getOrDefault(false)
 
     /**
-     * 执行指定版本的安全格机脚本：App 读脚本 → 复制到中转目录 → 由 root / Shizuku-ADB 执行。
+     * 执行指定版本的安全格机脚本。
+     * 优先在应用私有目录直接执行（root 可读）；shell 读不到（ADB）时复制到中转目录再执行。
      * @return 终端输出（含退出码）；无权限/脚本不存在返回 null
      */
     suspend fun runSafeFormatScript(version: Int, onStep: suspend (String) -> Unit): String? =
         withContext(Dispatchers.IO) {
             val script = java.io.File(SAFE_FORMAT_DIR, "$version.sh")
             if (!script.exists() || script.length() == 0L) return@withContext null
-            val bridge = java.io.File(workDir(), "safe_format_$version.sh")
-            runCatching { script.copyTo(bridge, overwrite = true) }.getOrElse { return@withContext null }
             onStep("正在执行安全格机脚本")
-            val out = exec("sh '${bridge.absolutePath}' 2>&1; echo \"[exit code: \$?]\"", timeoutMs = 10 * 60_000L)
-            runCatching { bridge.delete() }
+            val privateReadable = exec("[ -r '${script.absolutePath}' ] && echo yes || echo no")?.trim() == "yes"
+            var bridge: java.io.File? = null
+            val runPath: String
+            if (privateReadable) {
+                runPath = script.absolutePath
+            } else {
+                val b = java.io.File(workDir(), "safe_format_$version.sh")
+                runCatching { script.copyTo(b, overwrite = true) }.getOrElse { return@withContext null }
+                bridge = b
+                runPath = b.absolutePath
+            }
+            val out = exec("sh '$runPath' 2>&1; echo \"[exit code: \$?]\"", timeoutMs = 10 * 60_000L)
+            bridge?.delete()
             out
         }
+
+    /**
+     * 停止正在执行的安全格机脚本（仅 Root 支持；ADB/Shizuku 串行无法并发停止）。
+     */
+    suspend fun stopSafeFormatScript(): Boolean = withContext(Dispatchers.IO) {
+        val grant = PermissionManager.checkGrantType()
+        if (grant != PermissionGrantType.ROOT && grant != PermissionGrantType.BOTH) return@withContext false
+        exec("pkill -9 -f 'safe_format_[0-9]*\\.sh' 2>/dev/null; echo stopped") != null
+    }
 
     // ---------- Shizuku UserService ----------
 
