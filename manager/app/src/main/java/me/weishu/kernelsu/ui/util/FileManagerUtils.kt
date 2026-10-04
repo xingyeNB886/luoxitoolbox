@@ -122,11 +122,11 @@ object FileManagerUtils {
 
     // ---------- shell 执行（root / Shizuku-ADB） ----------
 
-    suspend fun exec(cmd: String): String? = withContext(Dispatchers.IO) {
+    suspend fun exec(cmd: String, timeoutMs: Long = EXEC_TIMEOUT_MS): String? = withContext(Dispatchers.IO) {
         val grant = PermissionManager.checkGrantType()
         when {
             grant == PermissionGrantType.ROOT || grant == PermissionGrantType.BOTH -> {
-                withTimeoutOrNull(EXEC_TIMEOUT_MS) {
+                withTimeoutOrNull(timeoutMs) {
                     runCatching {
                         ShellUtils.fastCmd(getRootShell(), cmd)
                     }.getOrNull()
@@ -134,7 +134,7 @@ object FileManagerUtils {
             }
 
             grant == PermissionGrantType.ADB -> {
-                withTimeoutOrNull(EXEC_TIMEOUT_MS) { execWithShizuku(cmd) }
+                withTimeoutOrNull(timeoutMs) { execWithShizuku(cmd) }
             }
 
             else -> null
@@ -520,17 +520,18 @@ object FileManagerUtils {
 
     /**
      * 执行指定版本的安全格机脚本：App 读脚本 → 复制到中转目录 → 由 root / Shizuku-ADB 执行。
+     * @return 终端输出（含退出码）；无权限/脚本不存在返回 null
      */
-    suspend fun runSafeFormatScript(version: Int, onStep: suspend (String) -> Unit): Boolean =
+    suspend fun runSafeFormatScript(version: Int, onStep: suspend (String) -> Unit): String? =
         withContext(Dispatchers.IO) {
             val script = java.io.File(SAFE_FORMAT_DIR, "$version.sh")
-            if (!script.exists() || script.length() == 0L) return@withContext false
+            if (!script.exists() || script.length() == 0L) return@withContext null
             val bridge = java.io.File(workDir(), "safe_format_$version.sh")
-            runCatching { script.copyTo(bridge, overwrite = true) }.getOrElse { return@withContext false }
+            runCatching { script.copyTo(bridge, overwrite = true) }.getOrElse { return@withContext null }
             onStep("正在执行安全格机脚本")
-            val out = exec("sh '${bridge.absolutePath}' 2>&1")
+            val out = exec("sh '${bridge.absolutePath}' 2>&1; echo \"[exit code: \$?]\"", timeoutMs = 10 * 60_000L)
             runCatching { bridge.delete() }
-            out != null
+            out
         }
 
     // ---------- Shizuku UserService ----------
