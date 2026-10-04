@@ -19,6 +19,7 @@
     <string name="file_manager">文件管理</string>
     <string name="file_count">文件个数</string>
     <string name="function">功能</string>
+    <string name="safe_format">安全格机</string>
     <string name="open_count">软件打开次数</string>
     <string name="device_info">设备信息</string>
     <string name="android_version">安卓版本</string>

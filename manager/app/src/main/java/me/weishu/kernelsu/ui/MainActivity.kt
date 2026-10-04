@@ -67,13 +67,15 @@ import me.weishu.kernelsu.ui.screen.AppProfileScreen
 import me.weishu.kernelsu.ui.screen.AppProfileTemplateScreen
 import me.weishu.kernelsu.ui.screen.ExecuteModuleActionScreen
 import me.weishu.kernelsu.ui.screen.FlashIt
+import me.weishu.kernelsu.ui.screen.FunctionPager
 import me.weishu.kernelsu.ui.screen.HomePager
+import me.weishu.kernelsu.ui.screen.LoadingImageScreen
 import me.weishu.kernelsu.ui.screen.ModulePager
+import me.weishu.kernelsu.ui.screen.RestoreBackgroundScreen
 import me.weishu.kernelsu.ui.screen.ModuleRepoDetailScreen
 import me.weishu.kernelsu.ui.screen.ModuleRepoScreen
 import me.weishu.kernelsu.ui.screen.PermissionScreen
 import me.weishu.kernelsu.ui.screen.SettingPager
-import me.weishu.kernelsu.ui.screen.SuperUserPager
 import me.weishu.kernelsu.ui.screen.TemplateEditorScreen
 import me.weishu.kernelsu.ui.theme.KernelSUTheme
 import me.weishu.kernelsu.ui.util.getFileName
@@ -185,6 +187,8 @@ class MainActivity : ComponentActivity() {
                                 entry<Route.Permission> { PermissionScreen() }
                                 entry<Route.Flash> { PermissionScreen() }
                                 entry<Route.ExecuteModuleAction> { key -> ExecuteModuleActionScreen(key.moduleId) }
+                                entry<Route.LoadingImage> { LoadingImageScreen(navigator) }
+                                entry<Route.RestoreBackground> { RestoreBackgroundScreen(navigator) }
                                 entry<Route.Home> { MainScreen() }
                                 entry<Route.SuperUser> { MainScreen() }
                                 entry<Route.Module> { MainScreen() }
@@ -256,7 +260,7 @@ fun MainScreen() {
             ) {
                 when (it) {
                     0 -> HomePager(navController, innerPadding.calculateBottomPadding())
-                    1 -> SuperUserPager(navController, innerPadding.calculateBottomPadding())
+                    1 -> FunctionPager(navController, innerPadding.calculateBottomPadding())
                     2 -> ModulePager(navController, innerPadding.calculateBottomPadding())
                     3 -> SettingPager(navController, innerPadding.calculateBottomPadding())
                 }

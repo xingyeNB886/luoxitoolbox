@@ -40,6 +40,7 @@
     <string name="file_manager">File Manager</string>
     <string name="file_count">File Count</string>
     <string name="function">Features</string>
+    <string name="safe_format">Safe Format</string>
     <string name="open_count">Times Opened</string>
     <string name="device_info">Device Info</string>
     <string name="android_version">Android Version</string>

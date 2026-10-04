@@ -70,8 +70,8 @@ enum class BottomBarDestination(
     val icon: ImageVector,
 ) {
     Home(R.string.home, Icons.Rounded.Cottage),
-    SuperUser(R.string.file_manager, Icons.Rounded.FolderOpen),
-    Module(R.string.function, Icons.Rounded.Apps),
+    Function(R.string.function, Icons.Rounded.FolderOpen),
+    Module(R.string.safe_format, Icons.Rounded.Apps),
     Setting(R.string.settings, Icons.Rounded.Settings)
 }
 
