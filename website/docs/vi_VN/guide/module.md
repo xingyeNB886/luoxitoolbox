@@ -4,6 +4,18 @@ KernelSU cung cấp một cơ chế mô-đun giúp đạt được hiệu quả 
 
 Cơ chế mô-đun của KernelSU gần giống với Magisk. Nếu bạn đã quen với việc phát triển mô-đun Magisk thì việc phát triển các mô-đun KernelSU cũng rất tương tự. Bạn có thể bỏ qua phần giới thiệu các mô-đun bên dưới và chỉ cần đọc [difference-with-magisk](difference-with-magisk.md).
 
+::: warning METAMODULE CHỈ CẦN THIẾT ĐỂ SỬA ĐỔI TỆP HỆ THỐNG
+KernelSU sử dụng kiến trúc [metamodule](metamodule.md) để mount thư mục `system`. **Chỉ khi module của bạn cần sửa đổi tệp `/system`** (thông qua thư mục `system`), bạn mới cần cài đặt metamodule (như [meta-overlayfs](https://github.com/tiann/KernelSU/releases)). Các tính năng module khác như scripts, quy tắc sepolicy và system.prop hoạt động mà không cần metamodule.
+:::
+
+## WebUI
+
+KernelSU modules support displaying interfaces and interacting with users. Xem [tài liệu WebUI](module-webui.md) để biết thêm chi tiết.
+
+## Cấu hình module
+
+KernelSU cung cấp hệ thống cấu hình tích hợp cho phép các module lưu trữ các cài đặt key-value liên tục hoặc tạm thời. Để biết thêm chi tiết, xem [tài liệu Cấu hình module](module-config.md).
+
 ## Busybox
 
 KernelSU cung cấp tính năng nhị phân BusyBox hoàn chỉnh (bao gồm hỗ trợ SELinux đầy đủ). Tệp thực thi được đặt tại `/data/adb/ksu/bin/busybox`. BusyBox của KernelSU hỗ trợ "ASH Standalone Shell Mode" có thể chuyển đổi thời gian chạy. Standalone mode này có nghĩa là khi chạy trong shell `ash` của BusyBox, mọi lệnh sẽ trực tiếp sử dụng applet trong BusyBox, bất kể cái gì được đặt là `PATH`. Ví dụ: các lệnh như `ls`, `rm`, `chmod` sẽ **KHÔNG** sử dụng những gì có trong `PATH` (trong trường hợp Android theo mặc định, nó sẽ là `/system/bin/ls`, ` /system/bin/rm` và `/system/bin/chmod` tương ứng), nhưng thay vào đó sẽ gọi trực tiếp các ứng dụng BusyBox nội bộ. Điều này đảm bảo rằng các tập lệnh luôn chạy trong môi trường có thể dự đoán được và luôn có bộ lệnh đầy đủ cho dù nó đang chạy trên phiên bản Android nào. Để buộc lệnh _not_ sử dụng BusyBox, bạn phải gọi tệp thực thi có đường dẫn đầy đủ.
@@ -93,14 +105,25 @@ version=<string>
 versionCode=<int>
 author=<string>
 description=<string>
+updateJson=<url> (optional)
+actionIcon=<path> (optional)
+webuiIcon=<path> (optional)
 ```
 
 - `id` phải khớp với biểu thức chính quy này: `^[a-zA-Z][a-zA-Z0-9._-]+$`<br>
    ví dụ: ✓ `a_module`, ✓ `a.module`, ✓ `module-101`, ✗ `a module`, ✗ `1_module`, ✗ `-a-module`<br>
    Đây là **mã định danh duy nhất** của mô-đun của bạn. Bạn không nên thay đổi nó sau khi được xuất bản.
-- `versionCode` phải là **số nguyên**. Điều này được sử dụng để so sánh các phiên bản
+- `versionCode` phải là **số nguyên**. Điều này được sử dụng để so sánh các phiên bản.
 - Các chuỗi khác không được đề cập ở trên có thể là chuỗi **một dòng** bất kỳ.
 - Đảm bảo sử dụng kiểu ngắt dòng `UNIX (LF)` chứ không phải `Windows (CR+LF)` hoặc `Macintosh (CR)`.
+- `actionIcon` và `webuiIcon` là các đường dẫn hình ảnh tùy chọn, được dùng làm
+  biểu tượng mặc định cho phím tắt hành động và phím tắt WebUI của mô-đun trong
+  ứng dụng quản lý. Các đường dẫn này phải là đường dẫn tương đối so với thư mục gốc
+  của mô-đun. Ví dụ, `actionIcon=icon/icon.png` sẽ được ánh xạ thành `<MODDIR>/icon/icon.png`.
+
+::: tip MÔ TẢ ĐỘNG
+Trường `description` có thể được ghi đè động khi chạy bằng hệ thống cấu hình mô-đun. Xem [Ghi đè Mô tả Mô-đun](module-config.md#overriding-module-description) để biết chi tiết.
+:::
 
 ### Tập lệnh Shell
 
@@ -114,7 +137,11 @@ Bạn có thể sử dụng biến môi trường KSU để xác định xem t�
 
 ### thư mục `system`
 
-Nội dung của thư mục này sẽ được phủ lên trên phân vùng /system của hệ thống bằng cách sử dụng overlayfs sau khi hệ thống được khởi động. Điều này có nghĩa rằng:
+Nội dung của thư mục này sẽ được phủ lên trên phân vùng /system của hệ thống sau khi hệ thống được khởi động. Điều này có nghĩa rằng:
+
+::: tip YÊU CẦU METAMODULE
+Thư mục `system` chỉ được mount nếu bạn đã cài đặt metamodule cung cấp chức năng mounting (như `meta-overlayfs`). Metamodule xử lý cách các module được mount. Xem [Hướng dẫn Metamodule](metamodule.md) để biết thêm thông tin.
+:::
 
 1. Các file có cùng tên với các file trong thư mục tương ứng trong hệ thống sẽ bị ghi đè bởi các file trong thư mục này.
 2. Các thư mục có cùng tên với thư mục tương ứng trong hệ thống sẽ được gộp với các thư mục trong thư mục này.
@@ -145,7 +172,7 @@ Danh sách này sẽ tự động tạo các thư mục `$MODPATH/system/app/You
 
 ::: tip sự khác biệt với Magisk
 
-Cơ chế không hệ thống của KernelSU được triển khai thông qua các overlayfs của kernel, trong khi Magisk hiện sử dụng magic mount (bind mount). Hai phương pháp triển khai có những khác biệt đáng kể, nhưng mục tiêu cuối cùng đều giống nhau: sửa đổi các tệp /system mà không sửa đổi vật lý phân vùng /system.
+KernelSU sử dụng kiến trúc [metamodule](metamodule.md) trong đó việc mounting được ủy thác cho các metamodule có thể cắm được. Metamodule `meta-overlayfs` chính thức sử dụng OverlayFS của kernel cho các sửa đổi systemless, trong khi Magisk sử dụng magic mount (bind mount) được tích hợp trực tiếp vào lõi của nó. Cả hai đều đạt được cùng một mục tiêu: sửa đổi tệp `/system` mà không sửa đổi vật lý phân vùng `/system`. Cách tiếp cận của KernelSU mang lại tính linh hoạt cao hơn và giảm bề mặt phát hiện.
 :::
 
 Nếu bạn quan tâm đến overlayfs, bạn nên đọc [documentation on overlayfs](https://docs.kernel.org/filesystems/overlayfs.html) của Kernel Linux.

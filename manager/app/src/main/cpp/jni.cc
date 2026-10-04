@@ -1,6 +1,8 @@
 #include <jni.h>
 
 #include <sys/prctl.h>
+#include <linux/capability.h>
+#include <pwd.h>
 
 #include <android/log.h>
 #include <cstring>
@@ -8,33 +10,31 @@
 #include "ksu.h"
 
 #define LOG_TAG "KernelSU"
+#ifdef NDEBUG
+#define LOGD(...) (void)0
+#else
 #define LOGD(...) __android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, __VA_ARGS__)
-
-extern "C"
-JNIEXPORT jboolean JNICALL
-Java_com_sukisu_ultra_Natives_becomeManager(JNIEnv *env, jobject, jstring pkg) {
-    auto cpkg = env->GetStringUTFChars(pkg, nullptr);
-    auto result = become_manager(cpkg);
-    env->ReleaseStringUTFChars(pkg, cpkg);
-    return result;
-}
+#endif
 
 extern "C"
 JNIEXPORT jint JNICALL
-Java_com_sukisu_ultra_Natives_getVersion(JNIEnv *env, jobject) {
-    return get_version();
+Java_me_weishu_kernelsu_Natives_getVersion(JNIEnv *env, jobject) {
+    int version = get_version();
+    if (version > 0) {
+        return version;
+    }
+    // try legacy method as fallback
+    return legacy_get_info().first;
 }
 
 extern "C"
 JNIEXPORT jintArray JNICALL
-Java_com_sukisu_ultra_Natives_getAllowList(JNIEnv *env, jobject) {
-    int uids[1024];
-    int size = 0;
-    bool result = get_allow_list(uids, &size);
-    LOGD("getAllowList: %d, size: %d", result, size);
+Java_me_weishu_kernelsu_Natives_getAllowList(JNIEnv *env, jobject) {
+    struct ksu_get_allow_list_cmd cmd = {};
+    bool result = get_allow_list(&cmd);
     if (result) {
-        auto array = env->NewIntArray(size);
-        env->SetIntArrayRegion(array, 0, size, uids);
+        auto array = env->NewIntArray(cmd.count);
+        env->SetIntArrayRegion(array, 0, cmd.count, reinterpret_cast<const jint *>(cmd.uids));
         return array;
     }
     return env->NewIntArray(0);
@@ -42,14 +42,20 @@ Java_com_sukisu_ultra_Natives_getAllowList(JNIEnv *env, jobject) {
 
 extern "C"
 JNIEXPORT jboolean JNICALL
-Java_com_sukisu_ultra_Natives_isSafeMode(JNIEnv *env, jclass clazz) {
+Java_me_weishu_kernelsu_Natives_isSafeMode(JNIEnv *env, jclass clazz) {
     return is_safe_mode();
 }
 
 extern "C"
 JNIEXPORT jboolean JNICALL
-Java_com_sukisu_ultra_Natives_isLkmMode(JNIEnv *env, jclass clazz) {
+Java_me_weishu_kernelsu_Natives_isLkmMode(JNIEnv *env, jclass clazz) {
     return is_lkm_mode();
+}
+
+extern "C"
+JNIEXPORT jboolean JNICALL
+Java_me_weishu_kernelsu_Natives_isManager(JNIEnv *env, jclass clazz) {
+    return is_manager();
 }
 
 static void fillIntArray(JNIEnv *env, jobject list, int *data, int count) {
@@ -111,7 +117,7 @@ static void fillArrayWithList(JNIEnv *env, jobject list, int *data, int count) {
 
 extern "C"
 JNIEXPORT jobject JNICALL
-Java_com_sukisu_ultra_Natives_getAppProfile(JNIEnv *env, jobject, jstring pkg, jint uid) {
+Java_me_weishu_kernelsu_Natives_getAppProfile(JNIEnv *env, jobject, jstring pkg, jint uid) {
     if (env->GetStringLength(pkg) > KSU_MAX_PACKAGE_NAME) {
         return nullptr;
     }
@@ -127,9 +133,9 @@ Java_com_sukisu_ultra_Natives_getAppProfile(JNIEnv *env, jobject, jstring pkg, j
     strcpy(profile.key, key);
     profile.current_uid = uid;
 
-    bool useDefaultProfile = !get_app_profile(key, &profile);
+    bool useDefaultProfile = get_app_profile(&profile) != 0;
 
-    auto cls = env->FindClass("com/sukisu/ultra/Natives$Profile");
+    auto cls = env->FindClass("me/weishu/kernelsu/Natives$Profile");
     auto constructor = env->GetMethodID(cls, "<init>", "()V");
     auto obj = env->NewObject(cls, constructor);
     auto keyField = env->GetFieldID(cls, "name", "Ljava/lang/String;");
@@ -171,7 +177,7 @@ Java_com_sukisu_ultra_Natives_getAppProfile(JNIEnv *env, jobject, jstring pkg, j
         env->SetBooleanField(obj, rootUseDefaultField, (jboolean) profile.rp_config.use_default);
         if (strlen(profile.rp_config.template_name) > 0) {
             env->SetObjectField(obj, rootTemplateField,
-                                env->NewStringUTF(profile.rp_config.template_name));
+                    env->NewStringUTF(profile.rp_config.template_name));
         }
 
         env->SetIntField(obj, uidField, profile.rp_config.profile.uid);
@@ -193,12 +199,12 @@ Java_com_sukisu_ultra_Natives_getAppProfile(JNIEnv *env, jobject, jstring pkg, j
         }
 
         env->SetObjectField(obj, domainField,
-                            env->NewStringUTF(profile.rp_config.profile.selinux_domain));
+                env->NewStringUTF(profile.rp_config.profile.selinux_domain));
         env->SetIntField(obj, namespacesField, profile.rp_config.profile.namespaces);
         env->SetBooleanField(obj, allowSuField, profile.allow_su);
     } else {
         env->SetBooleanField(obj, nonRootUseDefaultField,
-                             (jboolean) profile.nrp_config.use_default);
+                (jboolean) profile.nrp_config.use_default);
         env->SetBooleanField(obj, umountModulesField, profile.nrp_config.profile.umount_modules);
     }
 
@@ -207,8 +213,8 @@ Java_com_sukisu_ultra_Natives_getAppProfile(JNIEnv *env, jobject, jstring pkg, j
 
 extern "C"
 JNIEXPORT jboolean JNICALL
-Java_com_sukisu_ultra_Natives_setAppProfile(JNIEnv *env, jobject clazz, jobject profile) {
-    auto cls = env->FindClass("com/sukisu/ultra/Natives$Profile");
+Java_me_weishu_kernelsu_Natives_setAppProfile(JNIEnv *env, jobject clazz, jobject profile) {
+    auto cls = env->FindClass("me/weishu/kernelsu/Natives$Profile");
 
     auto keyField = env->GetFieldID(cls, "name", "Ljava/lang/String;");
     auto currentUidField = env->GetFieldID(cls, "currentUid", "I");
@@ -293,16 +299,38 @@ Java_com_sukisu_ultra_Natives_setAppProfile(JNIEnv *env, jobject clazz, jobject 
 }
 extern "C"
 JNIEXPORT jboolean JNICALL
-Java_com_sukisu_ultra_Natives_uidShouldUmount(JNIEnv *env, jobject thiz, jint uid) {
+Java_me_weishu_kernelsu_Natives_uidShouldUmount(JNIEnv *env, jobject thiz, jint uid) {
     return uid_should_umount(uid);
 }
 extern "C"
 JNIEXPORT jboolean JNICALL
-Java_com_sukisu_ultra_Natives_isSuEnabled(JNIEnv *env, jobject thiz) {
+Java_me_weishu_kernelsu_Natives_isSuEnabled(JNIEnv *env, jobject thiz) {
     return is_su_enabled();
 }
 extern "C"
 JNIEXPORT jboolean JNICALL
-Java_com_sukisu_ultra_Natives_setSuEnabled(JNIEnv *env, jobject thiz, jboolean enabled) {
+Java_me_weishu_kernelsu_Natives_setSuEnabled(JNIEnv *env, jobject thiz, jboolean enabled) {
     return set_su_enabled(enabled);
+}
+
+extern "C"
+JNIEXPORT jboolean JNICALL
+Java_me_weishu_kernelsu_Natives_isKernelUmountEnabled(JNIEnv *env, jobject thiz) {
+    return is_kernel_umount_enabled();
+}
+
+extern "C"
+JNIEXPORT jboolean JNICALL
+Java_me_weishu_kernelsu_Natives_setKernelUmountEnabled(JNIEnv *env, jobject thiz, jboolean enabled) {
+    return set_kernel_umount_enabled(enabled);
+}
+
+extern "C"
+JNIEXPORT jstring JNICALL
+Java_me_weishu_kernelsu_Natives_getUserName(JNIEnv *env, jobject thiz, jint uid) {
+    struct passwd *pw = getpwuid((uid_t) uid);
+    if (pw && pw->pw_name && pw->pw_name[0] != '\0') {
+        return env->NewStringUTF(pw->pw_name);
+    }
+    return nullptr;
 }

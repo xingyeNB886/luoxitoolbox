@@ -4,9 +4,17 @@ O KernelSU fornece um mecanismo de módulo que consegue modificar o diretório d
 
 O mecanismo de módulos do KernelSU é quase o mesmo do Magisk. Se você já está familiarizado com o desenvolvimento de módulos Magisk, o desenvolvimento de módulos KernelSU é muito semelhante. Você pode pular a introdução dos módulos abaixo e só precisa ler [Diferenças com Magisk](difference-with-magisk.md).
 
+::: warning METAMODULE NECESSÁRIO APENAS PARA MODIFICAÇÃO DE ARQUIVOS DO SISTEMA
+KernelSU usa uma arquitetura [metamodule](metamodule.md) para montar o diretório `system`. **Somente se seu módulo precisar modificar arquivos `/system`** (via diretório `system`), você precisa instalar um metamodule (como [meta-overlayfs](https://github.com/tiann/KernelSU/releases)). Outros recursos de módulos como scripts, regras sepolicy e system.prop funcionam sem um metamodule.
+:::
+
 ## WebUI
 
 Os módulos do KernelSU suportam a exibição de interfaces e a interação com os usuários. Para mais detalhes, consulte a [documentação do WebUI](module-webui.md).
+
+## Configuração de Módulo
+
+O KernelSU fornece um sistema de configuração integrado que permite que os módulos armazenem configurações de chave-valor persistentes ou temporárias. Para mais detalhes, consulte a [documentação de Configuração de Módulo](module-config.md).
 
 ## BusyBox
 
@@ -97,6 +105,9 @@ version=<string>
 versionCode=<int>
 author=<string>
 description=<string>
+updateJson=<url> (opcional)
+actionIcon=<path> (opcional)
+webuiIcon=<path> (opcional)
 ```
 
 - `id` deve corresponder a esta expressão regular: `^[a-zA-Z][a-zA-Z0-9._-]+$`<br>
@@ -105,6 +116,14 @@ description=<string>
 - `versionCode` deve ser um **número inteiro**. Isso é usado para comparar versões.
 - Outros que não foram mencionados acima podem ser qualquer string de **linha única**.
 - Certifique-se de usar o tipo de quebra de linha `UNIX (LF)` e não o `Windows (CR+LF)` ou `Macintosh (CR)`.
+- `actionIcon` e `webuiIcon` são caminhos de imagem opcionais usados como ícones
+  padrão para o atalho de ação do módulo e o atalho WebUI do módulo no
+  aplicativo gerenciador. Esses caminhos devem ser relativos ao diretório raiz do módulo.
+  Por exemplo, `actionIcon=icon/icon.png` será resolvido como `<MODDIR>/icon/icon.png`.
+
+::: tip DESCRIÇÃO DINÂMICA
+O campo `description` pode ser substituído dinamicamente em tempo de execução usando o sistema de configuração de módulos. Veja [Substituindo a Descrição do Módulo](module-config.md#overriding-module-description) para detalhes.
+:::
 
 ### Shell scripts
 
@@ -150,7 +169,7 @@ REPLACE="
 Esta lista criará automaticamente os diretórios `$MODPATH/system/app/YouTube` e `$MODPATH/system/app/Bloatware` e, em seguida, executará `setfattr -n trusted.overlay.opaque -v y $MODPATH/system/app/YouTube` e `setfattr -n trusted.overlay.opaque -v y $MODPATH/system/app/Bloatware`. Após o módulo entrar em vigor, `/system/app/YouTube` e `/system/app/Bloatware` serão substituídos por diretórios vazios.
 
 ::: tip DIFERENÇAS COM MAGISK
-O mecanismo sem sistema do KernelSU é implementado através do OverlayFS do kernel, enquanto o Magisk atualmente usa montagem mágica (montagem de ligação). Os dois métodos de implementação têm diferenças significativas, mas o objetivo final é o mesmo: modificar os arquivos /system sem modificar fisicamente a partição /system.
+O mecanismo sem sistema do KernelSU é implementado através do OverlayFS do kernel, enquanto o Magisk atualmente usa montagem mágica (montagem de ligação). Os dois métodos de implementação têm diferenças significativas, mas o objetivo final é o mesmo: modificar os arquivos `/system` sem modificar fisicamente a partição `/system`.
 :::
 
 Se você estiver interessado em OverlayFS, é recomendável ler a [documentação sobre OverlayFS](https://docs.kernel.org/filesystems/overlayfs.html) do kernel Linux.
@@ -229,7 +248,7 @@ set_perm_recursive <directory> <owner> <group> <dirpermission> <filepermission> 
     se [context] não está definido, o padrão é "u:object_r:system_file:s0"
     para todos os arquivos em <directory>, ele chamará:
        set_perm arquivo proprietário do grupo filepermission
-    para todos os diretórios em <directory> (including itself), ele vai ligar:
+    para todos os diretórios em <directory> (incluindo ele mesmo), ele vai ligar:
        set_perm dir owner group dirpermission context
 ```
 

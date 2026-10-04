@@ -1,55 +1,88 @@
 @file:Suppress("UnstableApiUsage")
 
-import com.android.build.api.dsl.ApkSigningConfig
-import com.android.build.gradle.internal.api.BaseVariantOutputImpl
-import com.android.build.gradle.tasks.PackageAndroidArtifact
-
 plugins {
     alias(libs.plugins.agp.app)
-    alias(libs.plugins.kotlin)
     alias(libs.plugins.compose.compiler)
-    alias(libs.plugins.ksp)
-    alias(libs.plugins.lsplugin.apksign)
+    alias(libs.plugins.kotlin.serialization)
     id("kotlin-parcelize")
-
-
 }
 
+val androidCompileSdkVersion: Int by rootProject.extra
+val androidCompileNdkVersion: String by rootProject.extra
+val androidBuildToolsVersion: String by rootProject.extra
+val androidMinSdkVersion: Int by rootProject.extra
+val androidTargetSdkVersion: Int by rootProject.extra
+val androidSourceCompatibility: JavaVersion by rootProject.extra
+val androidTargetCompatibility: JavaVersion by rootProject.extra
 val managerVersionCode: Int by rootProject.extra
 val managerVersionName: String by rootProject.extra
 
-apksign {
-    storeFileProperty = "KEYSTORE_FILE"
-    storePasswordProperty = "KEYSTORE_PASSWORD"
-    keyAliasProperty = "KEY_ALIAS"
-    keyPasswordProperty = "KEY_PASSWORD"
-}
+// 洛茜工具箱：默认包名 / 应用名
+val defaultManagerPackageName = "me.luoxi.toolbox"
+val defaultManagerName = "洛茜工具箱"
 
+val baseCFlags = listOf(
+    "-Wall", "-Qunused-arguments", "-fvisibility=hidden", "-fvisibility-inlines-hidden",
+    "-fno-exceptions", "-fno-stack-protector", "-fomit-frame-pointer",
+    "-Wno-builtin-macro-redefined", "-Wno-unused-value", "-D__FILE__=__FILE_NAME__"
+)
+val baseCppFlags = baseCFlags + "-fno-rtti"
 
 android {
+    namespace = "me.weishu.kernelsu"
 
-    /**signingConfigs {
-        create("Debug") {
-            storeFile = file("D:\\other\\AndroidTool\\android_key\\keystore\\release-key.keystore")
-            storePassword = ""
-            keyAlias = ""
-            keyPassword = ""
+    signingConfigs {
+        val ksFile = project.findProperty("KEYSTORE_FILE") as? String
+        val ksPassword = project.findProperty("KEYSTORE_PASSWORD") as? String
+        val ksAlias = project.findProperty("KEY_ALIAS") as? String
+        val ksKeyPassword = project.findProperty("KEY_PASSWORD") as? String
+
+        if (ksFile != null && ksPassword != null && ksAlias != null && ksKeyPassword != null) {
+            create("release") {
+                storeFile = rootProject.file(ksFile)
+                storePassword = ksPassword
+                keyAlias = ksAlias
+                keyPassword = ksKeyPassword
+            }
         }
-    }**/
-    namespace = "com.sukisu.ultra"
+    }
 
     buildTypes {
-        release {
-            isMinifyEnabled = true
-            isShrinkResources = true
-            ndk {
-                abiFilters += listOf("arm64-v8a")
+        debug {
+            externalNativeBuild {
+                cmake {
+                    arguments += listOf("-DCMAKE_CXX_FLAGS_DEBUG=-Og", "-DCMAKE_C_FLAGS_DEBUG=-Og")
+                }
             }
-            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
-        /**debug {
-            signingConfig = signingConfigs.named("Debug").get() as ApkSigningConfig
-        }**/
+        release {
+            signingConfig = signingConfigs.findByName("release")
+            isMinifyEnabled = true
+            isShrinkResources = false
+            vcsInfo.include = false
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            externalNativeBuild {
+                cmake {
+                    arguments += "-DDEBUG_SYMBOLS_PATH=${layout.buildDirectory.get().asFile.absolutePath}/symbols"
+                    arguments += "-DCMAKE_BUILD_TYPE=Release"
+
+                    val releaseFlags = listOf(
+                        "-flto", "-ffunction-sections", "-fdata-sections", "-Wl,--gc-sections",
+                        "-fno-unwind-tables", "-fno-asynchronous-unwind-tables", "-Wl,--exclude-libs,ALL"
+                    )
+                    val configFlags = listOf("-Oz", "-DNDEBUG").joinToString(" ")
+
+                    cppFlags += releaseFlags
+                    cFlags += releaseFlags
+
+                    arguments += listOf(
+                        "-DCMAKE_CXX_FLAGS_RELEASE=$configFlags",
+                        "-DCMAKE_C_FLAGS_RELEASE=$configFlags",
+                        "-DCMAKE_SHARED_LINKER_FLAGS=-Wl,--gc-sections -Wl,--exclude-libs,ALL -Wl,--icf=all -s -Wl,--hash-style=sysv -Wl,-z,norelro"
+                    )
+                }
+            }
+        }
     }
 
     buildFeatures {
@@ -59,46 +92,16 @@ android {
         prefab = true
     }
 
-    kotlinOptions {
-        jvmTarget = "21"
-    }
-
     packaging {
         jniLibs {
             useLegacyPackaging = true
-        }
-        resources {
-            // https://stackoverflow.com/a/58956288
-            // It will break Layout Inspector, but it's unused for release build.
-            excludes += "META-INF/*.version"
-            // https://github.com/Kotlin/kotlinx.coroutines?tab=readme-ov-file#avoiding-including-the-debug-infrastructure-in-the-resulting-apk
-            excludes += "DebugProbesKt.bin"
-            // https://issueantenna.com/repo/kotlin/kotlinx.coroutines/issues/3158
-            excludes += "kotlin-tooling-metadata.json"
         }
     }
 
     externalNativeBuild {
         cmake {
-            path("src/main/cpp/CMakeLists.txt")
+            path = file("src/main/cpp/CMakeLists.txt")
         }
-    }
-
-    applicationVariants.all {
-        outputs.forEach {
-            val output = it as BaseVariantOutputImpl
-            output.outputFileName = "SukiSU_${managerVersionName}_${managerVersionCode}-$name.apk"
-        }
-        kotlin.sourceSets {
-            getByName(name) {
-                kotlin.srcDir("build/generated/ksp/$name/kotlin")
-            }
-        }
-    }
-
-    // https://stackoverflow.com/a/77745844
-    tasks.withType<PackageAndroidArtifact> {
-        doFirst { appMetadata.asFile.orNull?.writeText("") }
     }
 
     dependenciesInfo {
@@ -109,20 +112,63 @@ android {
     androidResources {
         generateLocaleConfig = true
     }
+
+    compileSdk = androidCompileSdkVersion
+    ndkVersion = androidCompileNdkVersion
+    buildToolsVersion = androidBuildToolsVersion
+
+    defaultConfig {
+        minSdk = androidMinSdkVersion
+        targetSdk = androidTargetSdkVersion
+        versionCode = managerVersionCode
+        versionName = managerVersionName
+        applicationId = defaultManagerPackageName
+
+        buildConfigField("String", "EXPECTED_SIGNATURE", "\"${project.findProperty("EXPECTED_SIGNATURE") ?: ""}\"")
+
+        externalNativeBuild {
+            cmake {
+                arguments += "-DANDROID_STL=none"
+                cFlags += baseCFlags + "-std=c2x"
+                cppFlags += baseCppFlags + "-std=c++2b"
+            }
+        }
+
+        ndk {
+            abiFilters += listOf("arm64-v8a", "x86_64")
+        }
+    }
+
+    lint {
+        abortOnError = true
+        checkReleaseBuilds = false
+    }
+
+    compileOptions {
+        sourceCompatibility = androidSourceCompatibility
+        targetCompatibility = androidTargetCompatibility
+    }
+}
+
+androidComponents {
+    onVariants(selector().withBuildType("release")) {
+        it.packaging.resources.excludes.addAll(listOf("META-INF/**", "kotlin/**", "org/**", "**.bin"))
+    }
+}
+
+base {
+    archivesName.set(
+        "LuoxiToolbox_${managerVersionName}_${managerVersionCode}"
+    )
 }
 
 dependencies {
     implementation(libs.androidx.activity.compose)
-    implementation(libs.androidx.navigation.compose)
 
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.material.icons.extended)
-    implementation(libs.androidx.compose.material)
-    implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.ui.tooling.preview)
-    implementation(libs.androidx.foundation)
-    implementation(libs.androidx.documentfile)
 
     debugImplementation(libs.androidx.compose.ui.test.manifest)
     debugImplementation(libs.androidx.compose.ui.tooling)
@@ -130,9 +176,10 @@ dependencies {
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
+    implementation(libs.androidx.lifecycle.viewmodel.navigation3)
 
-    implementation(libs.compose.destinations.core)
-    ksp(libs.compose.destinations.ksp)
+    implementation(libs.androidx.navigation3.runtime)
+    implementation(libs.androidx.navigationevent.compose)
 
     implementation(libs.com.github.topjohnwu.libsu.core)
     implementation(libs.com.github.topjohnwu.libsu.service)
@@ -140,30 +187,25 @@ dependencies {
 
     implementation(libs.dev.rikka.rikkax.parcelablelist)
 
-    implementation(libs.io.coil.kt.coil.compose)
-
     implementation(libs.kotlinx.coroutines.core)
 
-    implementation(libs.me.zhanghai.android.appiconloader.coil)
+    implementation(libs.markwon)
 
-    implementation(libs.sheet.compose.dialogs.core)
-    implementation(libs.sheet.compose.dialogs.list)
-    implementation(libs.sheet.compose.dialogs.input)
-
-    implementation(libs.markdown)
     implementation(libs.androidx.webkit)
 
     implementation(libs.lsposed.cxx)
 
-    implementation(libs.com.github.topjohnwu.libsu.core)
+    implementation(libs.miuix)
+    implementation(libs.miuix.icons)
+    implementation(libs.miuix.navigation3.ui)
 
-    implementation(libs.mmrl.platform)
-    compileOnly(libs.mmrl.hidden.api)
-    implementation(libs.mmrl.webui)
-    implementation(libs.mmrl.ui)
+    implementation(platform(libs.okhttp.bom))
+    implementation(libs.okhttp)
 
+    implementation(libs.haze)
+    implementation(libs.capsule)
+
+    implementation(libs.hiddenapibypass)
     implementation(libs.rikka.shizuku.api)
     implementation(libs.rikka.shizuku.provider)
-    implementation(libs.hiddenapibypass)
-
 }

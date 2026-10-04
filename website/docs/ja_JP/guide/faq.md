@@ -12,7 +12,7 @@
 
 ## KernelSU はモジュールに対応していますか?
 
-はい。ただし初期バージョンであるためバグがある可能性があります。安定するのをお待ちください。
+はい。ほとんどの Magisk モジュールは KernelSU で動作します。ただし、モジュールが `/system` ファイルを変更する必要がある場合は、[metamodule](metamodule.md) (`meta-overlayfs`など) をインストールする必要があります。他のモジュール機能は metamodule なしで動作します。詳細は [モジュールガイド](module.md) をご覧ください。
 
 ## KernelSU は Xposed に対応していますか?
 
@@ -60,8 +60,18 @@ KernelSU は現在カーネル4.14にバックポートされていますが、�
 今はまだありませんが（将来的にはあるかもしれません）、グローバルマウントの名前空間に手動で切り替える方法は、以下のようにたくさんあります：
 
 1. `nsenter -t 1 -m sh` でシェルをグローバル名前空間にします。
-2. `nsenter --mount=/proc/1/ns/mnt` を実行したいコマンドに追加すればグローバル名前空間で実行されます。 KernelSU は [このような使い方](https://github.com/tiann/KernelSU/blob/77056a710073d7a5f7ee38f9e77c9fd0b3256576/manager/app/src/main/java/shirkneko/zako/mksu/ui/util/KsuCli.kt#L115) もできます。
+2. `nsenter --mount=/proc/1/ns/mnt` を実行したいコマンドに追加すればグローバル名前空間で実行されます。 KernelSU は [このような使い方](https://github.com/tiann/KernelSU/blob/77056a710073d7a5f7ee38f9e77c9fd0b3256576/manager/app/src/main/java/me/weishu/kernelsu/ui/util/KsuCli.kt#L115) もできます。
 
 ## GKI 1.0 なのですが、使えますか？
 
 GKI1 は GKI2 と全く異なるため、カーネルは自分でビルドする必要があります。
+
+## 新規インストール後にモジュールが動作しないのはなぜですか？
+
+モジュールが `/system` ファイルを変更する必要がある場合は、`system` ディレクトリをマウントするために [metamodule](metamodule.md) をインストールする必要があります。他のモジュール機能（スクリプト、sepolicy、system.prop）は metamodule なしで動作します。
+
+**解決策**：インストール手順については [Metamodule ガイド](metamodule.md) をご覧ください。
+
+## metamodule とは何ですか？なぜ必要なのですか？
+
+Metamodule は、通常のモジュールをマウントするためのインフラストラクチャを提供する特殊なモジュールです。完全な説明については [Metamodule ガイド](metamodule.md) をご覧ください。

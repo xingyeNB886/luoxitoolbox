@@ -1,67 +1,33 @@
-import com.android.build.api.dsl.ApplicationDefaultConfig
-import com.android.build.api.dsl.CommonExtension
-import com.android.build.gradle.api.AndroidBasePlugin
-
 plugins {
     alias(libs.plugins.agp.app) apply false
-    alias(libs.plugins.agp.lib) apply false
     alias(libs.plugins.kotlin) apply false
     alias(libs.plugins.compose.compiler) apply false
-    alias(libs.plugins.lsplugin.cmaker)
 }
 
-cmaker {
-    default {
-        arguments.addAll(
-            arrayOf(
-                "-DANDROID_STL=none",
-            )
-        )
-        abiFilters("arm64-v8a", "x86_64", "armeabi-v7a")
-    }
-    buildTypes {
-        if (it.name == "release") {
-            arguments += "-DDEBUG_SYMBOLS_PATH=${layout.buildDirectory.asFile.get().absolutePath}/symbols"
-        }
-    }
+val androidMinSdkVersion by extra(26)
+val androidTargetSdkVersion by extra(36)
+val androidCompileSdkVersion by extra(36)
+val androidBuildToolsVersion by extra("36.1.0")
+val androidCompileNdkVersion by extra(libs.versions.ndk.get())
+val androidSourceCompatibility by extra(JavaVersion.VERSION_21)
+val androidTargetCompatibility by extra(JavaVersion.VERSION_21)
+val managerVersionCode by extra(getVersionCode())
+val managerVersionName by extra(getVersionName())
+
+fun getGitCommitCount(): Int {
+    val process = Runtime.getRuntime().exec(arrayOf("git", "rev-list", "--count", "HEAD"))
+    return process.inputStream.bufferedReader().use { it.readText().trim().toInt() }
 }
 
-val androidMinSdkVersion = 26
-val androidTargetSdkVersion = 36
-val androidCompileSdkVersion = 36
-val androidCompileNdkVersion = "28.0.13004108"
-val androidSourceCompatibility = JavaVersion.VERSION_21
-val androidTargetCompatibility = JavaVersion.VERSION_21
-val managerVersionCode by extra(12900)
-val managerVersionName by extra("v3.1.2")
+fun getGitDescribe(): String {
+    val process = Runtime.getRuntime().exec(arrayOf("git", "describe", "--tags", "--always"))
+    return process.inputStream.bufferedReader().use { it.readText().trim() }
+}
 
-subprojects {
-    plugins.withType(AndroidBasePlugin::class.java) {
-        extensions.configure(CommonExtension::class.java) {
-            compileSdk = androidCompileSdkVersion
-            ndkVersion = androidCompileNdkVersion
+fun getVersionCode(): Int {
+    return 1000000
+}
 
-            defaultConfig {
-                minSdk = androidMinSdkVersion
-                if (this is ApplicationDefaultConfig) {
-                    targetSdk = androidTargetSdkVersion
-                    versionCode = managerVersionCode
-                    versionName = managerVersionName
-                }
-                ndk {
-                    abiFilters += listOf("arm64-v8a", "x86_64", "armeabi-v7a")
-                }
-            }
-
-            lint {
-                abortOnError = true
-                checkReleaseBuilds = false
-            }
-
-            compileOptions {
-                sourceCompatibility = androidSourceCompatibility
-                targetCompatibility = androidTargetCompatibility
-            }
-        }
-    }
+fun getVersionName(): String {
+    return "1.0.0"
 }

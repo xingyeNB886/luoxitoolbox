@@ -2,10 +2,11 @@ menu "KernelSU"
 
 config KSU
 	tristate "KernelSU function support"
-	depends on OVERLAY_FS
+	depends on KPROBES
 	default y
 	help
 	  Enable kernel-level root privileges on Android System.
+	  Requires CONFIG_KPROBES for kernel hooking support.
 	  To compile as a module, choose M here: the
 	  module will be called kernelsu.
 
@@ -15,21 +16,5 @@ config KSU_DEBUG
 	default n
 	help
 	  Enable KernelSU debug mode.
-
-config KSU_HOOK
-	bool "Enable KernelSU Hook"
-	default n
-	help
-	  This option enables the KernelSU Hook feature. If enabled, it will
-	  override the kernel version check and enable the hook functionality.
-
-config KPM
-	bool "Enable SukiSU KPM"
-	default n
-	help
-	  Enabling this option will activate the KPM feature of SukiSU.
-	  This option is suitable for scenarios where you need to force KPM to be enabled.
-	  but it may affect system stability.
-
 
 endmenu

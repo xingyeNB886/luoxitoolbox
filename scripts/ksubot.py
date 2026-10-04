@@ -2,6 +2,7 @@ import asyncio
 import os
 import sys
 from telethon import TelegramClient
+from telethon.tl.functions.help import GetConfigRequest
 
 API_ID = 611335
 API_HASH = "d524b414d21f4d37f08684c1df41ac9c"
@@ -15,8 +16,10 @@ COMMIT_MESSAGE = os.environ.get("COMMIT_MESSAGE")
 RUN_URL = os.environ.get("RUN_URL")
 TITLE = os.environ.get("TITLE")
 VERSION = os.environ.get("VERSION")
+BRANCH = os.environ.get("BRANCH")
 MSG_TEMPLATE = """
 **{title}**
+Branch: {branch}
 #ci_{version}
 ```
 {commit_message}
@@ -29,13 +32,17 @@ MSG_TEMPLATE = """
 def get_caption():
     msg = MSG_TEMPLATE.format(
         title=TITLE,
+        branch=BRANCH,
         version=VERSION,
         commit_message=COMMIT_MESSAGE,
         commit_url=COMMIT_URL,
         run_url=RUN_URL,
     )
     if len(msg) > 1024:
-        return COMMIT_URL
+        msg = COMMIT_URL
+    if BRANCH == "dev":
+        msg += "\n⚠️⚠️**DEV VERSION, PLEASE BACKUP BEFORE INSTALLATION**⚠️⚠️"
+        msg += "\n⚠️⚠️**测试版，安装前请备份**⚠️⚠️"
     return msg
 
 
@@ -48,10 +55,7 @@ def check_environ():
         print("[-] Invalid CHAT_ID")
         exit(1)
     else:
-        try:
-            CHAT_ID = int(CHAT_ID)
-        except:
-            pass
+        CHAT_ID = int(CHAT_ID)
     if COMMIT_URL is None:
         print("[-] Invalid COMMIT_URL")
         exit(1)
@@ -67,14 +71,14 @@ def check_environ():
     if VERSION is None:
         print("[-] Invalid VERSION")
         exit(1)
-    if MESSAGE_THREAD_ID is not None and MESSAGE_THREAD_ID != "":
-        try:
-            MESSAGE_THREAD_ID = int(MESSAGE_THREAD_ID)
-        except:
-            print("[-] Invaild MESSAGE_THREAD_ID")
-            exit(1)
+    if BRANCH is None:
+        print("[-] Invalid BRANCH")
+        exit(1)
+    if MESSAGE_THREAD_ID is None:
+        print("[-] Invaild MESSAGE_THREAD_ID")
+        exit(1)
     else:
-        MESSAGE_THREAD_ID = None
+        MESSAGE_THREAD_ID = int(MESSAGE_THREAD_ID)
 
 
 async def main():

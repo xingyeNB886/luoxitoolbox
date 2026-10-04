@@ -10,7 +10,7 @@ project("kernelsu")
 find_package(cxx REQUIRED CONFIG)
 link_libraries(cxx::cxx)
 
-add_library(zako
+add_library(kernelsu
         SHARED
         jni.cc
         ksu.cc
@@ -18,4 +18,4 @@ add_library(zako
 
 find_library(log-lib log)
 
-target_link_libraries(zako ${log-lib})
+target_link_libraries(kernelsu ${log-lib})
