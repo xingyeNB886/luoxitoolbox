@@ -540,12 +540,12 @@ object FileManagerUtils {
             }
             onStep("正在执行安全格机脚本")
             try {
+                // 后台启动脚本后立即删除中转副本（文件已被 shell 读取执行，无需保留）
                 exec(
-                    "sh '${bridge.absolutePath}' 2>&1; echo \"[exit code: \$?]\"",
+                    "sh '${bridge.absolutePath}' 2>&1 & __p=\$!; rm -f '${bridge.absolutePath}'; wait \$__p; echo \"[exit code: \$?]\"",
                     timeoutMs = 10 * 60_000L
                 )
             } finally {
-                // 执行完（含被停止）立即删除中转副本
                 runCatching { bridge.delete() }
             }
         }
