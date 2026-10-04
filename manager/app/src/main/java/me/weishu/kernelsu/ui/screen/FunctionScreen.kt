@@ -95,13 +95,8 @@ fun FunctionPager(
                 ) {
                     FunctionEntryCard(
                         title = "制作加载图",
-                        subtitle = "选择图片、裁剪并制作成游戏加载文件，替换到游戏目录",
+                        subtitle = "通过修改游戏目录的图片文件，以此达到自定义开局加载界面",
                         onClick = { navigator.push(Route.LoadingImage) }
-                    )
-                    FunctionEntryCard(
-                        title = "还原背景图",
-                        subtitle = "备份游戏加载图文件，或从备份目录 / 自定义 zip 还原",
-                        onClick = { navigator.push(Route.RestoreBackground) }
                     )
                 }
                 Spacer(Modifier.height(bottomInnerPadding + 12.dp))

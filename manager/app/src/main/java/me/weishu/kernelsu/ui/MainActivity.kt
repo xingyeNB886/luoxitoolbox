@@ -67,11 +67,12 @@ import me.weishu.kernelsu.ui.screen.AppProfileScreen
 import me.weishu.kernelsu.ui.screen.AppProfileTemplateScreen
 import me.weishu.kernelsu.ui.screen.ExecuteModuleActionScreen
 import me.weishu.kernelsu.ui.screen.FlashIt
+import me.weishu.kernelsu.ui.screen.BackupRestoreScreen
 import me.weishu.kernelsu.ui.screen.FunctionPager
 import me.weishu.kernelsu.ui.screen.HomePager
+import me.weishu.kernelsu.ui.screen.LoadingEditScreen
 import me.weishu.kernelsu.ui.screen.LoadingImageScreen
 import me.weishu.kernelsu.ui.screen.ModulePager
-import me.weishu.kernelsu.ui.screen.RestoreBackgroundScreen
 import me.weishu.kernelsu.ui.screen.ModuleRepoDetailScreen
 import me.weishu.kernelsu.ui.screen.ModuleRepoScreen
 import me.weishu.kernelsu.ui.screen.PermissionScreen
@@ -188,7 +189,8 @@ class MainActivity : ComponentActivity() {
                                 entry<Route.Flash> { PermissionScreen() }
                                 entry<Route.ExecuteModuleAction> { key -> ExecuteModuleActionScreen(key.moduleId) }
                                 entry<Route.LoadingImage> { LoadingImageScreen(navigator) }
-                                entry<Route.RestoreBackground> { RestoreBackgroundScreen(navigator) }
+                                entry<Route.LoadingEdit> { LoadingEditScreen(navigator) }
+                                entry<Route.BackupRestore> { BackupRestoreScreen(navigator) }
                                 entry<Route.Home> { MainScreen() }
                                 entry<Route.SuperUser> { MainScreen() }
                                 entry<Route.Module> { MainScreen() }

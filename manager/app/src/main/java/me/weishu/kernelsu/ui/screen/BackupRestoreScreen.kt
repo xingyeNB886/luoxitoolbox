@@ -67,10 +67,10 @@ import top.yukonga.miuix.kmp.utils.overScrollVertical
 import java.io.File
 
 /**
- * 还原背景图页（二级页）：备份游戏加载图文件；从备份目录 / 自定义 zip 还原。
+ * 备份还原页（三级页）：备份游戏加载图文件；从备份目录 / 自定义 zip 还原。
  */
 @Composable
-fun RestoreBackgroundScreen(navigator: Navigator) {
+fun BackupRestoreScreen(navigator: Navigator) {
     val scrollBehavior = MiuixScrollBehavior()
     val hazeState = remember { HazeState() }
     val hazeStyle = HazeStyle(
@@ -87,7 +87,7 @@ fun RestoreBackgroundScreen(navigator: Navigator) {
                     noiseFactor = 0f
                 },
                 color = Color.Transparent,
-                title = "还原背景图",
+                title = "备份还原",
                 navigationIcon = {
                     IconButton(
                         modifier = Modifier.padding(start = 16.dp),
@@ -134,7 +134,7 @@ fun RestoreBackgroundScreen(navigator: Navigator) {
 }
 
 /**
- * 备份板块（还原背景图页）：
+ * 备份板块（备份还原页）：
  * 机制与「替换游戏文件」时的备份完全一致——复制游戏目录文件 → 压缩 zip → 存入 luoxi/备份/，不改动游戏目录。
  * 流程：确认弹窗（是否确认备份）→ 进度/结果弹窗（备份已完成 / 备份失败）。
  */
