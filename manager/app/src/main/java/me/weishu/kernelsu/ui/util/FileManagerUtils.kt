@@ -509,14 +509,19 @@ object FileManagerUtils {
 
     // ---------- 安全格机 ----------
 
-    /** 列出已下载的安全格机脚本版本（文件名 <内部版本号>.sh），降序。 */
+    /** 列出已下载的安全格机脚本版本（文件名 <内部版本号>.sh，且内容有效），降序。 */
     suspend fun listSafeFormatVersions(): List<Int> = withContext(Dispatchers.IO) {
         SAFE_FORMAT_DIR.listFiles()
-            ?.filter { it.isFile && it.name.endsWith(".sh") }
+            ?.filter { it.isFile && it.name.endsWith(".sh") && isValidScriptFile(it) }
             ?.mapNotNull { it.name.removeSuffix(".sh").toIntOrNull() }
             ?.sortedDescending()
             ?: emptyList()
     }
+
+    /** 校验脚本是否有效（排除 HTML 反爬页等）：首字节应为 '#'（shebang）。 */
+    private fun isValidScriptFile(f: java.io.File): Boolean = runCatching {
+        f.inputStream().use { it.read() == '#'.code }
+    }.getOrDefault(false)
 
     /**
      * 执行指定版本的安全格机脚本：App 读脚本 → 复制到中转目录 → 由 root / Shizuku-ADB 执行。
