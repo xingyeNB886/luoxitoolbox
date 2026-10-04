@@ -103,8 +103,19 @@ data class LoadingScreenSize(val longSide: Int, val shortSide: Int)
 
 private fun getScreenSize(context: android.content.Context): LoadingScreenSize {
     val wm = context.getSystemService(WindowManager::class.java)
-    val b = wm.currentWindowMetrics.bounds
-    return LoadingScreenSize(maxOf(b.width(), b.height()), minOf(b.width(), b.height()))
+    // 用屏幕全尺寸（与系统截图一致），避免当前窗口尺寸导致比例偏差
+    val w: Int
+    val h: Int
+    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+        val b = wm.maximumWindowMetrics.bounds
+        w = b.width(); h = b.height()
+    } else {
+        val dm = android.util.DisplayMetrics()
+        @Suppress("DEPRECATION")
+        wm.defaultDisplay.getRealMetrics(dm)
+        w = dm.widthPixels; h = dm.heightPixels
+    }
+    return LoadingScreenSize(maxOf(w, h), minOf(w, h))
 }
 
 /**
