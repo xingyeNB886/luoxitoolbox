@@ -32,6 +32,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -67,16 +68,15 @@ import me.weishu.kernelsu.ui.screen.AppProfileScreen
 import me.weishu.kernelsu.ui.screen.AppProfileTemplateScreen
 import me.weishu.kernelsu.ui.screen.ExecuteModuleActionScreen
 import me.weishu.kernelsu.ui.screen.FlashIt
-import me.weishu.kernelsu.ui.screen.BackupRestoreScreen
 import me.weishu.kernelsu.ui.screen.FunctionPager
 import me.weishu.kernelsu.ui.screen.HomePager
-import me.weishu.kernelsu.ui.screen.LoadingEditScreen
 import me.weishu.kernelsu.ui.screen.LoadingImageScreen
 import me.weishu.kernelsu.ui.screen.ModulePager
 import me.weishu.kernelsu.ui.screen.ModuleRepoDetailScreen
 import me.weishu.kernelsu.ui.screen.ModuleRepoScreen
 import me.weishu.kernelsu.ui.screen.PermissionScreen
 import me.weishu.kernelsu.ui.screen.SettingPager
+import me.weishu.kernelsu.ui.screen.SuperUserPager
 import me.weishu.kernelsu.ui.screen.TemplateEditorScreen
 import me.weishu.kernelsu.ui.theme.KernelSUTheme
 import me.weishu.kernelsu.ui.util.getFileName
@@ -189,8 +189,8 @@ class MainActivity : ComponentActivity() {
                                 entry<Route.Flash> { PermissionScreen() }
                                 entry<Route.ExecuteModuleAction> { key -> ExecuteModuleActionScreen(key.moduleId) }
                                 entry<Route.LoadingImage> { LoadingImageScreen(navigator) }
-                                entry<Route.LoadingEdit> { LoadingEditScreen(navigator) }
-                                entry<Route.BackupRestore> { BackupRestoreScreen(navigator) }
+                                entry<Route.LoadingEdit> { SuperUserPager(navigator, 0.dp) }
+                                entry<Route.BackupRestore> { ModulePager(navigator, 0.dp, title = "备份还原", showBack = true) }
                                 entry<Route.Home> { MainScreen() }
                                 entry<Route.SuperUser> { MainScreen() }
                                 entry<Route.Module> { MainScreen() }
