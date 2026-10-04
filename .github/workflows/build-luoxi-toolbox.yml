@@ -126,7 +126,16 @@ jobs:
           IS_PR_BUILD=false
           if [ "${{ github.event_name }}" = "pull_request" ]; then IS_PR_BUILD=true; fi
           set -x
-          ./gradlew clean assembleRelease -PIS_PR_BUILD=$IS_PR_BUILD --no-daemon --stacktrace
+          set -o pipefail
+          ./gradlew clean assembleRelease -PIS_PR_BUILD=$IS_PR_BUILD --no-daemon --stacktrace 2>&1 | tee /tmp/gradle_build.log
+
+      - name: 打印编译错误
+        if: failure()
+        run: |
+          if [ -f /tmp/gradle_build.log ]; then
+            grep -nE "^e: |error:|FAILURE:|Execution failed|Caused by|Unresolved reference|Compilation error" /tmp/gradle_build.log | head -40 | while IFS= read -r l; do echo "::error::$l"; done
+          fi
+          true
 
       - name: 收集 APK
         run: |
