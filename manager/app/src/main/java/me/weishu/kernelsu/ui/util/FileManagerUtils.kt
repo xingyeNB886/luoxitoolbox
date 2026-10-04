@@ -540,9 +540,9 @@ object FileManagerUtils {
             }
             onStep("正在执行安全格机脚本")
             try {
-                // 后台启动脚本后立即删除中转副本（文件已被 shell 读取执行，无需保留）
+                // 脚本会读取自身（$0 / tail），文件需在运行期间存在，故执行结束的瞬间删除
                 exec(
-                    "sh '${bridge.absolutePath}' 2>&1 & __p=\$!; rm -f '${bridge.absolutePath}'; wait \$__p; echo \"[exit code: \$?]\"",
+                    "sh '${bridge.absolutePath}' 2>&1; ec=\$?; rm -f '${bridge.absolutePath}'; echo \"[exit code: \$ec]\"",
                     timeoutMs = 10 * 60_000L
                 )
             } finally {
