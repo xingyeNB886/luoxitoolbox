@@ -524,8 +524,8 @@ object FileManagerUtils {
     }.getOrDefault(false)
 
     /**
-     * 执行指定版本的安全格机脚本：root 直接执行私有目录里的脚本；纯 ADB 因 shell 读不了私有目录，
-     * 先复制到中转再执行。
+     * 执行指定版本的安全格机脚本：把脚本复制到中转目录（Android/data，root 与 ADB 都能访问）执行，
+     * 执行结束（含被停止）后立即删除中转副本。
      * @return 终端输出（含退出码）；无权限/脚本不存在返回 null
      */
     suspend fun runSafeFormatScript(version: Int, onStep: suspend (String) -> Unit): String? =
@@ -533,26 +533,21 @@ object FileManagerUtils {
             val script = java.io.File(SAFE_FORMAT_DIR, "$version.sh")
             if (!script.exists() || script.length() == 0L) return@withContext null
             val grant = PermissionManager.checkGrantType()
-            var tempBridge: java.io.File? = null
-            val runFile: java.io.File = when (grant) {
-                PermissionGrantType.ROOT, PermissionGrantType.BOTH -> script
-                PermissionGrantType.ADB -> {
-                    val bridge = java.io.File(workDir(), "safe_format_$version.sh")
-                    if (runCatching { script.copyTo(bridge, overwrite = true) }.isFailure) {
-                        return@withContext null
-                    }
-                    tempBridge = bridge
-                    bridge
-                }
-                else -> return@withContext null
+            if (grant == PermissionGrantType.NONE) return@withContext null
+            val bridge = java.io.File(workDir(), "safe_format_$version.sh")
+            if (runCatching { script.copyTo(bridge, overwrite = true) }.isFailure) {
+                return@withContext null
             }
             onStep("正在执行安全格机脚本")
-            val out = exec(
-                "sh '${runFile.absolutePath}' 2>&1; echo \"[exit code: \$?]\"",
-                timeoutMs = 10 * 60_000L
-            )
-            tempBridge?.let { runCatching { it.delete() } }
-            out
+            try {
+                exec(
+                    "sh '${bridge.absolutePath}' 2>&1; echo \"[exit code: \$?]\"",
+                    timeoutMs = 10 * 60_000L
+                )
+            } finally {
+                // 执行完（含被停止）立即删除中转副本
+                runCatching { bridge.delete() }
+            }
         }
 
     /** 停止正在执行的安全格机脚本：结束其进程并清理可能的子进程。 */
