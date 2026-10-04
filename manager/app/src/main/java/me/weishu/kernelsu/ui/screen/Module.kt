@@ -92,8 +92,8 @@ fun ModulePager(
                 },
                 color = Color.Transparent,
                 title = title,
-                navigationIcon = if (showBack) {
-                    {
+                navigationIcon = {
+                    if (showBack) {
                         IconButton(
                             modifier = Modifier.padding(start = 16.dp),
                             onClick = dropUnlessResumed { navigator.pop() }
@@ -105,7 +105,7 @@ fun ModulePager(
                             )
                         }
                     }
-                } else null,
+                },
                 scrollBehavior = scrollBehavior
             )
         },
