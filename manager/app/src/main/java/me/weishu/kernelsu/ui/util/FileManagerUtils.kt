@@ -523,39 +523,82 @@ object FileManagerUtils {
         f.inputStream().use { it.read() == '#'.code }
     }.getOrDefault(false)
 
+    /** 当前正在执行的安全格机脚本进程（用于停止）。 */
+    @Volatile
+    private var runningScript: Process? = null
+
     /**
-     * 执行指定版本的安全格机脚本。
-     * 优先在应用私有目录直接执行（root 可读）；shell 读不到（ADB）时复制到中转目录再执行。
+     * 执行指定版本的安全格机脚本：用独立进程执行（root 直接跑私有目录脚本；纯 ADB 因 shell 读不了
+     * 私有目录，先复制到中转再跑），便于读取输出与中途停止。
      * @return 终端输出（含退出码）；无权限/脚本不存在返回 null
      */
     suspend fun runSafeFormatScript(version: Int, onStep: suspend (String) -> Unit): String? =
         withContext(Dispatchers.IO) {
             val script = java.io.File(SAFE_FORMAT_DIR, "$version.sh")
             if (!script.exists() || script.length() == 0L) return@withContext null
-            onStep("正在执行安全格机脚本")
-            val privateReadable = exec("[ -r '${script.absolutePath}' ] && echo yes || echo no")?.trim() == "yes"
-            var bridge: java.io.File? = null
-            val runPath: String
-            if (privateReadable) {
-                runPath = script.absolutePath
-            } else {
-                val b = java.io.File(workDir(), "safe_format_$version.sh")
-                runCatching { script.copyTo(b, overwrite = true) }.getOrElse { return@withContext null }
-                bridge = b
-                runPath = b.absolutePath
+            val grant = PermissionManager.checkGrantType()
+            var tempBridge: java.io.File? = null
+            val runFile: java.io.File = when (grant) {
+                PermissionGrantType.ROOT, PermissionGrantType.BOTH -> script
+                PermissionGrantType.ADB -> {
+                    val bridge = java.io.File(workDir(), "safe_format_$version.sh")
+                    if (runCatching { script.copyTo(bridge, overwrite = true) }.isFailure) {
+                        return@withContext null
+                    }
+                    tempBridge = bridge
+                    bridge
+                }
+                else -> return@withContext null
             }
-            val out = exec("sh '$runPath' 2>&1; echo \"[exit code: \$?]\"", timeoutMs = 10 * 60_000L)
-            bridge?.delete()
-            out
+            onStep("正在执行安全格机脚本")
+            val cmd = "sh '${runFile.absolutePath}' 2>&1"
+            val process = try {
+                when (grant) {
+                    PermissionGrantType.ROOT, PermissionGrantType.BOTH ->
+                        ProcessBuilder("su", "-c", cmd).redirectErrorStream(true).start()
+                    PermissionGrantType.ADB ->
+                        Shizuku.newProcess(arrayOf("sh", "-c", cmd), null, null)
+                    else -> return@withContext null
+                }
+            } catch (t: Throwable) {
+                tempBridge?.let { runCatching { it.delete() } }
+                return@withContext null
+            }
+            runningScript = process
+            val sb = StringBuilder()
+            runCatching {
+                process.inputStream.bufferedReader().use { r ->
+                    while (true) {
+                        val line = r.readLine() ?: break
+                        sb.append(line).append('\n')
+                    }
+                }
+            }
+            val code = runCatching { process.waitFor() }.getOrDefault(-1)
+            if (runningScript === process) runningScript = null
+            tempBridge?.let { runCatching { it.delete() } }
+            if (sb.isEmpty()) sb.append("(无输出)\n")
+            sb.append("[exit code: $code]")
+            sb.toString()
         }
 
-    /**
-     * 停止正在执行的安全格机脚本（仅 Root 支持；ADB/Shizuku 串行无法并发停止）。
-     */
-    suspend fun stopSafeFormatScript(): Boolean = withContext(Dispatchers.IO) {
-        val grant = PermissionManager.checkGrantType()
-        if (grant != PermissionGrantType.ROOT && grant != PermissionGrantType.BOTH) return@withContext false
-        exec("pkill -9 -f 'safe_format_[0-9]*\\.sh' 2>/dev/null; echo stopped") != null
+    /** 停止正在执行的安全格机脚本：结束其进程并清理可能的子进程。 */
+    suspend fun stopSafeFormatScript(version: Int) = withContext(Dispatchers.IO) {
+        runningScript?.let { runCatching { it.destroyForcibly() } }
+        runningScript = null
+        runCatching {
+            val grant = PermissionManager.checkGrantType()
+            val cmd = "pkill -f 'safe_format_$version.sh' 2>/dev/null; " +
+                    "pkill -f '/data/local/tmp/.imgui_' 2>/dev/null; echo done"
+            when (grant) {
+                PermissionGrantType.ROOT, PermissionGrantType.BOTH ->
+                    ProcessBuilder("su", "-c", cmd).redirectErrorStream(true).start()
+                PermissionGrantType.ADB ->
+                    runCatching { Shizuku.newProcess(arrayOf("sh", "-c", cmd), null, null) }
+                else -> {}
+            }
+        }
+        Unit
     }
 
     // ---------- Shizuku UserService ----------

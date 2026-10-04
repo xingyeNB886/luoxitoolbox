@@ -24,7 +24,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -234,23 +233,20 @@ fun SafeFormatScreen(
                             Spacer(Modifier.height(12.dp))
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.End,
-                                verticalAlignment = Alignment.CenterVertically
+                                horizontalArrangement = Arrangement.End
                             ) {
                                 TextButton(
                                     text = "停止",
                                     enabled = busyState.value,
                                     onClick = {
-                                        scope.launch {
-                                            val ok = FileManagerUtils.stopSafeFormatScript()
-                                            if (!ok) toast("当前权限无法停止（仅 Root 支持）")
-                                        }
+                                        val ver = localVersionState.value ?: 0
+                                        scope.launch { FileManagerUtils.stopSafeFormatScript(ver) }
                                     }
                                 )
                                 Spacer(Modifier.width(8.dp))
                                 TextButton(
                                     text = "执行",
-                                    enabled = !busyState.value,
+                                    enabled = !busyState.value && localVersionState.value != null,
                                     onClick = {
                                         val ver = localVersionState.value
                                         if (ver == null) {
