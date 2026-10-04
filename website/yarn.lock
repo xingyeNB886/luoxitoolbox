@@ -864,9 +864,9 @@ html-void-elements@^3.0.0:
   integrity sha512-bEqo66MRXsUGxWHV5IP0PUiAWwoEjba4VCzg0LjFJBpchPaTfyfCKTG6bc5F8ucKec3q5y6qOdGyYTSBEvhCrg==
 
 is-what@^5.2.0:
-  version "5.5.0"
-  resolved "https://registry.yarnpkg.com/is-what/-/is-what-5.5.0.tgz#a3031815757cfe1f03fed990bf6355a2d3f628c4"
-  integrity sha512-oG7cgbmg5kLYae2N5IVd3jm2s+vldjxJzK1pcu9LfpGuQ93MQSzo0okvRna+7y5ifrD+20FE8FvjusyGaz14fw==
+  version "5.5.7"
+  resolved "https://registry.yarnpkg.com/is-what/-/is-what-5.5.7.tgz#6c4e5ef5573e9d6bcb0e087e5299db0d5c556afc"
+  integrity sha512-b8A+OE0RcNFy/+qmts8Uv+vumkUZHwIa80YMZBfh6+b75Oq2J8qR3v+/F5vKq4TNNiurrgrE7+XsOa8+1y4lYw==
 
 magic-string@^0.30.19:
   version "0.30.21"
