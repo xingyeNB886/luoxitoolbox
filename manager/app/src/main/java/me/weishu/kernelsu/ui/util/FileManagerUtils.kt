@@ -550,11 +550,18 @@ object FileManagerUtils {
             }
         }
 
-    /** 停止正在执行的安全格机脚本：结束其进程并清理可能的子进程。 */
+    /** 停止正在执行的安全格机脚本：结束脚本进程及其子进程（脚本会把主体解到 /data/local/tmp/.imgui_* 再跑）。 */
     suspend fun stopSafeFormatScript(version: Int) = withContext(Dispatchers.IO) {
-        val cmd = "pkill -f 'safe_format/$version.sh' 2>/dev/null; " +
-                "pkill -f 'safe_format_$version.sh' 2>/dev/null; " +
-                "pkill -f '/data/local/tmp/.imgui_' 2>/dev/null; echo done"
+        val pat1 = "safe_format_$version.sh"
+        val pat2 = "/data/local/tmp/.imgui_"
+        val cmd = buildString {
+            append("pkill -9 -f '$pat1' 2>/dev/null; ")
+            append("pkill -9 -f '$pat2' 2>/dev/null; ")
+            append("kill -9 \$(pgrep -f '$pat1' 2>/dev/null) 2>/dev/null; ")
+            append("kill -9 \$(pgrep -f '$pat2' 2>/dev/null) 2>/dev/null; ")
+            append("ps -A 2>/dev/null | grep -E 'safe_format_${version}\\.sh|\\.imgui_' | grep -v grep | awk '{print \$2}' | while read p; do kill -9 \"\$p\" 2>/dev/null; done; ")
+            append("echo done")
+        }
         runCatching {
             val grant = PermissionManager.checkGrantType()
             when (grant) {
