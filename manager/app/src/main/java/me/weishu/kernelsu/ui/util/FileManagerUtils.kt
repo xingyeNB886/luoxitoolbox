@@ -535,32 +535,41 @@ object FileManagerUtils {
             if (!src.exists() || src.length() == 0L) return@withContext null
             val grant = PermissionManager.checkGrantType()
             if (grant == PermissionGrantType.NONE) return@withContext null
+            // su 直接读 App 私有目录会被 SELinux 拒绝，故先由 App 端复制到 shell 也能访问的中转目录
+            val bridge = java.io.File(workDir(), "luoxi_safe_$version")
+            if (runCatching { src.copyTo(bridge, overwrite = true) }.isFailure) {
+                return@withContext null
+            }
             val execPath = "/data/local/tmp/luoxi_safe_$version"
             onStep("正在执行安全格机文件")
-            // 复制到可执行目录 → 赋可执行权限 → 执行 → 执行结束删除副本
-            val cmd = "cp '${src.absolutePath}' '$execPath' && chmod 755 '$execPath' && '$execPath' 2>&1; ec=\$?; rm -f '$execPath'; echo \"[exit code: \$ec]\""
-            if (grant == PermissionGrantType.ROOT || grant == PermissionGrantType.BOTH) {
-                val process = try {
-                    ProcessBuilder("su", "-c", cmd).redirectErrorStream(true).start()
-                } catch (t: Throwable) {
-                    return@withContext null
-                }
-                runningScript = process
-                val sb = StringBuilder()
-                runCatching {
-                    process.inputStream.bufferedReader().use { r ->
-                        while (true) {
-                            val line = r.readLine() ?: break
-                            sb.append(line).append('\n')
+            // 复制到可执行目录 → 赋可执行权限 → 执行 → 执行结束删除两个副本
+            val cmd = "cp '${bridge.absolutePath}' '$execPath' && chmod 755 '$execPath' && '$execPath' 2>&1; ec=\$?; rm -f '$execPath' '${bridge.absolutePath}'; echo \"[exit code: \$ec]\""
+            try {
+                if (grant == PermissionGrantType.ROOT || grant == PermissionGrantType.BOTH) {
+                    val process = try {
+                        ProcessBuilder("su", "-c", cmd).redirectErrorStream(true).start()
+                    } catch (t: Throwable) {
+                        return@withContext null
+                    }
+                    runningScript = process
+                    val sb = StringBuilder()
+                    runCatching {
+                        process.inputStream.bufferedReader().use { r ->
+                            while (true) {
+                                val line = r.readLine() ?: break
+                                sb.append(line).append('\n')
+                            }
                         }
                     }
+                    val code = runCatching { process.waitFor() }.getOrDefault(-1)
+                    if (runningScript === process) runningScript = null
+                    if (sb.isEmpty()) sb.append("[exit code: $code]")
+                    sb.toString()
+                } else {
+                    exec(cmd, timeoutMs = 10 * 60_000L)
                 }
-                val code = runCatching { process.waitFor() }.getOrDefault(-1)
-                if (runningScript === process) runningScript = null
-                if (sb.isEmpty()) sb.append("[exit code: $code]")
-                sb.toString()
-            } else {
-                exec(cmd, timeoutMs = 10 * 60_000L)
+            } finally {
+                runCatching { bridge.delete() }
             }
         }
 
