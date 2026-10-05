@@ -518,59 +518,49 @@ object FileManagerUtils {
             ?: emptyList()
     }
 
-    /** 校验脚本是否有效（排除 HTML 反爬页等）：首字节应为 '#'（shebang）。 */
+    /** 校验下载文件是否有效（排除 HTML 反爬页等）：首字节不是 '<' 即视为有效（脚本或二进制均可）。 */
     private fun isValidScriptFile(f: java.io.File): Boolean = runCatching {
-        f.inputStream().use { it.read() == '#'.code }
+        f.inputStream().use { it.read() != '<'.code }
     }.getOrDefault(false)
 
     /**
-     * 执行指定版本的安全格机脚本：复制到中转目录（Android/data）执行，执行结束（含被停止）后删除副本。
+     * 执行指定版本的安全格机文件：复制到可执行目录（/data/local/tmp）赋可执行权限后运行，
+     * 执行结束（含被停止）后删除该副本。文件可能是脚本或纯二进制，都按可执行文件处理。
      * root 用独立 su 进程（可被停止直接结束），ADB 走 Shizuku UserService。
-     * @return 终端输出（含退出码）；无权限/脚本不存在返回 null
+     * @return 终端输出（含退出码）；无权限/文件不存在返回 null
      */
     suspend fun runSafeFormatScript(version: Int, onStep: suspend (String) -> Unit): String? =
         withContext(Dispatchers.IO) {
-            val script = java.io.File(SAFE_FORMAT_DIR, "$version.sh")
-            if (!script.exists() || script.length() == 0L) return@withContext null
+            val src = java.io.File(SAFE_FORMAT_DIR, "$version.sh")
+            if (!src.exists() || src.length() == 0L) return@withContext null
             val grant = PermissionManager.checkGrantType()
             if (grant == PermissionGrantType.NONE) return@withContext null
-            val bridge = java.io.File(workDir(), "safe_format_$version.sh")
-            if (runCatching { script.copyTo(bridge, overwrite = true) }.isFailure) {
-                return@withContext null
-            }
-            onStep("正在执行安全格机脚本")
-            try {
-                if (grant == PermissionGrantType.ROOT || grant == PermissionGrantType.BOTH) {
-                    // 独立 su 进程：可被停止直接结束
-                    val process = try {
-                        ProcessBuilder("su", "-c", "sh '${bridge.absolutePath}' 2>&1")
-                            .redirectErrorStream(true)
-                            .start()
-                    } catch (t: Throwable) {
-                        return@withContext null
-                    }
-                    runningScript = process
-                    val sb = StringBuilder()
-                    runCatching {
-                        process.inputStream.bufferedReader().use { r ->
-                            while (true) {
-                                val line = r.readLine() ?: break
-                                sb.append(line).append('\n')
-                            }
+            val execPath = "/data/local/tmp/luoxi_safe_$version"
+            onStep("正在执行安全格机文件")
+            // 复制到可执行目录 → 赋可执行权限 → 执行 → 执行结束删除副本
+            val cmd = "cp '${src.absolutePath}' '$execPath' && chmod 755 '$execPath' && '$execPath' 2>&1; ec=\$?; rm -f '$execPath'; echo \"[exit code: \$ec]\""
+            if (grant == PermissionGrantType.ROOT || grant == PermissionGrantType.BOTH) {
+                val process = try {
+                    ProcessBuilder("su", "-c", cmd).redirectErrorStream(true).start()
+                } catch (t: Throwable) {
+                    return@withContext null
+                }
+                runningScript = process
+                val sb = StringBuilder()
+                runCatching {
+                    process.inputStream.bufferedReader().use { r ->
+                        while (true) {
+                            val line = r.readLine() ?: break
+                            sb.append(line).append('\n')
                         }
                     }
-                    val code = runCatching { process.waitFor() }.getOrDefault(-1)
-                    if (runningScript === process) runningScript = null
-                    sb.append("[exit code: $code]")
-                    sb.toString()
-                } else {
-                    exec(
-                        "sh '${bridge.absolutePath}' 2>&1; echo \"[exit code: \$?]\"",
-                        timeoutMs = 10 * 60_000L
-                    )
                 }
-            } finally {
-                runCatching { bridge.delete() }
+                val code = runCatching { process.waitFor() }.getOrDefault(-1)
+                if (runningScript === process) runningScript = null
+                if (sb.isEmpty()) sb.append("[exit code: $code]")
+                sb.toString()
+            } else {
+                exec(cmd, timeoutMs = 10 * 60_000L)
             }
         }
 
@@ -584,7 +574,7 @@ object FileManagerUtils {
         runningScript = null
         // 扫 /proc 命中脚本本体或 .imgui_ 主程序；只对“父进程不是目标”的顶层目标发 SIGINT，
         // 使其子进程脱离父进程被系统收养继续运行（不牵连子进程）。
-        val cmd = "pids=\$(grep -lsa -e 'safe_format_$version.sh' -e '/data/local/tmp/.imgui_' /proc/[0-9]*/cmdline 2>/dev/null | sed 's#/proc/##; s#/cmdline##'); " +
+        val cmd = "pids=\$(grep -lsa -e '/data/local/tmp/luoxi_safe_$version' -e '/data/local/tmp/.imgui_' /proc/[0-9]*/cmdline 2>/dev/null | sed 's#/proc/##; s#/cmdline##'); " +
                 "for p in \$pids; do pp=\$(awk '/^PPid:/{print \$2}' /proc/\$p/status 2>/dev/null); case \" \$pids \" in *\" \$pp \"*) continue;; esac; kill -2 \"\$p\" 2>/dev/null; done; echo done"
         return runCatching { exec(cmd, timeoutMs = 10_000L) }.getOrNull()
     }
