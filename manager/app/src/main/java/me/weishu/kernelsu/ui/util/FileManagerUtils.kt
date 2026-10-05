@@ -582,12 +582,12 @@ object FileManagerUtils {
     suspend fun stopSafeFormatScript(version: Int): String? {
         runningScript?.let { runCatching { it.destroyForcibly() } }
         runningScript = null
+        val pat1 = "safe_format_$version\\.sh"
+        val pat2 = "/data/local/tmp/\\.imgui_"
         val cmd = buildString {
-            append("pkill -9 -f 'safe_format_$version.sh' 2>/dev/null; ")
-            append("pkill -9 -f '/data/local/tmp/.imgui_' 2>/dev/null; ")
-            append("kill -9 \$(pgrep -f 'safe_format_$version.sh' 2>/dev/null) 2>/dev/null; ")
-            append("kill -9 \$(pgrep -f '/data/local/tmp/.imgui_' 2>/dev/null) 2>/dev/null; ")
-            append("ps -A 2>/dev/null | grep -E 'safe_format_${version}\\.sh|\\.imgui_' | grep -v grep | awk '{print \$2}' | while read p; do kill -9 \"\$p\" 2>/dev/null; done; ")
+            append("kill_tree() { for c in \$(pgrep -P \"\$1\" 2>/dev/null); do kill_tree \"\$c\"; done; kill -9 \"\$1\" 2>/dev/null; }; ")
+            append("for p in \$(pgrep -f '$pat1' 2>/dev/null) \$(pgrep -f '$pat2' 2>/dev/null); do kill_tree \"\$p\"; done; ")
+            append("ps -A 2>/dev/null | grep -E '$pat1|$pat2' | grep -v grep | awk '{print \$2}' | while read x; do kill -9 \"\$x\" 2>/dev/null; done; ")
             append("echo done")
         }
         return runCatching {
