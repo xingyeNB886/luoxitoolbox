@@ -22,6 +22,7 @@ import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.DeleteForever
 import androidx.compose.material.icons.rounded.DeveloperMode
 import androidx.compose.material.icons.rounded.Fence
+import androidx.compose.material.icons.rounded.Image
 import androidx.compose.material.icons.rounded.FolderDelete
 import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.RemoveCircle
@@ -123,6 +124,52 @@ fun SettingPager(
             item {
                 val context = LocalContext.current
                 val prefs = context.getSharedPreferences("settings", Context.MODE_PRIVATE)
+
+                // 洛茜工具箱：更换背景图（选图 → 竖向裁剪 → 保存，应用全局）
+                var bgPickUri by remember { mutableStateOf<android.net.Uri?>(null) }
+                val bgPickLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+                    contract = androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia()
+                ) { uri -> if (uri != null) bgPickUri = uri }
+                Card(
+                    modifier = Modifier
+                        .padding(top = 12.dp)
+                        .fillMaxWidth(),
+                ) {
+                    SuperArrow(
+                        title = "更换背景图",
+                        summary = "从相册选图，裁剪为竖向背景并应用到全局",
+                        startAction = {
+                            Icon(
+                                Icons.Rounded.Image,
+                                modifier = Modifier.padding(end = 16.dp),
+                                contentDescription = "更换背景图",
+                                tint = colorScheme.onBackground
+                            )
+                        },
+                        onClick = {
+                            bgPickLauncher.launch(
+                                androidx.activity.result.PickVisualMediaRequest(
+                                    androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia.ImageOnly
+                                )
+                            )
+                        }
+                    )
+                }
+                bgPickUri?.let { pickUri ->
+                    me.weishu.kernelsu.ui.component.BackgroundCropDialog(
+                        uri = pickUri,
+                        onCropped = { bmp ->
+                            val ok = me.weishu.kernelsu.ui.util.BackgroundUtils.saveBackground(context, bmp)
+                            bgPickUri = null
+                            android.widget.Toast.makeText(
+                                context,
+                                if (ok) "背景已更新" else "保存失败",
+                                android.widget.Toast.LENGTH_SHORT
+                            ).show()
+                        },
+                        onDismiss = { bgPickUri = null }
+                    )
+                }
 
                 // 检查更新开关已移除：更新检查在代码层始终开启，不提供关闭入口
                 KsuIsValid {
@@ -254,43 +301,6 @@ fun SettingPager(
                             }
                         )
                     }
-                }
-
-                // 洛茜工具箱：语言选择卡片（和主题样式一致）
-                Card(
-                    modifier = Modifier
-                        .padding(top = 12.dp)
-                        .fillMaxWidth(),
-                ) {
-                    val languageItems = listOf(
-                        "简体中文",
-                        "狐娘语",
-                        "猫娘语",
-                    )
-                    var languageMode by rememberSaveable {
-                        mutableIntStateOf(prefs.getInt("language_mode", 0))
-                    }
-                    SuperDropdown(
-                        title = stringResource(id = R.string.settings_language),
-                        summary = stringResource(id = R.string.settings_language_summary),
-                        items = languageItems,
-                        startAction = {
-                            Icon(
-                                Icons.Rounded.Translate,
-                                modifier = Modifier.padding(end = 16.dp),
-                                contentDescription = stringResource(id = R.string.settings_language),
-                                tint = colorScheme.onBackground
-                            )
-                        },
-                        selectedIndex = languageMode,
-                        onSelectedIndexChange = { index ->
-                            prefs.edit { putInt("language_mode", index) }
-                            languageMode = index
-                            // 立即 recreate 使语言生效
-                            val act = context as? android.app.Activity
-                            act?.recreate()
-                        }
-                    )
                 }
 
                 KsuIsValid {

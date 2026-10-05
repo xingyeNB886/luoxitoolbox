@@ -190,8 +190,7 @@
     <string name="group_contains_apps">Contains %d apps</string>
     <string name="settings_theme">Theme</string>
     <string name="settings_theme_summary">Choose the app theme mode.</string>
-    <string name="settings_language">Language</string>
-    <string name="settings_language_summary">Choose the app language. Takes effect immediately and persists.</string>
+    <string name="bg_crop_guide">Crop frame follows this device\'s portrait ratio %s; drag inside to move, corners to scale</string>
     <string name="settings_theme_mode_system">Follow system</string>
     <string name="settings_theme_mode_light">Light</string>
     <string name="settings_theme_mode_dark">Dark</string>

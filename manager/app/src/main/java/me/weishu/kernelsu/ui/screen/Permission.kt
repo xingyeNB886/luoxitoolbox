@@ -302,8 +302,8 @@ fun PermissionScreen() {
                         }
                     )
 
-                    // Shizuku 安装卡片
-                    ShizukuInstallCard(scope = scope)
+                    // Stellar 安装卡片
+                    StellarInstallCard(scope = scope)
 
                     if (grantType == PermissionGrantType.BOTH) {
                         Card(
@@ -331,16 +331,16 @@ fun PermissionScreen() {
 }
 
 /**
- * Shizuku 安装卡片
+ * Stellar 安装卡片
  *
- * 主标题：没有安装 Shizuku？
- * 副标题：Shizuku 可提供 ADB 级权限，无需 Root 即可使用本工具全部功能。
- * 按钮：安装 Shizuku —— 从内置 assets/shizuku.apk 拷贝到应用缓存后触发系统安装。
+ * 主标题：没有安装 Stellar？
+ * 副标题：Stellar 可提供 ADB 级权限，无需 Root 即可使用本工具全部功能。
+ * 按钮：安装 Stellar —— 从内置 assets/stellar.apk 拷贝到应用缓存后触发系统安装。
  * 首次安装可能需要授予"安装未知应用"权限。
  * 卡片样式与功能区一致。
  */
 @Composable
-private fun ShizukuInstallCard(scope: kotlinx.coroutines.CoroutineScope) {
+private fun StellarInstallCard(scope: kotlinx.coroutines.CoroutineScope) {
     val context = LocalContext.current
     var installing by remember { mutableStateOf(false) }
 
@@ -353,14 +353,14 @@ private fun ShizukuInstallCard(scope: kotlinx.coroutines.CoroutineScope) {
                 .padding(18.dp)
         ) {
             Text(
-                text = stringResource(R.string.permission_shizuku_install_title),
+                text = "没有安装 Stellar？",
                 fontSize = 18.sp,
                 fontWeight = FontWeight.Medium,
                 color = colorScheme.onSurface
             )
             Spacer(Modifier.height(8.dp))
             Text(
-                text = stringResource(R.string.permission_shizuku_install_summary),
+                text = "Stellar 可提供 ADB 级权限，无需 Root 即可使用本工具全部功能。",
                 fontSize = 14.sp,
                 color = colorScheme.onSurfaceVariantSummary
             )
@@ -370,15 +370,15 @@ private fun ShizukuInstallCard(scope: kotlinx.coroutines.CoroutineScope) {
                 horizontalArrangement = Arrangement.End
             ) {
                 TextButton(
-                    text = if (installing) stringResource(R.string.preparing) else stringResource(R.string.install_shizuku),
+                    text = if (installing) stringResource(R.string.preparing) else "安装 Stellar",
                     enabled = !installing,
                     onClick = {
                         scope.launch(Dispatchers.IO) {
                             installing = true
                             try {
-                                // 从内置 assets 读取 Shizuku APK，写入应用缓存目录后触发安装
-                                val apkFile = File(context.cacheDir, "shizuku.apk")
-                                context.assets.open("shizuku.apk").use { input ->
+                                // 从内置 assets 读取 Stellar APK，写入应用缓存目录后触发安装
+                                val apkFile = File(context.cacheDir, "stellar.apk")
+                                context.assets.open("stellar.apk").use { input ->
                                     apkFile.outputStream().use { output -> input.copyTo(output) }
                                 }
                                 withContext(Dispatchers.Main) {

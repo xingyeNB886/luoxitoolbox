@@ -167,6 +167,20 @@ fun SafeFormatScreen(
                                 horizontalArrangement = Arrangement.End
                             ) {
                                 TextButton(
+                                    text = "下载最新版本",
+                                    enabled = !busyState.value,
+                                    onClick = {
+                                        if (busyState.value) return@TextButton
+                                        val url = cloudState.value.safeFormatUrl
+                                        if (url.isBlank() || cloudState.value.safeFormatVersion <= 0) {
+                                            toast("未获取到安全格机下载信息")
+                                        } else {
+                                            doDownload()
+                                        }
+                                    }
+                                )
+                                Spacer(Modifier.width(8.dp))
+                                TextButton(
                                     text = when {
                                         busyState.value -> "处理中…"
                                         localVersionState.value == null -> "下载"

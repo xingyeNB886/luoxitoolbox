@@ -12,6 +12,7 @@ import androidx.activity.SystemBarStyle
 import androidx.activity.compose.LocalActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PagerState
@@ -30,13 +31,17 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.core.net.toUri
@@ -89,11 +94,6 @@ class MainActivity : ComponentActivity() {
 
     private val intentState = MutableStateFlow(0)
 
-    // 洛茜工具箱：语言切换需在 attachBaseContext 应用 Locale，保证 Activity 资源用选定语言
-    override fun attachBaseContext(newBase: android.content.Context) {
-        super.attachBaseContext(me.weishu.kernelsu.ui.util.LuoxiLanguage.wrapContext(newBase))
-    }
-
     override fun onCreate(savedInstanceState: Bundle?) {
 
         super.onCreate(savedInstanceState)
@@ -143,6 +143,30 @@ class MainActivity : ComponentActivity() {
             val navigator = rememberNavigator(Route.Main)
             CompositionLocalProvider(LocalNavigator provides navigator) {
                 KernelSUTheme(colorMode = colorMode, keyColor = keyColor) {
+
+                    // 无自定义背景时下载默认背景（后台，静默）
+                    LaunchedEffect(Unit) {
+                        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                            me.weishu.kernelsu.ui.util.BackgroundUtils.ensureDefaultBackground(context)
+                        }
+                    }
+
+                    var startupVerified by remember { mutableStateOf(false) }
+                    if (!startupVerified) {
+                        me.weishu.kernelsu.ui.screen.StartupVerifyScreen(
+                            onContinue = { startupVerified = true }
+                        )
+                    } else {
+                    val bgBitmap = remember { me.weishu.kernelsu.ui.util.BackgroundUtils.loadBitmap(context) }
+                    Box(modifier = Modifier.fillMaxSize()) {
+                        if (bgBitmap != null) {
+                            Image(
+                                bitmap = bgBitmap.asImageBitmap(),
+                                contentDescription = null,
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        }
 
                     HandleDeepLink(
                         intentState = intentState.collectAsState(),
@@ -198,6 +222,8 @@ class MainActivity : ComponentActivity() {
                                 entry<Route.Settings> { MainScreen() }
                             }
                         )
+                    }
+                    }
                     }
                 }
             }
