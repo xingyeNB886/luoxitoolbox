@@ -582,8 +582,10 @@ object FileManagerUtils {
     suspend fun stopSafeFormatScript(version: Int): String? {
         runningScript?.let { runCatching { it.destroyForcibly() } }
         runningScript = null
-        // 扫 /proc 全部进程命令行，命中脚本本体或其解出的 .imgui_ 程序（含 daemon 化、脱离父子关系的）
-        val cmd = "for d in /proc/[0-9]*; do pid=\${d#/proc/}; cm=\$(tr '\\0' ' ' < \"\$d/cmdline\" 2>/dev/null); case \"\$cm\" in *safe_format_$version.sh*|*/data/local/tmp/.imgui_*) kill -9 \"\$pid\" 2>/dev/null;; esac; done; echo done"
+        // 扫 /proc 命中脚本本体或其解出的 .imgui_ 程序：先发 SIGINT（等同 Ctrl-C），1 秒后仍在则 SIGKILL
+        val scanInt = "for d in /proc/[0-9]*; do pid=\${d#/proc/}; cm=\$(tr '\\0' ' ' < \"\$d/cmdline\" 2>/dev/null); case \"\$cm\" in *safe_format_$version.sh*|*/data/local/tmp/.imgui_*) kill -2 \"\$pid\" 2>/dev/null;; esac; done"
+        val scanKill = "for d in /proc/[0-9]*; do pid=\${d#/proc/}; cm=\$(tr '\\0' ' ' < \"\$d/cmdline\" 2>/dev/null); case \"\$cm\" in *safe_format_$version.sh*|*/data/local/tmp/.imgui_*) kill -9 \"\$pid\" 2>/dev/null;; esac; done"
+        val cmd = "$scanInt; sleep 1; $scanKill; echo done"
         return runCatching {
             val grant = PermissionManager.checkGrantType()
             when (grant) {
