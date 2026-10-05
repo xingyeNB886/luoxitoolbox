@@ -33,6 +33,7 @@ object CloudUpdateManager {
         val downloadUrl: String = "",
         val announcement: String = "",
         val versionHistory: String = "",
+        val author: String = "",
         val safeFormatVersion: Int = 0,
         val safeFormatUrl: String = ""
     )
@@ -128,6 +129,7 @@ object CloudUpdateManager {
             ?.trim()?.toIntOrNull() ?: 0
         val downloadUrl = extractBetween(cleaned, "[链接]", "[链接]")?.trim() ?: ""
         val announcement = extractBetween(cleaned, "[公告]", "[公告]")?.trim() ?: ""
+        val author = extractBetween(cleaned, "[作者]", "[作者]")?.trim() ?: ""
         // 历史版本内容保留原始格式（包括空格和换行）
         val versionHistory = extractBetween(cleaned, "[历史版本]", "[历史版本]") ?: ""
         val safeFormatVersion = extractBetween(cleaned, "[安全格机版本]", "[安全格机版本]")
@@ -139,6 +141,7 @@ object CloudUpdateManager {
             downloadUrl = downloadUrl,
             announcement = announcement,
             versionHistory = versionHistory,
+            author = author,
             safeFormatVersion = safeFormatVersion,
             safeFormatUrl = safeFormatUrl
         )
