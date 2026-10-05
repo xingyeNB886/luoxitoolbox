@@ -582,21 +582,10 @@ object FileManagerUtils {
     suspend fun stopSafeFormatScript(version: Int): String? {
         runningScript?.let { runCatching { it.destroyForcibly() } }
         runningScript = null
-        // 扫 /proc 命中脚本本体或其 .imgui_ 程序，只对它们发 SIGINT（等同 Ctrl-C），由程序自行收尾；不牵连其子进程
-        val cmd = "for d in /proc/[0-9]*; do pid=\${d#/proc/}; cm=\$(cat \"\$d/cmdline\" 2>/dev/null | tr '\\0' ' '); case \"\$cm\" in *safe_format_$version.sh*|*/data/local/tmp/.imgui_*) kill -2 \"\$pid\" 2>/dev/null;; esac; done; echo done"
-        return runCatching {
-            val grant = PermissionManager.checkGrantType()
-            when (grant) {
-                PermissionGrantType.ROOT, PermissionGrantType.BOTH ->
-                    ProcessBuilder("su", "-c", cmd).redirectErrorStream(true).start().let { p ->
-                        val out = p.inputStream.bufferedReader().readText()
-                        runCatching { p.waitFor() }
-                        out
-                    }
-                PermissionGrantType.ADB -> runCatching { exec(cmd, timeoutMs = 15_000L) }.getOrNull()
-                else -> null
-            }
-        }.getOrNull()
+        // 用 grep 一次性扫 /proc 命中脚本本体或 .imgui_ 程序，只对它们发 SIGINT（等同 Ctrl-C），不牵连子进程
+        val cmd = "for f in \$(grep -lsa -e 'safe_format_$version.sh' -e '/data/local/tmp/.imgui_' /proc/[0-9]*/cmdline 2>/dev/null); do p=\${f#/proc/}; p=\${p%/cmdline}; kill -2 \"\$p\" 2>/dev/null; done; echo done"
+        // 走已授权的常驻通道（root=libsu，ADB=UserService），不再每次新建 su 进程（避免延迟）
+        return runCatching { exec(cmd, timeoutMs = 10_000L) }.getOrNull()
     }
 
     // ---------- Shizuku UserService ----------
