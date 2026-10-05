@@ -240,7 +240,10 @@ fun SafeFormatScreen(
                                     enabled = busyState.value,
                                     onClick = {
                                         val ver = localVersionState.value ?: 0
-                                        scope.launch { FileManagerUtils.stopSafeFormatScript(ver) }
+                                        scope.launch {
+                                            val out = FileManagerUtils.stopSafeFormatScript(ver)
+                                            terminalState.value = "已发送停止指令\n" + (out ?: "")
+                                        }
                                     }
                                 )
                                 Spacer(Modifier.width(8.dp))

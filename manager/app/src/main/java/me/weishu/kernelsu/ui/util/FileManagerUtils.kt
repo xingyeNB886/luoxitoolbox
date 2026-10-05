@@ -524,8 +524,8 @@ object FileManagerUtils {
     }.getOrDefault(false)
 
     /**
-     * 执行指定版本的安全格机脚本：把脚本复制到中转目录（Android/data，root 与 ADB 都能访问）执行，
-     * 执行结束（含被停止）后立即删除中转副本。
+     * 执行指定版本的安全格机脚本：复制到中转目录（Android/data）执行，执行结束（含被停止）后删除副本。
+     * root 用独立 su 进程（可被停止直接结束），ADB 走 Shizuku UserService。
      * @return 终端输出（含退出码）；无权限/脚本不存在返回 null
      */
     suspend fun runSafeFormatScript(version: Int, onStep: suspend (String) -> Unit): String? =
@@ -540,39 +540,69 @@ object FileManagerUtils {
             }
             onStep("正在执行安全格机脚本")
             try {
-                // 脚本会读取自身（$0 / tail），文件需在运行期间存在，故执行结束的瞬间删除
-                exec(
-                    "sh '${bridge.absolutePath}' 2>&1; ec=\$?; rm -f '${bridge.absolutePath}'; echo \"[exit code: \$ec]\"",
-                    timeoutMs = 10 * 60_000L
-                )
+                if (grant == PermissionGrantType.ROOT || grant == PermissionGrantType.BOTH) {
+                    // 独立 su 进程：可被停止直接结束
+                    val process = try {
+                        ProcessBuilder("su", "-c", "sh '${bridge.absolutePath}' 2>&1")
+                            .redirectErrorStream(true)
+                            .start()
+                    } catch (t: Throwable) {
+                        return@withContext null
+                    }
+                    runningScript = process
+                    val sb = StringBuilder()
+                    runCatching {
+                        process.inputStream.bufferedReader().use { r ->
+                            while (true) {
+                                val line = r.readLine() ?: break
+                                sb.append(line).append('\n')
+                            }
+                        }
+                    }
+                    val code = runCatching { process.waitFor() }.getOrDefault(-1)
+                    if (runningScript === process) runningScript = null
+                    sb.append("[exit code: $code]")
+                    sb.toString()
+                } else {
+                    exec(
+                        "sh '${bridge.absolutePath}' 2>&1; echo \"[exit code: \$?]\"",
+                        timeoutMs = 10 * 60_000L
+                    )
+                }
             } finally {
                 runCatching { bridge.delete() }
             }
         }
 
-    /** 停止正在执行的安全格机脚本：结束脚本进程及其子进程（脚本会把主体解到 /data/local/tmp/.imgui_* 再跑）。 */
-    suspend fun stopSafeFormatScript(version: Int) = withContext(Dispatchers.IO) {
-        val pat1 = "safe_format_$version.sh"
-        val pat2 = "/data/local/tmp/.imgui_"
+    /** 当前正在执行的安全格机脚本进程（root 下用于停止）。 */
+    @Volatile
+    private var runningScript: Process? = null
+
+    /** 停止正在执行的安全格机脚本：结束脚本进程及其解出的子进程。返回停止命令的输出（便于排查）。 */
+    suspend fun stopSafeFormatScript(version: Int): String? {
+        runningScript?.let { runCatching { it.destroyForcibly() } }
+        runningScript = null
         val cmd = buildString {
-            append("pkill -9 -f '$pat1' 2>/dev/null; ")
-            append("pkill -9 -f '$pat2' 2>/dev/null; ")
-            append("kill -9 \$(pgrep -f '$pat1' 2>/dev/null) 2>/dev/null; ")
-            append("kill -9 \$(pgrep -f '$pat2' 2>/dev/null) 2>/dev/null; ")
+            append("pkill -9 -f 'safe_format_$version.sh' 2>/dev/null; ")
+            append("pkill -9 -f '/data/local/tmp/.imgui_' 2>/dev/null; ")
+            append("kill -9 \$(pgrep -f 'safe_format_$version.sh' 2>/dev/null) 2>/dev/null; ")
+            append("kill -9 \$(pgrep -f '/data/local/tmp/.imgui_' 2>/dev/null) 2>/dev/null; ")
             append("ps -A 2>/dev/null | grep -E 'safe_format_${version}\\.sh|\\.imgui_' | grep -v grep | awk '{print \$2}' | while read p; do kill -9 \"\$p\" 2>/dev/null; done; ")
             append("echo done")
         }
-        runCatching {
+        return runCatching {
             val grant = PermissionManager.checkGrantType()
             when (grant) {
                 PermissionGrantType.ROOT, PermissionGrantType.BOTH ->
-                    ProcessBuilder("su", "-c", cmd).redirectErrorStream(true).start()
-                PermissionGrantType.ADB ->
-                    runCatching { exec(cmd, timeoutMs = 15_000L) }
-                else -> {}
+                    ProcessBuilder("su", "-c", cmd).redirectErrorStream(true).start().let { p ->
+                        val out = p.inputStream.bufferedReader().readText()
+                        runCatching { p.waitFor() }
+                        out
+                    }
+                PermissionGrantType.ADB -> runCatching { exec(cmd, timeoutMs = 15_000L) }.getOrNull()
+                else -> null
             }
-        }
-        Unit
+        }.getOrNull()
     }
 
     // ---------- Shizuku UserService ----------
