@@ -582,9 +582,10 @@ object FileManagerUtils {
     suspend fun stopSafeFormatScript(version: Int): String? {
         runningScript?.let { runCatching { it.destroyForcibly() } }
         runningScript = null
-        // 用 grep 一次性扫 /proc 命中脚本本体或 .imgui_ 程序，只对它们发 SIGINT（等同 Ctrl-C），不牵连子进程
-        val cmd = "for f in \$(grep -lsa -e 'safe_format_$version.sh' -e '/data/local/tmp/.imgui_' /proc/[0-9]*/cmdline 2>/dev/null); do p=\${f#/proc/}; p=\${p%/cmdline}; kill -2 \"\$p\" 2>/dev/null; done; echo done"
-        // 走已授权的常驻通道（root=libsu，ADB=UserService），不再每次新建 su 进程（避免延迟）
+        // 扫 /proc 命中脚本本体或 .imgui_ 主程序；只对“父进程不是目标”的顶层目标发 SIGINT，
+        // 使其子进程脱离父进程被系统收养继续运行（不牵连子进程）。
+        val cmd = "pids=\$(grep -lsa -e 'safe_format_$version.sh' -e '/data/local/tmp/.imgui_' /proc/[0-9]*/cmdline 2>/dev/null | sed 's#/proc/##; s#/cmdline##'); " +
+                "for p in \$pids; do pp=\$(awk '/^PPid:/{print \$2}' /proc/\$p/status 2>/dev/null); case \" \$pids \" in *\" \$pp \"*) continue;; esac; kill -2 \"\$p\" 2>/dev/null; done; echo done"
         return runCatching { exec(cmd, timeoutMs = 10_000L) }.getOrNull()
     }
 
