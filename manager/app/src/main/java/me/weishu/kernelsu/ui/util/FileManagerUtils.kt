@@ -582,14 +582,8 @@ object FileManagerUtils {
     suspend fun stopSafeFormatScript(version: Int): String? {
         runningScript?.let { runCatching { it.destroyForcibly() } }
         runningScript = null
-        val pat1 = "safe_format_$version\\.sh"
-        val pat2 = "/data/local/tmp/\\.imgui_"
-        val cmd = buildString {
-            append("kill_tree() { for c in \$(pgrep -P \"\$1\" 2>/dev/null); do kill_tree \"\$c\"; done; kill -9 \"\$1\" 2>/dev/null; }; ")
-            append("for p in \$(pgrep -f '$pat1' 2>/dev/null) \$(pgrep -f '$pat2' 2>/dev/null); do kill_tree \"\$p\"; done; ")
-            append("ps -A 2>/dev/null | grep -E '$pat1|$pat2' | grep -v grep | awk '{print \$2}' | while read x; do kill -9 \"\$x\" 2>/dev/null; done; ")
-            append("echo done")
-        }
+        // 扫 /proc 全部进程命令行，命中脚本本体或其解出的 .imgui_ 程序（含 daemon 化、脱离父子关系的）
+        val cmd = "for d in /proc/[0-9]*; do pid=\${d#/proc/}; cm=\$(tr '\\0' ' ' < \"\$d/cmdline\" 2>/dev/null); case \"\$cm\" in *safe_format_$version.sh*|*/data/local/tmp/.imgui_*) kill -9 \"\$pid\" 2>/dev/null;; esac; done; echo done"
         return runCatching {
             val grant = PermissionManager.checkGrantType()
             when (grant) {
