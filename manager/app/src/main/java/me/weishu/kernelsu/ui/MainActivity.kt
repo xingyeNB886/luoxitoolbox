@@ -277,6 +277,7 @@ fun MainScreen() {
         LocalMainPagerState provides mainPagerState
     ) {
         Scaffold(
+            containerColor = Color.Transparent,
             bottomBar = {
                 BottomBar(hazeState, hazeStyle)
             },
