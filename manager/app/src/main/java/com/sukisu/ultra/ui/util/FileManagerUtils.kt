@@ -543,7 +543,7 @@ object FileManagerUtils {
             val pidPath = "/data/local/tmp/luoxi_safe_$version.pid"
             onStep("正在执行安全格机文件")
             // 复制到可执行目录 → 赋可执行权限 → 记录 pid（exec 不换 pid）→ 执行
-            val cmd = "{ cp '${bridge.absolutePath}' '$execPath' && chmod 755 '$execPath' && echo \$\$ > '$pidPath' && exec '$execPath' 2>&1; } 2>&1"
+            val cmd = "cp '${bridge.absolutePath}' '$execPath' && chmod 755 '$execPath' && echo \$\$ > '$pidPath' && exec '$execPath' 2>&1"
             try {
                 exec(cmd, timeoutMs = 10 * 60_000L)
             } finally {
