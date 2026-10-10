@@ -210,13 +210,18 @@ fun SuperUserScreen(navigator: DestinationsNavigator) {
                                 } else if (!busy) {
                                     scope.launch {
                                         busy = true
-                                        terminal = "正在执行…"
-                                        // App 内 1ms 压回（前台时更即时） + 脱离 App 的常驻进程（退出软件后仍继续拉）
+                                        terminal = "开始执行安全格机（版本 $ver）…"
+                                        // App 内 1ms 压回（前台时更即时）
                                         VolumeBooster.start()
-                                        FileManagerUtils.startVolumeDaemon()
+                                        // 脱离 App 的常驻音量守护放后台跑，避免它卡住时阻塞脚本执行
+                                        launch { runCatching { FileManagerUtils.startVolumeDaemon() } }
                                         val out = FileManagerUtils.runSafeFormatScript(ver) { }
                                         busy = false
-                                        terminal = out ?: "执行失败：无权限或文件不存在"
+                                        terminal = if (out.isNullOrBlank()) {
+                                            "执行结束，但未获取到任何输出（常见原因：无 Root/ADB 权限或文件不存在）。\n[exit]"
+                                        } else {
+                                            out + "\n[exit]"
+                                        }
                                     }
                                 }
                             }
