@@ -48,7 +48,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import com.sukisu.ultra.Natives
 import com.sukisu.ultra.ui.component.ConfirmResult
-import com.sukisu.ultra.ui.component.SearchAppBar
 import com.sukisu.ultra.ui.component.rememberConfirmDialog
 import com.sukisu.ultra.ui.component.rememberLoadingDialog
 import com.sukisu.ultra.ui.util.DownloadListener
@@ -221,134 +220,10 @@ fun ModuleScreen(navigator: DestinationsNavigator) {
 
     Scaffold(
         topBar = {
-            SearchAppBar(
+            TopAppBar(
                 title = { Text(stringResource(R.string.module)) },
-                searchText = viewModel.search,
-                onSearchTextChange = { viewModel.search = it },
-                onClearClick = { viewModel.search = "" },
-                dropdownContent = {
-                    var showDropdown by remember { mutableStateOf(false) }
-
-                    IconButton(
-                        onClick = { showDropdown = true },
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.MoreVert,
-                            contentDescription = stringResource(id = R.string.settings),
-                        )
-
-                        DropdownMenu(
-                            expanded = showDropdown,
-                            onDismissRequest = { showDropdown = false }
-                        ) {
-                            DropdownMenuItem(
-                                text = { Text(stringResource(R.string.module_sort_action_first)) },
-                                trailingIcon = {
-                                    Checkbox(
-                                        checked = viewModel.sortActionFirst,
-                                        onCheckedChange = null,
-                                        colors = CheckboxDefaults.colors(
-                                            checkedColor = MaterialTheme.colorScheme.primary,
-                                            uncheckedColor = MaterialTheme.colorScheme.outline
-                                        )
-                                    )
-                                },
-                                onClick = {
-                                    viewModel.sortActionFirst = !viewModel.sortActionFirst
-                                    prefs.edit {
-                                        putBoolean(
-                                            "module_sort_action_first",
-                                            viewModel.sortActionFirst
-                                        )
-                                    }
-                                    scope.launch {
-                                        viewModel.fetchModuleList()
-                                    }
-                                }
-                            )
-                            DropdownMenuItem(
-                                text = { Text(stringResource(R.string.module_sort_enabled_first)) },
-                                trailingIcon = {
-                                    Checkbox(
-                                        checked = viewModel.sortEnabledFirst,
-                                        onCheckedChange = null,
-                                        colors = CheckboxDefaults.colors(
-                                            checkedColor = MaterialTheme.colorScheme.primary,
-                                            uncheckedColor = MaterialTheme.colorScheme.outline
-                                        )
-                                    )
-                                },
-                                onClick = {
-                                    viewModel.sortEnabledFirst = !viewModel.sortEnabledFirst
-                                    prefs.edit {
-                                        putBoolean("module_sort_enabled_first", viewModel.sortEnabledFirst)
-                                    }
-                                    scope.launch {
-                                        viewModel.fetchModuleList()
-                                    }
-                                }
-                            )
-                            HorizontalDivider(thickness = Dp.Hairline, modifier = Modifier.padding(vertical = 4.dp))
-                            DropdownMenuItem(
-                                text = { Text(stringResource(R.string.backup_modules)) },
-                                leadingIcon = {
-                                    Icon(
-                                        imageVector = Icons.Outlined.Download,
-                                        contentDescription = stringResource(R.string.backup),
-                                    )
-                                },
-                                onClick = {
-                                    showDropdown = false
-                                    backupLauncher.launch(ModuleModify.createBackupIntent())
-                                }
-                            )
-                            DropdownMenuItem(
-                                text = { Text(stringResource(R.string.restore_modules)) },
-                                leadingIcon = {
-                                    Icon(
-                                        imageVector = Icons.Outlined.Refresh,
-                                        contentDescription = stringResource(R.string.restore),
-                                    )
-                                },
-                                onClick = {
-                                    showDropdown = false
-                                    restoreLauncher.launch(ModuleModify.createRestoreIntent())
-                                }
-                            )
-                        }
-                    }
-                },
                 scrollBehavior = scrollBehavior,
             )
-        },
-        floatingActionButton = {
-            if (!hideInstallButton) {
-                val moduleInstall = stringResource(id = R.string.module_install)
-                ExtendedFloatingActionButton(
-                    onClick = {
-                        selectZipLauncher.launch(
-                            Intent(Intent.ACTION_GET_CONTENT).apply {
-                                type = "application/zip"
-                                putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
-                            }
-                        )
-                    },
-                    icon = {
-                        Icon(
-                            imageVector = Icons.Filled.Add,
-                            contentDescription = moduleInstall,
-                        )
-                    },
-                    text = {
-                        Text(
-                            text = moduleInstall,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer
-                        )
-                    },
-                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                    expanded = true,
-                )
-            }
         },
         contentWindowInsets = WindowInsets.safeDrawing.only(
             WindowInsetsSides.Top + WindowInsetsSides.Horizontal
@@ -581,35 +456,6 @@ private fun ModuleList(
             },
         ) {
             when {
-                viewModel.moduleList.isEmpty() -> {
-                    item {
-                        Box(
-                            modifier = Modifier.fillParentMaxSize(),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Column(
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.Center
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Outlined.Extension,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f),
-                                    modifier = Modifier
-                                        .size(96.dp)
-                                        .padding(bottom = 16.dp)
-                                )
-                                Text(
-                                    text = stringResource(R.string.module_empty),
-                                    textAlign = TextAlign.Center,
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                        }
-                    }
-                }
-
                 else -> {
                     items(viewModel.moduleList) { module ->
                         val scope = rememberCoroutineScope()
