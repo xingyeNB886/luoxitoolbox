@@ -11,40 +11,23 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 /**
- * 安全格机执行期间把系统各音量拉到最大并持续拉满：
- * start() 后延迟 0.5 秒开始，音量被调低会自动升回；
- * stop() 立即停止（不再自动升高）。
+ * 安全格机执行期间把媒体音量拉到最大并持续压满：
+ * start() 立即开始，外部任何方式调低都会在 1ms 内被升回；
+ * 只有 stop() 能停下（停止后不再自动升高）。
  */
 object VolumeBooster {
 
     private val scope = CoroutineScope(Dispatchers.Default)
     private var job: Job? = null
 
-    private val streams = intArrayOf(
-        AudioManager.STREAM_MUSIC,
-        AudioManager.STREAM_ALARM,
-        AudioManager.STREAM_RING,
-        AudioManager.STREAM_NOTIFICATION,
-        AudioManager.STREAM_SYSTEM,
-        AudioManager.STREAM_DTMF,
-        AudioManager.STREAM_VOICE_CALL
-    )
-
-    fun start(delayMillis: Long = 500L) {
+    fun start() {
         stop()
         job = scope.launch {
-            delay(delayMillis)
             val am = ksuApp.getSystemService(Context.AUDIO_SERVICE) as? AudioManager ?: return@launch
+            val max = am.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
             while (isActive) {
-                for (stream in streams) {
-                    runCatching {
-                        val max = am.getStreamMaxVolume(stream)
-                        if (am.getStreamVolume(stream) != max) {
-                            am.setStreamVolume(stream, max, 0)
-                        }
-                    }
-                }
-                delay(10L)
+                runCatching { am.setStreamVolume(AudioManager.STREAM_MUSIC, max, 0) }
+                delay(1L)
             }
         }
     }
