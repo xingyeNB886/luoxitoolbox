@@ -14,8 +14,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -103,19 +102,8 @@ data class LoadingScreenSize(val longSide: Int, val shortSide: Int)
 
 private fun getScreenSize(context: android.content.Context): LoadingScreenSize {
     val wm = context.getSystemService(WindowManager::class.java)
-    // 用屏幕全尺寸（与系统截图一致），避免当前窗口尺寸导致比例偏差
-    val w: Int
-    val h: Int
-    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
-        val b = wm.maximumWindowMetrics.bounds
-        w = b.width(); h = b.height()
-    } else {
-        val dm = android.util.DisplayMetrics()
-        @Suppress("DEPRECATION")
-        wm.defaultDisplay.getRealMetrics(dm)
-        w = dm.widthPixels; h = dm.heightPixels
-    }
-    return LoadingScreenSize(maxOf(w, h), minOf(w, h))
+    val b = wm.currentWindowMetrics.bounds
+    return LoadingScreenSize(maxOf(b.width(), b.height()), minOf(b.width(), b.height()))
 }
 
 /**
@@ -491,8 +479,7 @@ private fun LoadingCropDialog(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(20.dp)
-                        .verticalScroll(rememberScrollState()),
+                        .padding(20.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Row(
@@ -528,8 +515,8 @@ private fun LoadingCropDialog(
                         val imgH = src.height.toFloat()
                         val imgAspect = imgW / imgH
 
-                        // 画布尺寸跟随图片比例（宽上限 320dp、高上限 280dp）
-                        val maxW = 320.dp
+                        // 画布尺寸跟随图片比例（宽上限 300dp、高上限 280dp）
+                        val maxW = 300.dp
                         val maxH = 280.dp
                         val dispW: Dp
                         val dispH: Dp
@@ -545,70 +532,60 @@ private fun LoadingCropDialog(
                                 .clip(RoundedCornerShape(12.dp))
                                 .background(Color.Black)
                                 .pointerInput(src) {
-                                    awaitEachGesture {
-                                        val down = awaitFirstDown(requireUnconsumed = false)
-                                        val nb = normBox ?: return@awaitEachGesture
-                                        val cwR = size.width.toFloat()
-                                        val chR = size.height.toFloat()
-                                        val s = cwR / imgW
-                                        val bl = nb.left * imgW * s
-                                        val bt = nb.top * imgH * s
-                                        val br = nb.right * imgW * s
-                                        val bb = nb.bottom * imgH * s
-                                        val grab = with(density) { 26.dp.toPx() }
-                                        val corners = arrayOf(
-                                            Offset(bl, bt), Offset(br, bt),
-                                            Offset(bl, bb), Offset(br, bb)
-                                        )
-                                        val hit = corners.indexOfFirst { (it - down.position).getDistance() <= grab }
-                                        val mode: Int
-                                        val corner: Int
-                                        if (hit >= 0) {
-                                            mode = 2; corner = hit
-                                        } else if (down.position.x >= bl && down.position.x <= br && down.position.y >= bt && down.position.y <= bb) {
-                                            mode = 1; corner = 0
-                                        } else {
-                                            // 框外按下：不消费，交给父级滚动（图片底部可滚出来）
-                                            return@awaitEachGesture
-                                        }
-
-                                        down.consume()
-                                        var lastX = down.position.x
-                                        var lastY = down.position.y
-                                        while (true) {
-                                            val event = awaitPointerEvent()
-                                            val change = event.changes.firstOrNull { it.id == down.id } ?: break
-                                            if (!change.pressed) break
+                                    var mode = 0   // 0=无操作 1=移动框 2=缩放角
+                                    var corner = 0 // 0=左上 1=右上 2=左下 3=右下
+                                    detectDragGestures(
+                                        onDragStart = { p ->
+                                            val nb = normBox ?: return@detectDragGestures
+                                            val cwR = size.width.toFloat()
+                                            val chR = size.height.toFloat()
+                                            val s = cwR / imgW
+                                            val bl = nb.left * imgW * s
+                                            val bt = nb.top * imgH * s
+                                            val br = nb.right * imgW * s
+                                            val bb = nb.bottom * imgH * s
+                                            val grab = with(density) { 26.dp.toPx() }
+                                            val corners = arrayOf(
+                                                Offset(bl, bt), Offset(br, bt),
+                                                Offset(bl, bb), Offset(br, bb)
+                                            )
+                                            val hit = corners.indexOfFirst { (it - p).getDistance() <= grab }
+                                            if (hit >= 0) {
+                                                mode = 2; corner = hit
+                                            } else if (p.x >= bl && p.x <= br && p.y >= bt && p.y <= bb) {
+                                                mode = 1
+                                            } else {
+                                                mode = 0
+                                            }
+                                        },
+                                        onDrag = { change, drag ->
                                             change.consume()
-                                            val dx = change.position.x - lastX
-                                            val dy = change.position.y - lastY
-                                            lastX = change.position.x
-                                            lastY = change.position.y
-                                            val cur = normBox ?: break
+                                            val nb = normBox ?: return@detectDragGestures
+                                            val cwR = size.width.toFloat()
+                                            val chR = size.height.toFloat()
+                                            val s = cwR / imgW
                                             if (mode == 1) {
-                                                // 整体移动：水平用 cwR/imgW，垂直用 chR/imgH，换算精确
-                                                val dnX = dx / s / imgW
-                                                val dnY = dy * imgH / chR
-                                                val nw = cur.right - cur.left
-                                                val nh = cur.bottom - cur.top
-                                                val nl = (cur.left + dnX).coerceIn(0f, 1f - nw)
-                                                val nt = (cur.top + dnY).coerceIn(0f, 1f - nh)
+                                                val dnX = drag.x / s / imgW
+                                                val dnY = drag.y / s / imgH
+                                                val nw = nb.right - nb.left
+                                                val nh = nb.bottom - nb.top
+                                                val nl = (nb.left + dnX).coerceIn(0f, 1f - nw)
+                                                val nt = (nb.top + dnY).coerceIn(0f, 1f - nh)
                                                 normBox = RectF(nl, nt, nl + nw, nt + nh)
                                             } else if (mode == 2) {
-                                                // 对角固定缩放
                                                 val px = change.position.x / s
-                                                val py = change.position.y * imgH / chR
-                                                val fixX = if (corner == 0 || corner == 2) cur.right * imgW else cur.left * imgW
-                                                val fixY = if (corner == 0 || corner == 1) cur.bottom * imgH else cur.top * imgH
-                                                val dx2 = px - fixX
-                                                val dy2 = py - fixY
-                                                val dirX = if (dx2 >= 0f) 1f else -1f
-                                                val dirY = if (dy2 >= 0f) 1f else -1f
+                                                val py = change.position.y / s
+                                                val fixX = if (corner == 0 || corner == 2) nb.right * imgW else nb.left * imgW
+                                                val fixY = if (corner == 0 || corner == 1) nb.bottom * imgH else nb.top * imgH
+                                                val dx = px - fixX
+                                                val dy = py - fixY
+                                                val dirX = if (dx >= 0f) 1f else -1f
+                                                val dirY = if (dy >= 0f) 1f else -1f
                                                 val availX = if (dirX > 0f) imgW - fixX else fixX
                                                 val availY = if (dirY > 0f) imgH - fixY else fixY
                                                 val wMax = minOf(availX, availY / cropRatio, minOf(imgW, imgH / cropRatio))
                                                 val wMin = minOf(24f, wMax)
-                                                var w = maxOf(kotlin.math.abs(dx2), kotlin.math.abs(dy2) / cropRatio)
+                                                var w = maxOf(kotlin.math.abs(dx), kotlin.math.abs(dy) / cropRatio)
                                                 w = w.coerceIn(wMin, wMax)
                                                 val h = w * cropRatio
                                                 val nl = (minOf(fixX, fixX + dirX * w) / imgW).coerceIn(0f, 1f)
@@ -618,7 +595,7 @@ private fun LoadingCropDialog(
                                                 normBox = RectF(nl, nt, nr, nb2)
                                             }
                                         }
-                                    }
+                                    )
                                 }
                         ) {
                             val cwR = size.width.roundToInt().toFloat()
@@ -1100,8 +1077,8 @@ private fun loadingDefaultNormBox(imgW: Float, imgH: Float, ratio: Float): RectF
 }
 
 /**
- * 执行裁剪：用 BitmapRegionDecoder 只解码目标裁剪区域（不解全图，速度快很多），
- * 结果存为中转目录 JPEG 文件，并通过 onPublish 复制到 luoxi/裁剪/
+ * 执行裁剪：使用归一化坐标直接计算裁剪区域，消除 inSampleSize 取整导致的偏差。
+ * 以高分辨率（≤4096）重新解码原图，按归一化框裁剪，结果存为中转目录 JPEG 文件。
  */
 private suspend fun performCrop(
     uri: Uri,
@@ -1110,44 +1087,25 @@ private suspend fun performCrop(
     onPublish: suspend (java.io.File) -> Unit
 ): Uri? {
     return try {
-        // 先取原图全尺寸（仅读边界，很快）
-        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-        ksuApp.contentResolver.openInputStream(uri)?.use {
-            BitmapFactory.decodeStream(it, null, bounds)
-        }
-        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
-        val fw = bounds.outWidth.toFloat()
-        val fh = bounds.outHeight.toFloat()
+        val full = loadingDecodeSampledBitmap(uri, 4096) ?: return null
+        val fw = full.width.toFloat()
+        val fh = full.height.toFloat()
         val normW = normBox.right - normBox.left
         val boxW = normW * fw
         val boxH = boxW * cropRatio
         val cx = (normBox.left + normBox.right) / 2f * fw
         val cy = (normBox.top + normBox.bottom) / 2f * fh
-        val l = (cx - boxW / 2f).roundToInt().coerceIn(0, bounds.outWidth - 1)
-        val t = (cy - boxH / 2f).roundToInt().coerceIn(0, bounds.outHeight - 1)
-        val r = (cx + boxW / 2f).roundToInt().coerceIn(l + 1, bounds.outWidth)
-        val b = (cy + boxH / 2f).roundToInt().coerceIn(t + 1, bounds.outHeight)
-
-        // 按目标区域尺寸采样（最长边 ≤4096），只解码该区域
-        var sample = 1
-        while (maxOf(r - l, b - t) / (sample * 2) >= 4096) {
-            sample *= 2
-        }
-        val opts = BitmapFactory.Options().apply { inSampleSize = sample }
-        val cropped = ksuApp.contentResolver.openInputStream(uri)?.use { ins ->
-            val decoder: BitmapRegionDecoder = BitmapRegionDecoder.newInstance(ins, false) ?: return null
-            try {
-                decoder.decodeRegion(android.graphics.Rect(l, t, r, b), opts)
-            } finally {
-                decoder.recycle()
-            }
-        } ?: return null
-
+        val l = (cx - boxW / 2f).roundToInt().coerceIn(0, full.width - 1)
+        val t = (cy - boxH / 2f).roundToInt().coerceIn(0, full.height - 1)
+        val r = (cx + boxW / 2f).roundToInt().coerceIn(l + 1, full.width)
+        val b = (cy + boxH / 2f).roundToInt().coerceIn(t + 1, full.height)
+        val cropped = Bitmap.createBitmap(full, l, t, r - l, b - t)
         val stamp = java.text.SimpleDateFormat("yyyyMMdd_HHmmss_SSS", java.util.Locale.getDefault())
             .format(java.util.Date())
         val f = java.io.File(FileManagerUtils.workDir(), "crop_$stamp.jpg")
         java.io.FileOutputStream(f).use { cropped.compress(Bitmap.CompressFormat.JPEG, 95, it) }
-        cropped.recycle()
+        if (cropped !== full) cropped.recycle()
+        full.recycle()
         onPublish(f)
         Uri.fromFile(f)
     } catch (e: Exception) {
