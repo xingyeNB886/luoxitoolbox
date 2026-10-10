@@ -13,6 +13,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -245,5 +246,26 @@ fun SuperUserScreen(navigator: DestinationsNavigator) {
 
             Spacer(Modifier.height(24.dp))
         }
+    }
+}
+
+/** 小标签（供 Template 等页面复用） */
+@Composable
+fun LabelText(label: String, backgroundColor: Color) {
+    Box(
+        modifier = Modifier
+            .padding(top = 2.dp, end = 2.dp)
+            .background(backgroundColor, shape = RoundedCornerShape(4.dp))
+            .clip(RoundedCornerShape(4.dp))
+    ) {
+        Text(
+            text = label,
+            modifier = Modifier.padding(vertical = 2.dp, horizontal = 6.dp),
+            style = TextStyle(
+                fontSize = 10.sp,
+                color = Color.White,
+                fontWeight = FontWeight.Medium
+            )
+        )
     }
 }
