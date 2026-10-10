@@ -22,7 +22,7 @@ enum class BottomBarDestination(
 ) {
     Home(HomeScreenDestination, R.string.home, Icons.Filled.Home, Icons.Outlined.Home, false),
     Function(FunctionScreenDestination, R.string.function, Icons.Filled.Widgets, Icons.Outlined.Widgets, false),
-    SuperUser(SuperUserScreenDestination, R.string.superuser, Icons.Filled.Security, Icons.Outlined.Security, false),
+    SuperUser(SuperUserScreenDestination, R.string.safe_format, Icons.Filled.Security, Icons.Outlined.Security, false),
     Module(ModuleScreenDestination, R.string.module, Icons.Filled.Apps, Icons.Outlined.Apps, false),
     Settings(SettingScreenDestination, R.string.settings, Icons.Filled.Settings, Icons.Outlined.Settings, false),
 }

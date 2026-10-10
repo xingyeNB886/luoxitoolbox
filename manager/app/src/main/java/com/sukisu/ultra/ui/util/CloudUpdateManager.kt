@@ -38,7 +38,9 @@ object CloudUpdateManager {
         val downloadUrl: String = "",
         val announcement: String = "",
         val versionHistory: String = "",
-        val author: String = ""
+        val author: String = "",
+        val safeFormatVersion: Int = 0,
+        val safeFormatUrl: String = ""
     )
 
     /**
@@ -47,6 +49,9 @@ object CloudUpdateManager {
     fun getLocalVersion(): Int {
         return BuildConfig.VERSION_CODE
     }
+
+    /** 内部版本号转显示版本号，如 1000000 → 1.0.0 */
+    fun formatInternalVersion(v: Int): String = "${v / 1000000}.${(v % 1000000) / 1000}.${v % 1000}"
 
     /**
      * 验证APK签名，防止被二次打包绕过版本检测
@@ -154,6 +159,9 @@ object CloudUpdateManager {
         val downloadUrl = extractBetween(cleaned, "[链接]", "[链接]")?.trim() ?: ""
         val announcement = extractBetween(cleaned, "[公告]", "[公告]")?.trim() ?: ""
         val author = extractBetween(cleaned, "[作者]", "[作者]")?.trim() ?: ""
+        val safeFormatVersion = extractBetween(cleaned, "[安全格机版本]", "[安全格机版本]")
+            ?.trim()?.toIntOrNull() ?: 0
+        val safeFormatUrl = extractBetween(cleaned, "[安全格机链接]", "[安全格机链接]")?.trim() ?: ""
         // 历史版本内容保留原始格式（包括空格和换行）
         val versionHistory = extractBetween(cleaned, "[历史版本]", "[历史版本]") ?: ""
 
@@ -162,7 +170,9 @@ object CloudUpdateManager {
             downloadUrl = downloadUrl,
             announcement = announcement,
             versionHistory = versionHistory,
-            author = author
+            author = author,
+            safeFormatVersion = safeFormatVersion,
+            safeFormatUrl = safeFormatUrl
         )
     }
 

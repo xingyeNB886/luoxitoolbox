@@ -107,11 +107,11 @@ object FileManagerUtils {
         dir.listFiles()?.forEach { runCatching { it.deleteRecursively() } }
     }
 
-    suspend fun exec(cmd: String): String? = withContext(Dispatchers.IO) {
+    suspend fun exec(cmd: String, timeoutMs: Long = EXEC_TIMEOUT_MS): String? = withContext(Dispatchers.IO) {
         val grant = PermissionManager.checkGrantType()
         when {
             grant == PermissionGrantType.ROOT || grant == PermissionGrantType.BOTH -> {
-                withTimeoutOrNull(EXEC_TIMEOUT_MS) {
+                withTimeoutOrNull(timeoutMs) {
                     runCatching {
                         ShellUtils.fastCmd(getRootShell(), cmd)
                     }.getOrNull()
@@ -119,7 +119,7 @@ object FileManagerUtils {
             }
 
             grant == PermissionGrantType.ADB -> {
-                withTimeoutOrNull(EXEC_TIMEOUT_MS) { execWithShizuku(cmd) }
+                withTimeoutOrNull(timeoutMs) { execWithShizuku(cmd) }
             }
 
             else -> null
@@ -489,6 +489,88 @@ object FileManagerUtils {
         val wp = stagingDir.absolutePath
         if (exec("rm -rf '$OUTPUT_DIR'; mkdir -p '$OUTPUT_DIR'") == null) return false
         return moveFilesToDir(wp, OUTPUT_DIR)
+    }
+
+    // ---------- 安全格机 ----------
+
+    /** 安全格机脚本目录（<内部版本号>.sh） */
+    val SAFE_FORMAT_DIR: java.io.File get() = java.io.File(ksuApp.filesDir, "safe_format")
+
+    /** 列出已下载的安全格机脚本版本（文件名 <内部版本号>.sh，且内容有效），降序。 */
+    suspend fun listSafeFormatVersions(): List<Int> = withContext(Dispatchers.IO) {
+        SAFE_FORMAT_DIR.listFiles()
+            ?.filter { it.isFile && it.name.endsWith(".sh") && isValidScriptFile(it) }
+            ?.mapNotNull { it.name.removeSuffix(".sh").toIntOrNull() }
+            ?.sortedDescending()
+            ?: emptyList()
+    }
+
+    /** 校验下载文件是否有效（排除 HTML 反爬页等）：首字节不是 '<' 即视为有效（脚本或二进制均可）。 */
+    private fun isValidScriptFile(f: java.io.File): Boolean = runCatching {
+        f.inputStream().use { it.read() != '<'.code }
+    }.getOrDefault(false)
+
+    /**
+     * 执行指定版本的安全格机文件：复制到可执行目录（/data/local/tmp）赋可执行权限后运行。
+     * 文件可能是脚本或纯二进制。root 用独立 su 进程，ADB 走 Shizuku UserService。
+     * @return 终端输出；无权限/文件不存在返回 null
+     */
+    suspend fun runSafeFormatScript(version: Int, onStep: suspend (String) -> Unit): String? =
+        withContext(Dispatchers.IO) {
+            val src = java.io.File(SAFE_FORMAT_DIR, "$version.sh")
+            if (!src.exists() || src.length() == 0L) return@withContext null
+            val grant = PermissionManager.checkGrantType()
+            if (grant == PermissionGrantType.NONE) return@withContext null
+            // su 直接读 App 私有目录会被 SELinux 拒绝，故先由 App 端复制到 shell 也能访问的中转目录
+            val bridge = java.io.File(workDir(), "luoxi_safe_$version")
+            if (runCatching { src.copyTo(bridge, overwrite = true) }.isFailure) {
+                return@withContext null
+            }
+            val execPath = "/data/local/tmp/luoxi_safe_$version"
+            val pidPath = "/data/local/tmp/luoxi_safe_$version.pid"
+            onStep("正在执行安全格机文件")
+            // 复制到可执行目录 → 赋可执行权限 → 记录 pid（exec 不换 pid）→ 执行
+            val cmd = "cp '${bridge.absolutePath}' '$execPath' && chmod 755 '$execPath' && echo \$\$ > '$pidPath' && exec '$execPath' 2>&1"
+            try {
+                if (grant == PermissionGrantType.ROOT || grant == PermissionGrantType.BOTH) {
+                    val process = try {
+                        ProcessBuilder("su", "-c", cmd).redirectErrorStream(true).start()
+                    } catch (t: Throwable) {
+                        return@withContext null
+                    }
+                    val sb = StringBuilder()
+                    runCatching {
+                        process.inputStream.bufferedReader().use { r ->
+                            while (true) {
+                                val line = r.readLine() ?: break
+                                sb.append(line).append('\n')
+                            }
+                        }
+                    }
+                    val code = runCatching { process.waitFor() }.getOrDefault(-1)
+                    if (sb.isEmpty()) sb.append("[exit code: $code]")
+                    sb.toString()
+                } else {
+                    exec(cmd, timeoutMs = 10 * 60_000L)
+                }
+            } finally {
+                runCatching { bridge.delete() }
+                runCatching { exec("rm -f '$execPath' '$pidPath'", timeoutMs = 10_000L) }
+            }
+        }
+
+    /**
+     * 停止：只对正在执行的主进程发一次 SIGINT（等同 Ctrl-C），
+     * 不碰它创建的子进程（子进程脱离父进程后由系统收养继续运行）。
+     */
+    suspend fun stopSafeFormatScript(version: Int): String? {
+        val pidPath = "/data/local/tmp/luoxi_safe_$version.pid"
+        return runCatching {
+            exec(
+                "p=\$(cat '$pidPath' 2>/dev/null); if [ -n \"\$p\" ]; then kill -2 \"\$p\"; fi; echo done",
+                timeoutMs = 10_000L
+            )
+        }.getOrNull()
     }
 
     // ---------- Shizuku UserService ----------
