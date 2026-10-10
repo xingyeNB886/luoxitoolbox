@@ -1,10 +1,5 @@
 # Como compilar
 
-::: warning
-Este documento é apenas para referência de arquivo e não é mais mantido.
-Desde o KernelSU v3.0, abandonamos o suporte oficial para o modo de imagem GKI para iteração e velocidade de compilação mais rápidas. É recomendado usar `Ylarod/ddk` para compilar o LKM.
-:::
-
 Primeiro, você deve ler a documentação oficial do Android para compilação do kernel:
 
 1. [Como criar kernels](https://source.android.com/docs/setup/build/building-kernels)
@@ -63,7 +58,7 @@ Se você conseguir compilar o kernel com sucesso, adicionar suporte ao KernelSU 
 curl -LSs "https://raw.githubusercontent.com/tiann/KernelSU/main/kernel/setup.sh" | bash -
 ```
 
-```sh[Branch main (dev)]
+```sh[Branch principal (dev)]
 curl -LSs "https://raw.githubusercontent.com/tiann/KernelSU/main/kernel/setup.sh" | bash -s main
 ```
 

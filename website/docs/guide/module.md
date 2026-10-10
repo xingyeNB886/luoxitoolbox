@@ -4,17 +4,9 @@ KernelSU provides a module mechanism that achieves the effect of modifying the s
 
 The module mechanism of KernelSU is almost the same as that of Magisk. If you're familiar with Magisk module development, developing KernelSU modules is very similar. You can skip the introduction of modules below and just read [Difference with Magisk](difference-with-magisk.md).
 
-::: warning METAMODULE ONLY NEEDED FOR SYSTEM FILE MODIFICATION
-KernelSU uses a [metamodule](metamodule.md) architecture for mounting the `system` directory. **Only if your module needs to modify `/system` files** (via the `system` directory) do you need to install a metamodule (such as [meta-overlayfs](https://github.com/tiann/KernelSU/releases)). Other module features like scripts, sepolicy rules, and system.prop work without a metamodule.
-:::
-
 ## WebUI
 
 KernelSU's modules support displaying interfaces and interacting with users. For more details, refer to the [WebUI documentation](module-webui.md).
-
-## Module Configuration
-
-KernelSU provides a built-in configuration system that allows modules to store persistent or temporary key-value settings. For more details, refer to the [Module Configuration documentation](module-config.md).
 
 ## BusyBox
 
@@ -105,25 +97,14 @@ version=<string>
 versionCode=<int>
 author=<string>
 description=<string>
-updateJson=<url> (optional)
-actionIcon=<path> (optional)
-webuiIcon=<path> (optional)
 ```
 
-- `id` has to match this regular expression: `^[a-zA-Z][a-zA-Z0-9._-]+$`<br>
+- `id` has to match this regular expression: `^[a-zA-Z][a-zA-Z0-9._-]+$` .<br>
   Example: ✓ `a_module`, ✓ `a.module`, ✓ `module-101`, ✗ `a module`, ✗ `1_module`, ✗ `-a-module`<br>
   This is the **unique identifier** of your module. You should not change it once published.
 - `versionCode` has to be an **integer**. This is used to compare versions.
 - Others that were not mentioned above can be any **single line** string.
 - Make sure to use the `UNIX (LF)` line break type and not the `Windows (CR+LF)` or `Macintosh (CR)`.
-- `actionIcon` and `webuiIcon` are optional icon paths used as the default
-  icons for the module action shortcut and WebUI shortcut in the Manager. These
-  paths must be relative to the module root directory. For example,
-  `actionIcon=icon/icon.png` will be resolved as `<MODDIR>/icon/icon.png`.
-
-::: tip DYNAMIC DESCRIPTION
-The `description` field can be dynamically overridden at runtime using the module configuration system. See [Overriding Module Description](module-config.md#overriding-module-description) for details.
-:::
 
 ### Shell scripts
 
@@ -137,11 +118,7 @@ You can use the environment variable `KSU` to determine if a script is running i
 
 ### `system` directory
 
-The contents of this directory will be overlaid on top of the system's `/system` partition after the system is booted. This means that:
-
-::: tip METAMODULE REQUIREMENT
-The `system` directory is only mounted if you have a metamodule installed that provides mounting functionality (such as `meta-overlayfs`). The metamodule handles how modules are mounted. See the [Metamodule Guide](metamodule.md) for more information.
-:::
+The contents of this directory will be overlaid on top of the system's `/system` partition using OverlayFS after the system is booted. This means that:
 
 1. Files with the same name as those in the corresponding directory in the system will be overwritten by the files in this directory.
 2. Folders with the same name as those in the corresponding directory in the system will be merged with the folders in this directory.
@@ -173,10 +150,10 @@ REPLACE="
 This list will automatically create the directories `$MODPATH/system/app/YouTube` and `$MODPATH/system/app/Bloatware`, and then execute `setfattr -n trusted.overlay.opaque -v y $MODPATH/system/app/YouTube` and `setfattr -n trusted.overlay.opaque -v y $MODPATH/system/app/Bloatware`. After the module takes effect, `/system/app/YouTube` and `/system/app/Bloatware` will be replaced with empty directories.
 
 ::: tip DIFFERENCE WITH MAGISK
-KernelSU uses a [metamodule architecture](metamodule.md) where mounting is delegated to pluggable metamodules. The official `meta-overlayfs` metamodule uses the kernel's OverlayFS for systemless modifications, while Magisk uses magic mount (bind mount) built directly into its core. Both achieve the same goal: modifying `/system` files without physically modifying the `/system` partition. KernelSU's approach provides more flexibility and reduces detection surface.
+KernelSU's systemless mechanism is implemented through the kernel's OverlayFS, while Magisk currently uses magic mount (bind mount). These two implementation methods have significant differences, but the ultimate goal is the same: modifying /system files without physically modifying the /system partition.
 :::
 
-If you're interested in OverlayFS, it's recommended to read the Linux Kernel's [documentation on OverlayFS](https://docs.kernel.org/filesystems/overlayfs.html). For details on KernelSU's metamodule system, see the [Metamodule Guide](metamodule.md).
+If you're interested in OverlayFS, it's recommended to read the Linux Kernel's [documentation on OverlayFS](https://docs.kernel.org/filesystems/overlayfs.html).
 
 ### system.prop
 
@@ -273,8 +250,8 @@ In KernelSU, scripts are divided into two types based on their running mode: pos
 In KernelSU, startup scripts are divided into two types based on their storage location: general scripts and module scripts.
 
 - General scripts
-  - Placed in `/data/adb/post-fs-data.d`, `/data/adb/service.d`, `/data/adb/post-mount.d` or `/data/adb/boot-completed.d`.
-  - Only executed if the script is set as executable (`chmod +x script.sh`).
+  - Placed in `/data/adb/post-fs-data.d`, `/data/adb/service.d`, `/data/adb/post-mount.d` or `/data/adb/boot-completed.d.`
+  - Only executed if the script is set as executable (`chmod +x script.sh`)
   - Scripts in `post-fs-data.d` runs in post-fs-data mode, and scripts in `service.d` runs in late_start service mode.
   - Modules should **NOT** add general scripts during installation.
 - Module scripts
@@ -312,13 +289,12 @@ post-fs-data
   *safe mode check
   *execute general scripts in post-fs-data.d/
   *load sepolicy.rule
-  *execute metamodule's post-fs-data.sh (if exists)
+  *mount tmpfs
   *execute module scripts post-fs-data.sh
     **(Zygisk)./bin/zygisk-ptrace64 monitor
   *(pre)load system.prop (same as resetprop -n)
-  *execute metamodule's metamount.sh (mounts all modules)
+  *remount modules /system
   *execute general scripts in post-mount.d/
-  *execute metamodule's post-mount.sh (if exists)
   *execute module scripts post-mount.sh
 zygote-start
 load_all_props_action
@@ -331,7 +307,6 @@ load_all_props_action
 
 2. kernel2user init (ROM animation on screen, start by service bootanim)
 *execute general scripts in service.d/
-*execute metamodule's service.sh (if exists)
 *execute module scripts service.sh
 *set props for resetprop without -p option
   **(Zygisk) hook zygote (start zygiskd)
@@ -340,7 +315,6 @@ start system apps (autostart)
 ...
 boot complete (broadcast ACTION_BOOT_COMPLETED event)
 *execute general scripts in boot-completed.d/
-*execute metamodule's boot-completed.sh (if exists)
 *execute module scripts boot-completed.sh
 
 3. User operable (lock screen)

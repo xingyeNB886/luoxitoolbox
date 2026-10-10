@@ -5,6 +5,8 @@
     <string name="home_click_to_install">إضغط للتثبيت</string>
     <string name="home_working">يعمل</string>
     <string name="home_working_version">الإصدار: %d</string>
+    <string name="home_superuser_count">مستخدمين الجذر: %d</string>
+    <string name="home_module_count">الإضافات: %d</string>
     <string name="home_unsupported">غير مدعوم</string>
     <string name="home_unsupported_reason">KernelSU يدعم GKI kernels فقط</string>
     <string name="home_kernel">إصدار النواة</string>
@@ -16,7 +18,7 @@
     <string name="selinux_status_permissive">متساهل</string>
     <string name="selinux_status_unknown">مجهول</string>
     <string name="superuser">مستخدم خارق</string>
-    <string name="module_failed_to_enable">فشل في تمكين الوحدة %s</string>
+    <string name="module_failed_to_enable">لا يمكن تشغيل %s الوحدة</string>
     <string name="module_failed_to_disable">فشل تعطيل الإضافة : %s</string>
     <string name="module_empty">لا توجد إضافات مثبتة</string>
     <string name="module">الإضافات</string>
@@ -36,7 +38,9 @@
     <string name="module_uninstall_failed">فشل إلغاء تثبيت %s</string>
     <string name="module_version">الإصدار</string>
     <string name="module_author">المطور</string>
+    <string name="refresh">إنعاش</string>
     <string name="show_system_apps">إظهار تطبيقات النظام</string>
+    <string name="hide_system_apps">إخفاء تطبيقات النظام</string>
     <string name="send_log">إرسال السجلات</string>
     <string name="safe_mode">الوضع الآمن</string>
     <string name="reboot_to_apply">إعادة التشغيل لتطبيق التغييرات</string>
@@ -45,8 +49,7 @@
     <string name="home_learn_kernelsu_url">https://kernelsu.org/guide/what-is-kernelsu.html</string>
     <string name="home_click_to_learn_kernelsu">تعرف على كيفية تثبيت KernelSU واستخدام الإضافات</string>
     <string name="home_support_title">إدعمنا</string>
-    <string name="home_support_content">KernelSU سيظل دائماً مجانياً ومفتوح المصدر. مع ذلك، يمكنك متى ما استطعت أن تظهر لنا أنك تهتم بالتبرع.</string>
-    <string name="about_source_code"><![CDATA[أنظر إلى مصدر البرمجة في %1$s<br/>إنضم إلى قناتنا في %2$s ]]></string>
+    <string name="home_support_content">KernelSU سيظل دائماً مجانياً ومفتوح المصدر. مع ذلك، يمكنك أن تظهر لنا أنك تهتم بالتبرع.</string>
     <string name="profile_capabilities">القدرات</string>
     <string name="module_update">تحديث</string>
     <string name="module_downloading">تحميل الإضافة: %s</string>
@@ -69,20 +72,22 @@
     <string name="settings_umount_modules_default_summary">القيمة الافتراضية العامة لـ\"إلغاء تحميل الإضافات\" في ملفات تعريف التطبيقات. إذا تم تمكينه، إزالة جميع تعديلات الإضافات على النظام للتطبيقات التي لا تحتوي على مجموعة ملف تعريف.</string>
     <string name="profile_umount_modules_summary">سيسمح تمكين هذا الخيار لـKernelSU باستعادة أي ملفات معدلة بواسطة الإضافات لهذا التطبيق.</string>
     <string name="profile_selinux_domain">المجال</string>
-    <string name="profile_selinux_rules">القواعد</string>
+    <string name="profile_selinux_rules" formatted="false">القواعد</string>
     <string name="restart_app">إعادة تشغيل التطبيق</string>
     <string name="failed_to_update_sepolicy">فشل تحديث قواعد SELinux لـ %s</string>
     <string name="profile_name">اسم الملف الشخصي</string>
-    <string name="require_kernel_version">إصدار KernelSU الحالي %1$d منخفض جدًا بحيث لا يعمل المدير بشكل صحيح. الرجاء الترقية إلى الإصدار %2$d أو أعلى!</string>
     <string name="module_changelog">سجل التغييرات</string>
     <string name="app_profile_template_import_success">تم الاستيراد بنجاح</string>
     <string name="app_profile_export_to_clipboard">تصدير إلى الحافظة</string>
     <string name="app_profile_template_export_empty">لا يمكن العثور على القالب المحلي للتصدير!</string>
     <string name="app_profile_template_id_exist">معرف القالب موجود بالفعل!</string>
     <string name="app_profile_import_from_clipboard">استيراد من الحافظة</string>
+    <string name="module_changelog_failed">فشل في جلب سجل التغيير: %s</string>
     <string name="app_profile_template_name">الاسم</string>
     <string name="app_profile_template_id_invalid">معرف القالب غير صالح</string>
+    <string name="app_profile_template_sync">مزامنة القوالب عبر الإنترنت</string>
     <string name="app_profile_template_create">إنشاء قالب</string>
+    <string name="app_profile_template_readonly">للقراءة فقط</string>
     <string name="app_profile_import_export">استيراد / تصدير</string>
     <string name="app_profile_template_save_failed">فشل في حفظ القالب</string>
     <string name="app_profile_template_edit">تحرير القالب</string>
@@ -125,11 +130,4 @@
     <string name="log_saved">السجلات محفوظة</string>
     <string name="module_sort_enabled_first">فرز (الممكن أولاً)</string>
     <string name="module_sort_action_first">فرز (الإجراء أولاً)</string>
-    <string name="module_install_prompt_with_name">الحزم الاتيه سيتم تثبيتها %1$s</string>
-    <string name="confirm">تأكيد</string>
-    <string name="su_not_allowed">من الغير ممكن اعطاء صلاحيات (المسخدم الخارق) لـ %s</string>
-    <string name="settings_sucompat">إعادة توجيه ثنائي su</string>
-    <string name="settings_sucompat_summary">يسمح للتطبيقات التي تم منحها صلاحيات Superuser في ملف تعريف التطبيق بالحصول على shell superuser من خلال تنفيذ /system/bin/su؛ فعال فقط للعمليات الجديدة.</string>
-    <string name="settings_kernel_umount">إلغاء تحميل النواة</string>
-    <string name="settings_kernel_umount_summary">سلوك إلغاء تحميل مستوى النواة الذي يسيطر عليه KernelSU</string>
 </resources>

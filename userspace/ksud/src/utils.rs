@@ -1,6 +1,6 @@
 use anyhow::{Context, Error, Ok, Result, bail};
 use std::{
-    fs::{File, OpenOptions, create_dir_all, remove_file, write},
+    fs::{self, File, OpenOptions, create_dir_all, remove_file, write},
     io::{
         ErrorKind::{AlreadyExists, NotFound},
         Write,
@@ -17,26 +17,11 @@ use std::os::unix::prelude::PermissionsExt;
 
 use std::path::PathBuf;
 
-use crate::boot_patch::BootRestoreArgs;
-
+#[cfg(any(target_os = "linux", target_os = "android"))]
 use rustix::{
     process,
     thread::{LinkNameSpaceType, move_into_link_name_space},
 };
-
-#[macro_export]
-macro_rules! debug_select {
-    ($debug:expr, $release:expr) => {{
-        #[cfg(debug_assertions)]
-        {
-            $debug
-        }
-        #[cfg(not(debug_assertions))]
-        {
-            $release
-        }
-    }};
-}
 
 pub fn ensure_clean_dir(dir: impl AsRef<Path>) -> Result<()> {
     let path = dir.as_ref();
@@ -50,7 +35,7 @@ pub fn ensure_clean_dir(dir: impl AsRef<Path>) -> Result<()> {
 
 pub fn ensure_file_exists<T: AsRef<Path>>(file: T) -> Result<()> {
     match File::options().write(true).create_new(true).open(&file) {
-        std::result::Result::Ok(_) => Ok(()),
+        Result::Ok(_) => Ok(()),
         Err(err) => {
             if err.kind() == AlreadyExists && file.as_ref().is_file() {
                 Ok(())
@@ -63,11 +48,13 @@ pub fn ensure_file_exists<T: AsRef<Path>>(file: T) -> Result<()> {
 }
 
 pub fn ensure_dir_exists<T: AsRef<Path>>(dir: T) -> Result<()> {
-    let result = create_dir_all(&dir);
-    if dir.as_ref().is_dir() && result.is_ok() {
-        Ok(())
-    } else {
+    let result = create_dir_all(&dir).map_err(Error::from);
+    if dir.as_ref().is_dir() {
+        result
+    } else if result.is_ok() {
         bail!("{} is not a regular directory", dir.as_ref().display())
+    } else {
+        result
     }
 }
 
@@ -87,11 +74,11 @@ pub fn ensure_binary<T: AsRef<Path>>(
         )
     })?)?;
 
-    if let Err(e) = remove_file(path.as_ref())
-        && e.kind() != NotFound
-    {
-        return Err(Error::from(e))
-            .with_context(|| format!("failed to unlink {}", path.as_ref().display()));
+    if let Err(e) = remove_file(path.as_ref()) {
+        if e.kind() != NotFound {
+            return Err(Error::from(e))
+                .with_context(|| format!("failed to unlink {}", path.as_ref().display()));
+        }
     }
 
     write(&path, contents)?;
@@ -100,8 +87,14 @@ pub fn ensure_binary<T: AsRef<Path>>(
     Ok(())
 }
 
+#[cfg(any(target_os = "linux", target_os = "android"))]
 pub fn getprop(prop: &str) -> Option<String> {
     android_properties::getprop(prop).value()
+}
+
+#[cfg(not(any(target_os = "linux", target_os = "android")))]
+pub fn getprop(_prop: &str) -> Option<String> {
+    unimplemented!()
 }
 
 pub fn is_safe_mode() -> bool {
@@ -111,12 +104,12 @@ pub fn is_safe_mode() -> bool {
         || getprop("ro.sys.safemode")
             .filter(|prop| prop == "1")
             .is_some();
-    log::info!("safemode: {safemode}");
+    log::info!("safemode: {}", safemode);
     if safemode {
         return true;
     }
     let safemode = ksucalls::check_kernel_safemode();
-    log::info!("kernel_safemode: {safemode}");
+    log::info!("kernel_safemode: {}", safemode);
     safemode
 }
 
@@ -128,6 +121,7 @@ pub fn get_zip_uncompressed_size(zip_path: &str) -> Result<u64> {
     Ok(total)
 }
 
+#[cfg(any(target_os = "linux", target_os = "android"))]
 pub fn switch_mnt_ns(pid: i32) -> Result<()> {
     use rustix::{
         fd::AsFd,
@@ -151,7 +145,7 @@ fn switch_cgroup(grp: &str, pid: u32) {
 
     let fp = OpenOptions::new().append(true).open(path);
     if let std::result::Result::Ok(mut fp) = fp {
-        let _ = write!(fp, "{pid}");
+        let _ = writeln!(fp, "{pid}");
     }
 }
 
@@ -169,14 +163,53 @@ pub fn switch_cgroups() {
     }
 }
 
+#[cfg(any(target_os = "linux", target_os = "android"))]
 pub fn umask(mask: u32) {
     process::umask(rustix::fs::Mode::from_raw_mode(mask));
+}
+
+#[cfg(not(any(target_os = "linux", target_os = "android")))]
+pub fn umask(_mask: u32) {
+    unimplemented!("umask is not supported on this platform")
 }
 
 pub fn has_magisk() -> bool {
     which::which("magisk").is_ok()
 }
 
+fn is_ok_empty(dir: &str) -> bool {
+    use std::result::Result::Ok;
+
+    match fs::read_dir(dir) {
+        Ok(mut entries) => entries.next().is_none(),
+        Err(_) => false,
+    }
+}
+
+pub fn get_tmp_path() -> String {
+    let dirs = [
+        "/debug_ramdisk",
+        "/patch_hw",
+        "/oem",
+        "/root",
+        "/sbin",
+    ];
+
+    // find empty directory
+    for dir in dirs {
+        if is_ok_empty(dir) {
+            return dir.to_string();
+        }
+    }
+    "".to_string()
+}
+
+pub fn get_work_dir() -> String {
+     let tmp_path = get_tmp_path();
+     format!("{}/workdir/", tmp_path)
+}
+
+#[cfg(target_os = "android")]
 fn link_ksud_to_bin() -> Result<()> {
     let ksu_bin = PathBuf::from(defs::DAEMON_PATH);
     let ksu_bin_link = PathBuf::from(defs::DAEMON_LINK_PATH);
@@ -188,14 +221,12 @@ fn link_ksud_to_bin() -> Result<()> {
 
 pub fn install(magiskboot: Option<PathBuf>) -> Result<()> {
     ensure_dir_exists(defs::ADB_DIR)?;
-    std::fs::copy(
-        std::env::current_exe().with_context(|| "Failed to get self exe path")?,
-        defs::DAEMON_PATH,
-    )?;
+    std::fs::copy("/proc/self/exe", defs::DAEMON_PATH)?;
     restorecon::lsetfilecon(defs::DAEMON_PATH, restorecon::ADB_CON)?;
     // install binary assets
     assets::ensure_binaries(false).with_context(|| "Failed to extract assets")?;
 
+    #[cfg(target_os = "android")]
     link_ksud_to_bin()?;
 
     if let Some(magiskboot) = magiskboot {
@@ -217,12 +248,7 @@ pub fn uninstall(magiskboot_path: Option<PathBuf>) -> Result<()> {
     std::fs::remove_file(defs::DAEMON_PATH).ok();
     std::fs::remove_dir_all(defs::MODULE_DIR).ok();
     println!("- Restore boot image..");
-    boot_patch::restore(BootRestoreArgs {
-        boot: None,
-        flash: true,
-        magiskboot: magiskboot_path,
-        out_name: None,
-    })?;
+    boot_patch::restore(None, magiskboot_path, true)?;
     println!("- Uninstall KernelSU manager..");
     Command::new("pm")
         .args(["uninstall", "me.weishu.kernelsu"])

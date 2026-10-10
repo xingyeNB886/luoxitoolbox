@@ -1,0 +1,120 @@
+name: Build Manager
+# 触发构建
+
+on:
+  push:
+    branches: [ "main", "ci" ]
+    paths:
+      - '.github/workflows/build-manager.yml'
+      - 'manager/**'
+  pull_request:
+    branches: [ "main" ]
+    paths:
+      - 'manager/**'
+  workflow_dispatch:
+
+jobs:
+  build-manager:
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./manager
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Write key
+        if: ${{ ( github.event_name != 'pull_request' && github.ref == 'refs/heads/main' ) || github.ref == 'refs/heads/susfs' || github.ref_type == 'tag' }}
+        run: |
+          if [ ! -z "${{ secrets.KEYSTORE }}" ]; then
+            {
+              echo KEYSTORE_PASSWORD='${{ secrets.KEYSTORE_PASSWORD }}'
+              echo KEY_ALIAS='${{ secrets.KEY_ALIAS }}'
+              echo KEY_PASSWORD='${{ secrets.KEY_PASSWORD }}'
+              echo KEYSTORE_FILE='key.jks'
+            } >> gradle.properties
+            echo "${{ secrets.KEYSTORE }}" | base64 -d > key.jks
+            # 提取证书 SHA-256 指纹（Base64），用于运行时签名校验
+            EXPECTED_SIG=$(keytool -exportcert -keystore key.jks -storepass "${{ secrets.KEYSTORE_PASSWORD }}" -alias "${{ secrets.KEY_ALIAS }}" -rfc 2>/dev/null | openssl x509 -outform der 2>/dev/null | openssl dgst -sha256 -binary 2>/dev/null | base64 -w0 2>/dev/null)
+            echo "EXPECTED_SIGNATURE=$EXPECTED_SIG" >> gradle.properties
+          fi
+
+      - name: Setup Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v4
+
+      - name: 下载内置提权框架 APK（Shizuku / Stellar）
+        run: |
+          mkdir -p app/src/main/assets
+          curl -L -o app/src/main/assets/shizuku.apk \
+            "https://github.com/RikkaApps/Shizuku/releases/download/v13.6.0/shizuku-v13.6.0.r1086.2650830c-release.apk"
+          curl -L -o app/src/main/assets/stellar.apk \
+            "https://github.com/roro2239/Stellar/releases/download/v1.1%28101000%29/stellar-v1.1-release.apk"
+          ls -lh app/src/main/assets/
+
+      - name: Build with Gradle
+        run: |
+          set -o pipefail
+          sed -i '/systemProp\..*proxy.*/d' gradle.properties
+          {
+            echo 'org.gradle.parallel=true'
+            echo 'org.gradle.vfs.watch=true'
+            echo 'org.gradle.jvmargs=-Xmx2048m'
+            echo 'android.native.buildOutput=verbose'
+          } >> gradle.properties
+          sed -i 's/org.gradle.configuration-cache=true//g' gradle.properties
+          ./gradlew clean assembleRelease 2>&1 | tee /tmp/gradle-build.log || {
+            echo "::group::Gradle errors"
+            grep -iE "^e: |error:|unresolved|conflicting|redeclaration|exception|FAILURE|> Task.*FAILED" /tmp/gradle-build.log | head -60 | sed 's/^/::error::/'
+            echo "::endgroup::"
+            exit 1
+          }
+
+      - name: Upload gradle build log
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gradle-build-log
+          path: /tmp/gradle-build.log
+          if-no-files-found: ignore
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        if: ${{ ( github.event_name != 'pull_request' && github.ref == 'refs/heads/main' ) || github.ref_type == 'tag' }}
+        with:
+          name: manager
+          path: manager/app/build/outputs/apk/release/*.apk
+
+      - name: Upload mappings
+        uses: actions/upload-artifact@v4
+        if: ${{ ( github.event_name != 'pull_request' && github.ref == 'refs/heads/main' ) || github.ref_type == 'tag' }}
+        with:
+          name: "mappings"
+          path: "manager/app/build/outputs/mapping/release/"
+
+      - name: Publish Release (GitHub)
+        if: ${{ ( github.event_name != 'pull_request' && github.ref == 'refs/heads/main' ) || github.ref_type == 'tag' }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cd app/build/outputs/apk/release
+          APK=$(ls *.apk | head -n1)
+          mv -f "$APK" "Luoxitoolbox-manager.apk"
+          gh release create "luoxi-${{ github.run_number }}" \
+            --repo "${{ github.repository }}" \
+            --title "Manager luoxi-${{ github.run_number }}" \
+            --notes "Automated manager build from ${{ github.sha }}" \
+            "Luoxitoolbox-manager.apk"

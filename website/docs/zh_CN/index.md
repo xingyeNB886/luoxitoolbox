@@ -1,28 +1,29 @@
 ---
 layout: home
-title: 洛茜工具箱
+title: Android 上的内核级的 root 方案
 
 hero:
-  name: 洛茜工具箱
-  text: 游戏文件管理工具
-  tagline: "通过 Root 或 Shizuku 权限操作游戏私有目录"
+  name: KernelSU
+  text: Android 上的内核级的 root 方案
+  tagline: ""
   image:
     src: /logo.png
-    alt: 洛茜工具箱
+    alt: KernelSU
   actions:
     - theme: brand
-      text: 开始使用
-      link: https://github.com/xingyeNB886/luoxitoolbox/releases
+      text: 开始了解
+      link: /zh_CN/guide/what-is-kernelsu
     - theme: alt
       text: 在 GitHub 中查看
-      link: https://github.com/xingyeNB886/luoxitoolbox
+      link: https://github.com/tiann/KernelSU
 
 features:
-  - title: 图片裁剪
-    details: 多选图片后按设备分辨率等比例裁剪，裁剪框限制在图片内，不超出边界。
-  - title: 批量制作
-    details: 按记录的游戏文件名自动复制并重命名，均分到每张图片，不二次压缩，保留原始画质。
-  - title: 安全替换
-    details: 替换前可选择备份，失败自动回滚。一次操作不对就回到原样，不给用户添乱。
-  - title: 双通道权限
-    details: 同时支持 Root（KernelSU）和 Shizuku（ADB），自动检测，有什么用什么。
+  - title: 基于内核
+    details: KernelSU 运行在内核空间，对用户空间应用有更强的掌控。
+  - title: 白名单访问控制
+    details: 只有被授权的 App 才可以访问 `su`，而其他 App 无法感知其存在。
+  - title: 受限制的 root 权限
+    details: KernelSU 可以自定义 `su` 的 uid, gid, groups, capabilities 和 SELinux 规则：把 root 权限关进笼子里。
+  - title: 模块系统 & 开源
+    details: KernelSU 支持通过 overlayfs 修改 /system，并且是 GPL-3 许可下的开源项目。
+

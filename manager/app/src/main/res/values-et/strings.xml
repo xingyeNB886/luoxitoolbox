@@ -2,6 +2,7 @@
 <resources>
     <string name="home_working">Töötamine</string>
     <string name="home_working_version">Versioon: %d</string>
+    <string name="home_module_count">Mooduleid: %d</string>
     <string name="home_kernel">Tuum</string>
     <string name="home_manager_version">Manageri versioon</string>
     <string name="home_fingerprint">Sõrmejälg</string>
@@ -27,12 +28,16 @@
     <string name="app_profile_template_edit">Muuda malli</string>
     <string name="settings_profile_template">Rakenduseprofiili mall</string>
     <string name="app_profile_template_id">ID</string>
+    <string name="app_profile_template_readonly">Vaid lugemiseks</string>
     <string name="app_profile_template_id_exist">Malli ID juba eksisteerib!</string>
     <string name="app_profile_export_to_clipboard">Ekspordi lõikelauale</string>
+    <string name="app_profile_template_sync">Sünkrooni võrgumallid</string>
+    <string name="module_changelog_failed">Muudatuste logi hankimine ebaõnnestus: %s</string>
     <string name="home">Kodu</string>
     <string name="home_click_to_install">Klõpsa paigaldamiseks</string>
     <string name="home_not_installed">Pole paigaldatud</string>
     <string name="home_unsupported">Mittetoetatud</string>
+    <string name="home_superuser_count">Superkasutajaid: %d</string>
     <string name="home_unsupported_reason">KernelSU toetab hetkel vaid GSI tuumasid</string>
     <string name="home_selinux_status">SELinuxi olek</string>
     <string name="selinux_status_disabled">Keelatud</string>
@@ -50,18 +55,18 @@
     <string name="reboot_userspace">Pehme taaskäivitus</string>
     <string name="reboot_download">Taaskäivita allalaadimisrežiimi</string>
     <string name="reboot_edl">Taaskäivita EDL-i</string>
+    <string name="refresh">Värskenda</string>
     <string name="module_author">Autor</string>
     <string name="module_uninstall_failed">Eemaldamine ebaõnnestus: %s</string>
     <string name="module_version">Versioon</string>
     <string name="show_system_apps">Kuva süsteemirakendused</string>
+    <string name="hide_system_apps">Peida süsteemirakendused</string>
     <string name="module_magisk_conflict">Moodulid pole saadaval Magiski konflikti tõttu!</string>
     <string name="home_click_to_learn_kernelsu">Õpi KernelSUd paigaldama ja mooduleid kasutama</string>
     <string name="home_support_title">Toeta meid</string>
     <string name="profile_groups">Grupid</string>
     <string name="home_support_content">KernelSU on, ja alati jääb, tasuta ning avatud lähtekoodiga kättesaadavaks. Sellegipoolest võid sa näidata, et hoolid, ning teha annetuse.</string>
     <string name="profile_template">Mall</string>
-    <string name="about_source_code">Vaata lähtekoodi %1$sis<br/>
-Liitu meie %2$si kanaliga</string>
     <string name="profile_name">Profiili nimi</string>
     <string name="profile_custom">Kohandatud</string>
     <string name="profile_namespace_inherited">Päritud</string>
@@ -70,14 +75,13 @@ Liitu meie %2$si kanaliga</string>
     <string name="profile_capabilities">Võimekused</string>
     <string name="app_profile_template_id_invalid">Sobimatu malli ID</string>
     <string name="profile_selinux_context">SELinux kontekst</string>
-    <string name="require_kernel_version">Praegune KernelSU versioon %1$d on liiga madal, haldur ei saa korrektselt töötada. Palun täienda versioonile %2$d või kõrgem!</string>
     <string name="profile_selinux_domain">Domeen</string>
     <string name="launch_app">Käivita</string>
     <string name="force_stop_app">Sundpeata</string>
     <string name="profile_selinux_rules">Reeglid</string>
     <string name="module_update">Uuenda</string>
     <string name="module_downloading">Mooduli allalaadimine: %s</string>
-    <string name="new_version_available">Uus versioon %s on saadaval, klõpsa täiendamiseks.</string>
+    <string name="new_version_available" formatted="false">Uus versioon %s on saadaval, klõpsa täiendamiseks.</string>
     <string name="restart_app">Taaskäivita</string>
     <string name="module_changelog">Muudatuste logi</string>
     <string name="app_profile_template_name">Nimi</string>
@@ -120,8 +124,4 @@ Liitu meie %2$si kanaliga</string>
     <string name="settings_uninstall_temporary">Eemalda ajutiselt</string>
     <string name="settings_uninstall_permanent">Eemalda püsivalt</string>
     <string name="settings_restore_stock_image">Taasta vaikimisi tõmmis</string>
-    <string name="settings_sucompat">Suuna su binaarfail ümber</string>
-    <string name="settings_sucompat_summary">Võimaldab rakendustel, kellele on antud Superuser luba rakenduse profiilis, saada superuser shell, käivitades /system/bin/su; kehtib ainult uute protsesside puhul.</string>
-    <string name="settings_kernel_umount">Kernel umount</string>
-    <string name="settings_kernel_umount_summary">Kerneli tasemel lahtihaakimise käitumine, mida kontrollib KernelSU</string>
 </resources>
