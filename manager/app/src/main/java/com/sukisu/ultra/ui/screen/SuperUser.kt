@@ -202,7 +202,7 @@ fun SuperUserScreen(navigator: DestinationsNavigator) {
                         ) { Text("停止") }
                         Spacer(Modifier.width(8.dp))
                         Button(
-                            enabled = !busy && localVersion != null,
+                            enabled = !busy,
                             onClick = {
                                 val ver = localVersion
                                 if (ver == null) {
