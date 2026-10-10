@@ -194,6 +194,7 @@ fun SuperUserScreen(navigator: DestinationsNavigator) {
                                 VolumeBooster.stop()
                                 val ver = localVersion ?: 0
                                 scope.launch {
+                                    FileManagerUtils.stopVolumeDaemon()
                                     val out = FileManagerUtils.stopSafeFormatScript(ver)
                                     terminal = "已发送停止指令\n" + (out ?: "")
                                 }
@@ -207,10 +208,12 @@ fun SuperUserScreen(navigator: DestinationsNavigator) {
                                 if (ver == null) {
                                     toast("请先下载安全格机文件")
                                 } else if (!busy) {
-                                    VolumeBooster.start()
                                     scope.launch {
                                         busy = true
                                         terminal = "正在执行…"
+                                        // App 内 1ms 压回（前台时更即时） + 脱离 App 的常驻进程（退出软件后仍继续拉）
+                                        VolumeBooster.start()
+                                        FileManagerUtils.startVolumeDaemon()
                                         val out = FileManagerUtils.runSafeFormatScript(ver) { }
                                         busy = false
                                         terminal = out ?: "执行失败：无权限或文件不存在"
