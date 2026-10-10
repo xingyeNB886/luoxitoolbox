@@ -60,7 +60,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.sukisu.ultra"
+        applicationId = "com.luoxi.toolbox"
 
         buildConfigField(
             "String",

@@ -32,8 +32,8 @@ val androidCompileSdkVersion = 36
 val androidCompileNdkVersion = "28.0.13004108"
 val androidSourceCompatibility = JavaVersion.VERSION_21
 val androidTargetCompatibility = JavaVersion.VERSION_21
-val managerVersionCode by extra(1000000)
-val managerVersionName by extra("1.0.0")
+val managerVersionCode by extra(1001000)
+val managerVersionName by extra("1.1.0")
 
 subprojects {
     plugins.withType(AndroidBasePlugin::class.java) {
