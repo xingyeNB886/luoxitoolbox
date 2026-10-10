@@ -100,10 +100,7 @@ import com.sukisu.ultra.ui.component.rememberConfirmDialog
 import com.sukisu.ultra.ui.theme.CardConfig
 import com.sukisu.ultra.ui.theme.CardConfig.cardElevation
 import com.sukisu.ultra.ui.theme.getCardColors
-import com.sukisu.ultra.ui.util.getKpmModuleCount
-import com.sukisu.ultra.ui.util.getModuleCount
-import com.sukisu.ultra.ui.util.getSuSFS
-import com.sukisu.ultra.ui.util.getSuperuserCount
+import com.sukisu.ultra.ui.util.FileManagerUtils
 import com.sukisu.ultra.ui.util.PermissionManager
 import com.sukisu.ultra.ui.util.CloudUpdateManager
 import com.sukisu.ultra.ui.util.getRealResolution
@@ -447,7 +444,7 @@ private fun StatusCard(
     var infoVersion by remember { mutableStateOf("") }
     var superuserCount by remember { mutableStateOf(0) }
     var moduleCount by remember { mutableStateOf(0) }
-    var kpmModuleCount by remember { mutableStateOf(0) }
+    var kpmModuleCount by remember { mutableStateOf("") }
     var susfsSupport by remember { mutableStateOf("") }
 
     // 重新检测授权状态并读取真实数据；可在任意线程调用（内部切 IO 检测 / Main 更新）
@@ -459,27 +456,29 @@ private fun StatusCard(
             val (vName, vCode) = getManagerVersion(context)
             val version = if (vName.isNotBlank()) "$vName ($vCode)" else BuildConfig.VERSION_NAME
 
-            // 真实查询：KSU 驱动在线时返回真实计数，离线时如实返回空/0
-            val suCount = runCatching { getSuperuserCount() }.getOrDefault(0)
-            val modCount = runCatching { getModuleCount() }.getOrDefault(0)
+            // 游戏文件数（读取游戏目录中的文件）
+            val gameFileCount = runCatching { FileManagerUtils.listLoadingBGFiles()?.size ?: 0 }
+                .getOrDefault(0)
 
-            // KPM 模块数（始终显示；无 KPM 驱动时如实显示 0）
-            val kpmCount = runCatching { getKpmModuleCount() }.getOrDefault(0)
+            // 软件打开数（本地使用计数）
+            val useCount = runCatching { FileManagerUtils.readUseCount() }.getOrDefault(0)
 
-            // SusFS 支持状态（始终显示；空时显示"未知"）
-            var susfs = runCatching { getSuSFS() }.getOrDefault("")
-            if (susfs.isBlank()) {
-                susfs = "Unknown"
-            }
+            // 安全格机版本（已下载到本地的脚本版本）
+            val sfVersion = runCatching {
+                FileManagerUtils.listSafeFormatVersions().firstOrNull()
+            }.getOrNull()?.let { CloudUpdateManager.formatInternalVersion(it) } ?: "未下载"
+
+            // 设备代号
+            val deviceCode = Build.DEVICE ?: "Unknown"
 
             withContext(Dispatchers.Main) {
                 isWorking = working
                 grantLabel = label
                 infoVersion = version
-                superuserCount = suCount
-                moduleCount = modCount
-                kpmModuleCount = kpmCount
-                susfsSupport = susfs
+                superuserCount = gameFileCount
+                moduleCount = useCount
+                kpmModuleCount = sfVersion
+                susfsSupport = deviceCode
             }
         }
     }
@@ -498,6 +497,7 @@ private fun StatusCard(
 
     // 首次进入 + 每次回到前台时刷新（覆盖从 Shizuku App 外部授权后返回的场景）
     LaunchedEffect(context) {
+        runCatching { FileManagerUtils.incrementUseCount() }
         refreshStatus()
     }
     // 低频兜底轮询：授权变化可能来自外部（Shizuku 列表授权、binder 重连），
@@ -588,11 +588,7 @@ private fun StatusCard(
                     InfoLine(
                         text = stringResource(R.string.home_kpm_module_full, kpmModuleCount)
                     )
-                    val susfsTranslated = when (susfsSupport) {
-                        "Supported" -> stringResource(R.string.status_supported)
-                        "Not Supported" -> stringResource(R.string.status_not_supported)
-                        else -> stringResource(R.string.status_unknown)
-                    }
+                    val susfsTranslated = susfsSupport
                     InfoLine(
                         text = stringResource(R.string.home_susfs_full, susfsTranslated)
                     )

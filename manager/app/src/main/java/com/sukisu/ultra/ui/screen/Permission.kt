@@ -299,12 +299,6 @@ fun PermissionScreen(navigator: DestinationsNavigator) {
                 }
             )
 
-            // 初始化卡片
-            InitCard(
-                granted = rootGranted || shizukuGranted,
-                scope = scope
-            )
-
             // 选择提权框架：内置 Shizuku / Stellar 安装包
             InstallFrameworkCard(scope = scope)
 
@@ -524,82 +518,3 @@ private fun PermissionCardItem(
         }
     }
 }
-
-/**
- * 初始化卡片：点一次按钮就创建 luoxi 目录 + 伪装系统文件（幂等）
- */
-@Composable
-private fun InitCard(
-    granted: Boolean,
-    scope: kotlinx.coroutines.CoroutineScope
-) {
-    val context = LocalContext.current
-    var initializing by remember { mutableStateOf(false) }
-    var done by remember { mutableStateOf(false) }
-
-    ElevatedCard(
-        colors = getCardColors(MaterialTheme.colorScheme.surfaceVariant),
-        elevation = CardDefaults.cardElevation(defaultElevation = cardElevation),
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(20.dp)
-        ) {
-            Text(
-                text = stringResource(R.string.init_title),
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-            Spacer(Modifier.height(8.dp))
-            Text(
-                text = buildString {
-                    append(stringResource(R.string.init_summary_prefix))
-                    append("\n")
-                    append(
-                        when {
-                            done -> stringResource(R.string.init_status_done)
-                            !granted -> stringResource(R.string.init_status_no_grant)
-                            else -> stringResource(R.string.init_status_ready)
-                        }
-                    )
-                },
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Spacer(Modifier.height(12.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End
-            ) {
-                OutlinedButton(
-                    enabled = granted && !initializing && !done,
-                    onClick = {
-                        scope.launch {
-                            initializing = true
-                            val ok = PermissionManager.ensureInitFiles()
-                            initializing = false
-                            done = ok
-                            Toast.makeText(
-                                context,
-                                if (ok) context.getString(R.string.init_success)
-                                else context.getString(R.string.init_failed),
-                                Toast.LENGTH_SHORT
-                            ).show()
-                        }
-                    }
-                ) {
-                    Text(
-                        text = when {
-                            initializing -> stringResource(R.string.init_button_initializing)
-                            done -> stringResource(R.string.init_button_done)
-                            else -> stringResource(R.string.init_button)
-                        }
-                    )
-                }
-            }
-        }
-    }
-}
-

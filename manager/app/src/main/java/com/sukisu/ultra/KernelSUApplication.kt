@@ -11,6 +11,10 @@ import coil.Coil
 import coil.ImageLoader
 import com.dergoogler.mmrl.platform.Platform
 import com.sukisu.ultra.ui.util.CloudUpdateManager
+import com.sukisu.ultra.ui.util.FileManagerUtils
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import me.zhanghai.android.appiconloader.coil.AppIconFetcher
 import me.zhanghai.android.appiconloader.coil.AppIconKeyer
 import okhttp3.Cache
@@ -117,6 +121,12 @@ class KernelSUApplication : Application() {
         val webroot = File(dataDir, "webroot")
         if (!webroot.exists()) {
             webroot.mkdir()
+        }
+
+        // 打开软件自动在应用私有目录（/data/data/<pkg>/files）完成初始化，无需用户手动点初始化；
+        // 失败静默忽略，相关功能页自身也会兜底创建。
+        CoroutineScope(Dispatchers.IO).launch {
+            runCatching { FileManagerUtils.ensureInitFiles() }
         }
     }
 

@@ -258,15 +258,4 @@ object PermissionManager {
             }
         }
 
-    /**
-     * 执行初始化：创建 luoxi 目录、备份/文件输出/裁剪子目录和标记文件（幂等）。
-     */
-    suspend fun ensureInitFiles(): Boolean {
-        val cmd = "mkdir -p '/storage/emulated/0/luoxi' " +
-            "'/storage/emulated/0/luoxi/备份' " +
-            "'/storage/emulated/0/luoxi/文件输出' " +
-            "'/storage/emulated/0/luoxi/裁剪'; " +
-            "touch '/storage/emulated/0/Android/data/.media_cache_index'"
-        return execShell(cmd) != null
-    }
 }
