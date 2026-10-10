@@ -92,6 +92,7 @@ fun SettingPager(
     )
 
     Scaffold(
+        containerColor = Color.Transparent,
         topBar = {
             TopAppBar(
                 modifier = Modifier.hazeEffect(hazeState) {

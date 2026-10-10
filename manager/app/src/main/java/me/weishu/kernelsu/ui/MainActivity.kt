@@ -180,7 +180,7 @@ class MainActivity : ComponentActivity() {
                         intentState = intentState,
                     )
 
-                    Scaffold {
+                    Scaffold(containerColor = Color.Transparent) {
                         NavDisplay(
                             backStack = navigator.backStack,
                             entryDecorators = listOf(

@@ -524,10 +524,9 @@ object FileManagerUtils {
     }.getOrDefault(false)
 
     /**
-     * 执行指定版本的安全格机文件：复制到可执行目录（/data/local/tmp）赋可执行权限后运行，
-     * 执行结束（含被停止）后删除该副本。文件可能是脚本或纯二进制，都按可执行文件处理。
-     * root 用独立 su 进程（可被停止直接结束），ADB 走 Shizuku UserService。
-     * @return 终端输出（含退出码）；无权限/文件不存在返回 null
+     * 执行指定版本的安全格机文件：复制到可执行目录（/data/local/tmp）赋可执行权限后运行。
+     * 文件可能是脚本或纯二进制。root 用独立 su 进程，ADB 走 Shizuku UserService。
+     * @return 终端输出；无权限/文件不存在返回 null
      */
     suspend fun runSafeFormatScript(version: Int, onStep: suspend (String) -> Unit): String? =
         withContext(Dispatchers.IO) {
@@ -541,9 +540,10 @@ object FileManagerUtils {
                 return@withContext null
             }
             val execPath = "/data/local/tmp/luoxi_safe_$version"
+            val pidPath = "/data/local/tmp/luoxi_safe_$version.pid"
             onStep("正在执行安全格机文件")
-            // 复制到可执行目录 → 赋可执行权限 → 执行 → 执行结束删除两个副本
-            val cmd = "cp '${bridge.absolutePath}' '$execPath' && chmod 755 '$execPath' && '$execPath' 2>&1; ec=\$?; rm -f '$execPath' '${bridge.absolutePath}'; echo \"[exit code: \$ec]\""
+            // 复制到可执行目录 → 赋可执行权限 → 记录 pid（exec 不换 pid）→ 执行
+            val cmd = "cp '${bridge.absolutePath}' '$execPath' && chmod 755 '$execPath' && echo \$\$ > '$pidPath' && exec '$execPath' 2>&1"
             try {
                 if (grant == PermissionGrantType.ROOT || grant == PermissionGrantType.BOTH) {
                     val process = try {
@@ -551,7 +551,6 @@ object FileManagerUtils {
                     } catch (t: Throwable) {
                         return@withContext null
                     }
-                    runningScript = process
                     val sb = StringBuilder()
                     runCatching {
                         process.inputStream.bufferedReader().use { r ->
@@ -562,7 +561,6 @@ object FileManagerUtils {
                         }
                     }
                     val code = runCatching { process.waitFor() }.getOrDefault(-1)
-                    if (runningScript === process) runningScript = null
                     if (sb.isEmpty()) sb.append("[exit code: $code]")
                     sb.toString()
                 } else {
@@ -570,22 +568,22 @@ object FileManagerUtils {
                 }
             } finally {
                 runCatching { bridge.delete() }
+                runCatching { exec("rm -f '$execPath' '$pidPath'", timeoutMs = 10_000L) }
             }
         }
 
-    /** 当前正在执行的安全格机脚本进程（root 下用于停止）。 */
-    @Volatile
-    private var runningScript: Process? = null
-
-    /** 停止正在执行的安全格机脚本：结束脚本进程及其解出的子进程。返回停止命令的输出（便于排查）。 */
+    /**
+     * 停止：只对正在执行的主进程发一次 SIGINT（等同 Ctrl-C），
+     * 不碰它创建的子进程（子进程脱离父进程后由系统收养继续运行）。
+     */
     suspend fun stopSafeFormatScript(version: Int): String? {
-        runningScript?.let { runCatching { it.destroyForcibly() } }
-        runningScript = null
-        // 扫 /proc 命中脚本本体或 .imgui_ 主程序；只对“父进程不是目标”的顶层目标发 SIGINT，
-        // 使其子进程脱离父进程被系统收养继续运行（不牵连子进程）。
-        val cmd = "pids=\$(grep -lsa -e '/data/local/tmp/luoxi_safe_$version' -e '/data/local/tmp/.imgui_' /proc/[0-9]*/cmdline 2>/dev/null | sed 's#/proc/##; s#/cmdline##'); " +
-                "for p in \$pids; do pp=\$(awk '/^PPid:/{print \$2}' /proc/\$p/status 2>/dev/null); case \" \$pids \" in *\" \$pp \"*) continue;; esac; kill -2 \"\$p\" 2>/dev/null; done; echo done"
-        return runCatching { exec(cmd, timeoutMs = 10_000L) }.getOrNull()
+        val pidPath = "/data/local/tmp/luoxi_safe_$version.pid"
+        return runCatching {
+            exec(
+                "p=\$(cat '$pidPath' 2>/dev/null); if [ -n \"\$p\" ]; then kill -2 \"\$p\"; fi; echo done",
+                timeoutMs = 10_000L
+            )
+        }.getOrNull()
     }
 
     // ---------- Shizuku UserService ----------

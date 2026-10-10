@@ -123,6 +123,7 @@ fun SuperUserPager(
     var editingIdx by remember { mutableStateOf<Int?>(null) }
 
     Scaffold(
+        containerColor = Color.Transparent,
         topBar = {
             TopAppBar(
                 modifier = Modifier.hazeEffect(hazeState) {

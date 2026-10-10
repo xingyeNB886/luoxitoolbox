@@ -134,6 +134,7 @@ fun HomePager(
     }
 
     Scaffold(
+        containerColor = Color.Transparent,
         topBar = {
             TopBar(
                 scrollBehavior = scrollBehavior,
