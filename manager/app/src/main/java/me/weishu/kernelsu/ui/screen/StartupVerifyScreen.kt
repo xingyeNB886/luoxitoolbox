@@ -55,6 +55,7 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme.colorScheme
 private sealed interface VerifyState {
     data object Loading : VerifyState
     data class Success(val cloud: CloudUpdateManager.CloudData, val needUpdate: Boolean) : VerifyState
+    data class SignatureInvalid(val cloud: CloudUpdateManager.CloudData) : VerifyState
     data object Failure : VerifyState
 }
 
@@ -78,11 +79,14 @@ fun StartupVerifyScreen(onContinue: () -> Unit) {
     LaunchedEffect(generation) {
         state = VerifyState.Loading
         state = withContext(Dispatchers.IO) {
+            // 签名校验（防二次打包）+ 读 QQ 收藏的版本/更新信息
+            val signatureValid = CloudUpdateManager.verifyAppSignature(context)
             val data = CloudUpdateManager.fetchCloudData()
-            if (data.internalVersion > 0) {
-                VerifyState.Success(data, data.internalVersion > BuildConfig.VERSION_CODE)
-            } else {
-                VerifyState.Failure
+            when {
+                !signatureValid -> VerifyState.SignatureInvalid(data)
+                data.internalVersion > 0 ->
+                    VerifyState.Success(data, data.internalVersion > BuildConfig.VERSION_CODE)
+                else -> VerifyState.Failure
             }
         }
     }
@@ -183,6 +187,37 @@ fun StartupVerifyScreen(onContinue: () -> Unit) {
                             Spacer(Modifier.height(8.dp))
                             Text("正在获取最新版本信息，请稍候", fontSize = 13.sp, color = colorScheme.onSurfaceVariantSummary)
                         }
+                    }
+                }
+
+                is VerifyState.SignatureInvalid -> {
+                    Card(modifier = Modifier.fillMaxWidth()) {
+                        Column(Modifier.fillMaxWidth().padding(20.dp)) {
+                            Text("应用签名异常", fontSize = 17.sp, fontWeight = FontWeight.Bold, color = colorScheme.error)
+                            Spacer(Modifier.height(8.dp))
+                            Text(
+                                "检测到非官方签名（可能被二次打包），为保障安全请安装官方版本后使用。",
+                                fontSize = 13.sp,
+                                color = colorScheme.onSurfaceVariantSummary
+                            )
+                            if (downloading) {
+                                Spacer(Modifier.height(8.dp))
+                                Text("正在下载更新… $progress%", fontSize = 12.sp, color = colorScheme.primary)
+                            }
+                        }
+                    }
+                    Spacer(Modifier.height(14.dp))
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        TextButton(text = "退出", modifier = Modifier.weight(1f), enabled = !downloading, onClick = {
+                            (context as? android.app.Activity)?.finishAffinity()
+                        })
+                        TextButton(
+                            text = if (downloading) "下载中…" else "立即更新",
+                            modifier = Modifier.weight(2f),
+                            enabled = !downloading,
+                            onClick = { startUpdate(s.cloud.downloadUrl) },
+                            colors = ButtonDefaults.textButtonColorsPrimary()
+                        )
                     }
                 }
 
