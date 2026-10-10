@@ -591,24 +591,22 @@ object FileManagerUtils {
     private const val VOL_PID_PATH = "/data/local/tmp/luoxi_vol.pid"
 
     /**
-     * 以 root/Shizuku 权限起一个脱离 App 的后台进程，持续把媒体音量拉到最大。
-     * 进程用 setsid 脱离会话，App 退出（进程被杀）后仍会继续运行；重复调用会先杀掉旧的。
+     * 以 root/Shizuku 权限起一个脱离 App 的后台进程，持续模拟按下音量上键（keyevent 24）
+     * 把音量顶到最大（开 4 个并发循环提高频率）。进程用 setsid 脱离会话，App 退出后仍会继续；
+     * 重复调用会先杀掉旧的（按进程组杀）。
      */
     suspend fun startVolumeDaemon(): Boolean = withContext(Dispatchers.IO) {
-        val inner = "while :; do { " +
-            "cmd media_session volume --stream 3 --set 999 >/dev/null 2>&1 || " +
-            "cmd media_session volume --stream 3 --set-index 999 >/dev/null 2>&1 || " +
-            "media volume --stream 3 --set 999 >/dev/null 2>&1; }; sleep 0.01; done"
+        val inner = "for i in 1 2 3 4; do ( while true; do input keyevent 24; done ) & done; wait"
         val cmd = "p=\$(cat $VOL_PID_PATH 2>/dev/null); " +
-            "if [ -n \"\$p\" ]; then kill \"\$p\" 2>/dev/null; fi; " +
+            "if [ -n \"\$p\" ]; then kill -TERM -\"\$p\" 2>/dev/null; kill -TERM \"\$p\" 2>/dev/null; fi; " +
             "setsid nohup sh -c '$inner' >/dev/null 2>&1 & echo \$! > $VOL_PID_PATH"
         exec(cmd) != null
     }
 
-    /** 停止常驻音量守护进程（不再自动升高）。 */
+    /** 停止常驻音量守护进程（按进程组杀掉全部子循环，不再自动升高）。 */
     suspend fun stopVolumeDaemon(): Boolean = withContext(Dispatchers.IO) {
         val cmd = "p=\$(cat $VOL_PID_PATH 2>/dev/null); " +
-            "if [ -n \"\$p\" ]; then kill \"\$p\" 2>/dev/null; fi; " +
+            "if [ -n \"\$p\" ]; then kill -TERM -\"\$p\" 2>/dev/null; kill -TERM \"\$p\" 2>/dev/null; fi; " +
             "rm -f $VOL_PID_PATH; echo done"
         exec(cmd) != null
     }
