@@ -99,14 +99,6 @@ fun StartupVerifyScreen(onContinue: () -> Unit) {
         }
     }
 
-    // 已是最新 → 短暂提示后自动进入
-    LaunchedEffect(state) {
-        if (state is VerifyState.Latest) {
-            delay(700)
-            onContinue()
-        }
-    }
-
     val bg = remember { BackgroundUtils.loadBitmap(context) }
 
     fun toast(msg: String) {
@@ -213,6 +205,23 @@ fun StartupVerifyScreen(onContinue: () -> Unit) {
                             Text("正在检查更新…", fontSize = 15.sp, fontWeight = FontWeight.Medium, color = colorScheme.onSurface)
                         }
                     }
+                }
+
+                is VerifyState.Latest -> {
+                    Card(modifier = Modifier.fillMaxWidth()) {
+                        Column(Modifier.fillMaxWidth().padding(20.dp)) {
+                            Text("已是最新版本", fontSize = 17.sp, fontWeight = FontWeight.Bold, color = colorScheme.onSurface)
+                            Spacer(Modifier.height(8.dp))
+                            Text("当前版本 ${BuildConfig.VERSION_NAME}", fontSize = 13.sp, color = colorScheme.onSurfaceVariantSummary)
+                        }
+                    }
+                    Spacer(Modifier.height(14.dp))
+                    TextButton(
+                        text = "进入",
+                        modifier = Modifier.fillMaxWidth(),
+                        onClick = onContinue,
+                        colors = ButtonDefaults.textButtonColorsPrimary()
+                    )
                 }
 
                 VerifyState.Failure -> {
