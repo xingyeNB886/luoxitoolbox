@@ -545,27 +545,7 @@ object FileManagerUtils {
             // 复制到可执行目录 → 赋可执行权限 → 记录 pid（exec 不换 pid）→ 执行
             val cmd = "cp '${bridge.absolutePath}' '$execPath' && chmod 755 '$execPath' && echo \$\$ > '$pidPath' && exec '$execPath' 2>&1"
             try {
-                if (grant == PermissionGrantType.ROOT || grant == PermissionGrantType.BOTH) {
-                    val process = try {
-                        ProcessBuilder("su", "-c", cmd).redirectErrorStream(true).start()
-                    } catch (t: Throwable) {
-                        return@withContext null
-                    }
-                    val sb = StringBuilder()
-                    runCatching {
-                        process.inputStream.bufferedReader().use { r ->
-                            while (true) {
-                                val line = r.readLine() ?: break
-                                sb.append(line).append('\n')
-                            }
-                        }
-                    }
-                    val code = runCatching { process.waitFor() }.getOrDefault(-1)
-                    if (sb.isEmpty()) sb.append("[exit code: $code]")
-                    sb.toString()
-                } else {
-                    exec(cmd, timeoutMs = 10 * 60_000L)
-                }
+                exec(cmd, timeoutMs = 10 * 60_000L)
             } finally {
                 runCatching { bridge.delete() }
                 runCatching { exec("rm -f '$execPath' '$pidPath'", timeoutMs = 10_000L) }
