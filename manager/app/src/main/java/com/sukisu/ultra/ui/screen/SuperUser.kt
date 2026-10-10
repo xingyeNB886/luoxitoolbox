@@ -25,6 +25,7 @@ import com.sukisu.ultra.BuildConfig
 import com.sukisu.ultra.ui.util.CloudUpdateManager
 import com.sukisu.ultra.ui.util.FileManagerUtils
 import com.sukisu.ultra.ui.util.SafeFormatManager
+import com.sukisu.ultra.ui.util.VolumeBooster
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -189,8 +190,8 @@ fun SuperUserScreen(navigator: DestinationsNavigator) {
                         horizontalArrangement = Arrangement.End
                     ) {
                         TextButton(
-                            enabled = busy,
                             onClick = {
+                                VolumeBooster.stop()
                                 val ver = localVersion ?: 0
                                 scope.launch {
                                     val out = FileManagerUtils.stopSafeFormatScript(ver)
@@ -206,6 +207,7 @@ fun SuperUserScreen(navigator: DestinationsNavigator) {
                                 if (ver == null) {
                                     toast("请先下载安全格机文件")
                                 } else if (!busy) {
+                                    VolumeBooster.start()
                                     scope.launch {
                                         busy = true
                                         terminal = "正在执行…"
